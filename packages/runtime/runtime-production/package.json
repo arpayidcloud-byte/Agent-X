@@ -28,10 +28,10 @@
     "lint": "eslint src/"
   },
   "dependencies": {
-    "@agentx-fast/persistence": "^1.0.0",
-    "@agentx-fast/runtime-adapters": "^1.0.0",
-    "@agentx-fast/core-runtime": "^1.0.0",
-    "@agentx-fast/tool-sdk": "^1.0.0",
+    "@agentx-fast/persistence": "workspace:*",
+    "@agentx-fast/runtime-adapters": "workspace:*",
+    "@agentx-fast/core-runtime": "workspace:*",
+    "@agentx-fast/tool-sdk": "workspace:*",
     "@prisma/client": "^5.14.0"
   },
   "devDependencies": {

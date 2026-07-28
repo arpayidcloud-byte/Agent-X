@@ -59,7 +59,6 @@ export class BullMQProvider implements IQueueProvider {
   private getQueue(topic: string): Queue {
     let q = this.queues.get(topic);
     if (!q) {
-      // @ts-expect-error - bullmq redis connection type mismatch
       q = new Queue(topic, { connection: this.redis });
       this.queues.set(topic, q);
     }

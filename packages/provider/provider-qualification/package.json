@@ -28,7 +28,7 @@
     "lint": "eslint src/"
   },
   "dependencies": {
-    "@agentx-fast/runtime-adapters": "^1.0.0"
+    "@agentx-fast/runtime-adapters": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",

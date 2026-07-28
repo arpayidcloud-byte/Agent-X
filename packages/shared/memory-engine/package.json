@@ -33,7 +33,7 @@
     "vitest": "^3.2.6"
   },
   "dependencies": {
-    "@agentx-fast/core-runtime": "^1.0.0",
+    "@agentx-fast/core-runtime": "workspace:*",
     "@prisma/client": "^5.14.0"
   }
 }

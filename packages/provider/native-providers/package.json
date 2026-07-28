@@ -36,6 +36,6 @@
     "vitest": "^3.2.6"
   },
   "dependencies": {
-    "@agentx-fast/runtime-adapters": "^1.0.0"
+    "@agentx-fast/runtime-adapters": "workspace:*"
   }
 }

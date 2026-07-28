@@ -28,9 +28,9 @@
     "lint": "eslint src/"
   },
   "dependencies": {
-    "@agentx-fast/core-runtime": "^1.0.0",
-    "@agentx-fast/multi-agent-collaboration": "^1.0.0",
-    "@agentx-fast/provider-sdk": "^1.0.0"
+    "@agentx-fast/core-runtime": "workspace:*",
+    "@agentx-fast/multi-agent-collaboration": "workspace:*",
+    "@agentx-fast/provider-sdk": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",

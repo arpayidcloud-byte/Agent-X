@@ -28,7 +28,7 @@
     "lint": "eslint src/"
   },
   "dependencies": {
-    "@agentx-fast/core-runtime": "^1.0.0",
+    "@agentx-fast/core-runtime": "workspace:*",
     "bullmq": "^5.80.2",
     "ioredis": "^5.11.1"
   },

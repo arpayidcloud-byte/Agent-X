@@ -34,7 +34,7 @@
     "vitest": "^3.2.6"
   },
   "dependencies": {
-    "@agentx-fast/core-runtime": "^1.0.0",
-    "@agentx-fast/shared": "^1.0.0"
+    "@agentx-fast/core-runtime": "workspace:*",
+    "@agentx-fast/shared": "workspace:*"
   }
 }

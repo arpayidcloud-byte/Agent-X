@@ -33,7 +33,7 @@
     "vitest": "^3.2.6"
   },
   "dependencies": {
-    "@agentx-fast/shared": "^1.0.0",
+    "@agentx-fast/shared": "workspace:*",
     "@opentelemetry/api": "^1.9.0",
     "@opentelemetry/exporter-metrics-otlp-http": "^0.221.0",
     "@opentelemetry/exporter-trace-otlp-http": "^0.221.0",

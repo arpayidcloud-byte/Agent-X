@@ -23,6 +23,7 @@
       "uuid": ">=11.1.1",
       "fast-uri": ">=3.1.4",
       "minimatch": "^10.2.5"
+      ,"@agentx-cli/shared": "workspace:*"
     }
   },
   "packageManager": "pnpm@11.13.0",
