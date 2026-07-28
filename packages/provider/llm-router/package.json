@@ -1,0 +1,37 @@
+{
+  "name": "@agent-xai/llm-router",
+  "version": "1.0.0",
+  "description": "Smart LLM routing engine with cost optimization and multi-provider support",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsc --build",
+    "lint": "eslint src/",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/arpayidcloud-byte/Agent-X.git",
+    "directory": "packages/provider/llm-router"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "@agent-xai/shared": "workspace:*",
+    "@agent-xai/core-runtime": "workspace:*",
+    "@agent-xai/observability": "workspace:*",
+    "@agent-xai/cache": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^20.19.43",
+    "typescript": "5.4.5",
+    "vitest": "^3.2.7"
+  }
+}
