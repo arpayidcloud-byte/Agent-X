@@ -22,11 +22,11 @@ jobs:
       # Update: using proper version matching local
       - uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: '20'
           cache: 'pnpm'
       - run: pnpm install --no-frozen-lockfile
       - name: Generate Prisma Client
-        run: pnpm --filter @agentx/persistence db:generate
+        run: pnpm --filter @agentx-fast/persistence db:generate
       - run: pnpm typecheck
       - run: pnpm lint
       - run: pnpm lint:deps
@@ -47,8 +47,8 @@ jobs:
       - name: SAST scan
         run: |
           echo "Running SAST security scan..."
-          # Use existing SASTScanner from @agentx/shared/security
-          # In production: npx @agentx/shared security:scan packages/*/src
+          # Use existing SASTScanner from @agentx-fast/shared/security
+          # In production: npx @agentx-fast/shared security:scan packages/*/src
           echo "✅ SAST scan complete (integrated in code via /api/v1/security/scan)"
       - name: Secret detection
         run: |
