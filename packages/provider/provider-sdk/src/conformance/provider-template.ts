@@ -3,7 +3,7 @@
  * @description Official templates for AgentX Providers.
  */
 
-import type { IQueueProvider } from '@agentx-fast/runtime-adapters';
+import type { IQueueProvider } from '@agent-xai/runtime-adapters';
 
 export function createQueueTemplate(): IQueueProvider {
   return {

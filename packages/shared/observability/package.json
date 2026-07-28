@@ -1,5 +1,5 @@
 {
-  "name": "@agentx-fast/observability",
+  "name": "@agent-xai/observability",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -33,7 +33,7 @@
     "vitest": "^3.2.6"
   },
   "dependencies": {
-    "@agentx-fast/shared": "workspace:*",
+    "@agent-xai/shared": "workspace:*",
     "@opentelemetry/api": "^1.9.0",
     "@opentelemetry/exporter-metrics-otlp-http": "^0.221.0",
     "@opentelemetry/exporter-trace-otlp-http": "^0.221.0",

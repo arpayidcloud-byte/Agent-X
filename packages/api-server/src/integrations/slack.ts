@@ -14,7 +14,7 @@ export interface SlackNotification {
   }>;
 }
 
-import { AgentXLoggerFactory } from '@agentx-fast/shared';
+import { AgentXLoggerFactory } from '@agent-xai/shared';
 
 export class SlackNotifier {
   private webhookUrl: string;

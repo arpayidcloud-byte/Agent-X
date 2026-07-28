@@ -3,7 +3,7 @@
  * @description Automatically configures and executes test pipelines.
  */
 
-import type { IProvider } from '@agentx-fast/runtime-adapters';
+import type { IProvider } from '@agent-xai/runtime-adapters';
 import type { ConformanceReport } from './interfaces.js';
 import { ContractHarness } from './contract-harness.js';
 import { CompatibilityHarness } from './compatibility-harness.js';

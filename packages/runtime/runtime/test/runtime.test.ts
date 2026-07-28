@@ -53,7 +53,7 @@ import {
 } from '../src/index.js';
 import { AuditStore as LegacyAuditStore } from '../src/runtime-audit.js';
 import { RuntimeSupervisor as LegacySupervisor } from '../src/runtime-supervisor.js';
-import { InMemoryEventBus } from '@agentx-fast/core-runtime';
+import { InMemoryEventBus } from '@agent-xai/core-runtime';
 
 // ============================================================
 // Test Helpers

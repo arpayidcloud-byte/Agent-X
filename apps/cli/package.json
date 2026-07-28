@@ -1,5 +1,5 @@
 {
-  "name": "@agentx-fast/cli",
+  "name": "@agent-xai/cli",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -23,12 +23,12 @@
     "vitest": "^3.2.6"
   },
   "dependencies": {
-    "@agentx-fast/agent-platform": "workspace:*",
-    "@agentx-fast/core-runtime": "workspace:*",
-    "@agentx-fast/provider-sdk": "workspace:*",
-    "@agentx-fast/runtime-adapters": "workspace:*",
-    "@agentx-fast/runtime-production": "workspace:*",
-    "@agentx-fast/tool-sdk": "workspace:*",
+    "@agent-xai/agent-platform": "workspace:*",
+    "@agent-xai/core-runtime": "workspace:*",
+    "@agent-xai/provider-sdk": "workspace:*",
+    "@agent-xai/runtime-adapters": "workspace:*",
+    "@agent-xai/runtime-production": "workspace:*",
+    "@agent-xai/tool-sdk": "workspace:*",
     "@prisma/client": "^7.9.0",
     "commander": "^15.0.0"
   }

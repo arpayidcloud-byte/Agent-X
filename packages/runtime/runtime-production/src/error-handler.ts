@@ -3,7 +3,7 @@
  * @description Centralized error handling with classification, recovery strategies, and dead letter queue integration.
  */
 
-import type { TaskModel } from '@agentx-fast/core-runtime';
+import type { TaskModel } from '@agent-xai/core-runtime';
 import type { DeadLetterQueue } from './dead-letter-queue.js';
 import type { CircuitBreaker } from './circuit-breaker.js';
 

@@ -1,5 +1,5 @@
 {
-  "name": "@agentx-fast/runtime-production",
+  "name": "@agent-xai/runtime-production",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -28,10 +28,10 @@
     "lint": "eslint src/"
   },
   "dependencies": {
-    "@agentx-fast/persistence": "workspace:*",
-    "@agentx-fast/runtime-adapters": "workspace:*",
-    "@agentx-fast/core-runtime": "workspace:*",
-    "@agentx-fast/tool-sdk": "workspace:*",
+    "@agent-xai/persistence": "workspace:*",
+    "@agent-xai/runtime-adapters": "workspace:*",
+    "@agent-xai/core-runtime": "workspace:*",
+    "@agent-xai/tool-sdk": "workspace:*",
     "@prisma/client": "^5.14.0"
   },
   "devDependencies": {

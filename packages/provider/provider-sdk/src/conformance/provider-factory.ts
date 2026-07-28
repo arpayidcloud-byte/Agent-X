@@ -3,7 +3,7 @@
  * @description Creates reference memory instances dynamically.
  */
 
-import { MemoryQueueProvider, MemoryLockProvider } from '@agentx-fast/runtime-adapters';
+import { MemoryQueueProvider, MemoryLockProvider } from '@agent-xai/runtime-adapters';
 
 export class ProviderFactory {
   static create(type: string) {

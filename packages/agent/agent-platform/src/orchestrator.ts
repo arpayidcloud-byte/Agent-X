@@ -1,5 +1,5 @@
 // packages/agent/agent-platform/src/orchestrator.ts
-import type { TaskModel, TaskContext } from '@agentx-fast/core-runtime';
+import type { TaskModel, TaskContext } from '@agent-xai/core-runtime';
 import { CodingAgent, ReviewAgent, TestAgent, SecurityAgent } from './agent.js';
 import type { AgentResult } from './agent.js';
 

@@ -1,5 +1,5 @@
 {
-  "name": "@agentx-fast/runtime",
+  "name": "@agent-xai/runtime",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -28,7 +28,7 @@
     "lint": "eslint src/"
   },
   "dependencies": {
-    "@agentx-fast/core-runtime": "workspace:*"
+    "@agent-xai/core-runtime": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",

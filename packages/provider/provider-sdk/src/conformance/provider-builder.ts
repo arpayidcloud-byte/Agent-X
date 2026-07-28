@@ -3,7 +3,7 @@
  * @description Provider creation and validation builder.
  */
 
-import type { IProvider } from '@agentx-fast/runtime-adapters';
+import type { IProvider } from '@agent-xai/runtime-adapters';
 import type { ProviderConfiguration } from './interfaces.js';
 
 export class ProviderBuilder<T extends IProvider> {

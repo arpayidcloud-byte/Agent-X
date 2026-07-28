@@ -1,5 +1,5 @@
 // packages/agent/agent-platform/src/delegation.ts
-import type { TaskModel, TaskContext } from '@agentx-fast/core-runtime';
+import type { TaskModel, TaskContext } from '@agent-xai/core-runtime';
 import type { AgentRole, AgentResult } from './agent.js';
 import { CodingAgent, ReviewAgent, TestAgent, SecurityAgent } from './agent.js';
 

@@ -20,7 +20,7 @@ import {
 } from '../src/errors.js';
 import { AnthropicProvider } from '../src/providers/anthropic/index.js';
 import { GoogleProvider } from '../src/providers/google/index.js';
-import { CredentialResolver } from '@agentx-fast/secrets';
+import { CredentialResolver } from '@agent-xai/secrets';
 
 const mockResolver: CredentialResolver = {
   resolve: vi.fn().mockResolvedValue('fake-key'),

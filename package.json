@@ -56,7 +56,7 @@
     "release": "turbo run build && changeset publish"
   },
   "devDependencies": {
-    "@agentx-fast/eslint-plugin": "workspace:*",
+    "@agent-xai/eslint-plugin": "workspace:*",
     "@changesets/cli": "^2.27.5",
     "@commitlint/cli": "^19.3.0",
     "@commitlint/config-conventional": "^19.2.2",

@@ -1,5 +1,5 @@
 import type { AlertEvent, AlertRule } from './interfaces.js';
-import { AgentXLoggerFactory } from '@agentx-fast/shared';
+import { AgentXLoggerFactory } from '@agent-xai/shared';
 
 export interface AlertNotifier {
   send(event: AlertEvent): Promise<void>;

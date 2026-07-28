@@ -1,6 +1,6 @@
 import { randomUUID } from 'crypto';
 import { getRuntime } from '../lib/runtime.js';
-import { TaskStatus, TaskPriority } from '@agentx-fast/core-runtime';
+import { TaskStatus, TaskPriority } from '@agent-xai/core-runtime';
 
 export async function submit(args: string[]): Promise<string> {
   // Parse --role flag

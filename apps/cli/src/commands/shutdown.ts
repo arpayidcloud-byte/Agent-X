@@ -1,6 +1,6 @@
 // apps/cli/src/commands/shutdown.ts
 import { getRuntime } from '../lib/runtime.js';
-import { TaskStatus } from '@agentx-fast/core-runtime';
+import { TaskStatus } from '@agent-xai/core-runtime';
 
 /**
  * Graceful Shutdown Command

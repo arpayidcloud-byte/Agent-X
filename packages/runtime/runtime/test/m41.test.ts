@@ -30,7 +30,7 @@ import {
   extendContext,
   defaultHealthCheck,
 } from '../src/index.js';
-import { InMemoryEventBus } from '@agentx-fast/core-runtime';
+import { InMemoryEventBus } from '@agent-xai/core-runtime';
 
 // ============================================================
 // TESTS: Audit Store

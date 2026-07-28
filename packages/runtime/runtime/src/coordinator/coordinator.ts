@@ -20,7 +20,7 @@ import { ExecutionDispatcher } from './dispatcher.js';
 import { ExecutionReservationManager } from './reservation.js';
 import { ConcurrencyController } from './concurrency.js';
 import { CoordinatorRegistry } from './coordinator-registry.js';
-import type { IEventBus } from '@agentx-fast/core-runtime';
+import type { IEventBus } from '@agent-xai/core-runtime';
 
 export class ProductionExecutionCoordinator {
   private stateMachine = new CoordinatorStateMachine();

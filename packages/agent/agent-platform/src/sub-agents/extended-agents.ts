@@ -10,9 +10,9 @@
  * main index to keep the core roster clean.
  */
 
-import type { TaskModel } from '@agentx-fast/core-runtime';
-import type { CompletionRequest, CompletionResponse } from '@agentx-fast/provider-sdk';
-import { ProviderRegistry } from '@agentx-fast/provider-sdk';
+import type { TaskModel } from '@agent-xai/core-runtime';
+import type { CompletionRequest, CompletionResponse } from '@agent-xai/provider-sdk';
+import { ProviderRegistry } from '@agent-xai/provider-sdk';
 import type { AgentRole, AgentConfig } from './interfaces.js';
 
 export abstract class BaseExtendedAgent {

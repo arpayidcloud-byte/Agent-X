@@ -33,7 +33,7 @@ jobs:
         run: pnpm install --no-frozen-lockfile
 
       - name: Generate Prisma Client
-        run: pnpm --filter @agentx-fast/persistence db:generate
+        run: pnpm --filter @agent-xai/persistence db:generate
 
       - name: Dependency Audit
         run: pnpm audit --audit-level=high

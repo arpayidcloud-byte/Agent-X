@@ -1,5 +1,5 @@
 // packages/shared/tool-sdk/src/interfaces.ts
-import type { AgentRole } from '@agentx-fast/agent-platform';
+import type { AgentRole } from '@agent-xai/agent-platform';
 
 export type { AgentRole };
 export type ToolCategory =

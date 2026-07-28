@@ -1,4 +1,4 @@
-import type { TaskModel, TaskContext } from '@agentx-fast/core-runtime';
+import type { TaskModel, TaskContext } from '@agent-xai/core-runtime';
 
 export interface Agent {
   readonly id: string;

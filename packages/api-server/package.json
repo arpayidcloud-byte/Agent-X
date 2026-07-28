@@ -1,5 +1,5 @@
 {
-  "name": "@agentx-fast/api-server",
+  "name": "@agent-xai/api-server",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -35,11 +35,11 @@
     "vitest": "^3.2.6"
   },
   "dependencies": {
-    "@agentx-fast/cognitive-kernel": "workspace:*",
-    "@agentx-fast/core-runtime": "workspace:*",
-    "@agentx-fast/memory-engine": "workspace:*",
-    "@agentx-fast/observability": "workspace:*",
-    "@agentx-fast/shared": "workspace:*",
+    "@agent-xai/cognitive-kernel": "workspace:*",
+    "@agent-xai/core-runtime": "workspace:*",
+    "@agent-xai/memory-engine": "workspace:*",
+    "@agent-xai/observability": "workspace:*",
+    "@agent-xai/shared": "workspace:*",
     "@fastify/cors": "^10.0.0",
     "@fastify/helmet": "^13.1.0",
     "@fastify/rate-limit": "^10.0.0",

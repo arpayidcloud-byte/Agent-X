@@ -3,7 +3,7 @@
  * @description Master SDK class entrypoint for the Conformance Kit (PSCK).
  */
 
-import type { IProvider } from '@agentx-fast/runtime-adapters';
+import type { IProvider } from '@agent-xai/runtime-adapters';
 import type { ConformanceReport, ProviderManifest } from './interfaces.js';
 import { ProviderRunner } from './provider-runner.js';
 import { ProviderValidator } from './provider-validator.js';

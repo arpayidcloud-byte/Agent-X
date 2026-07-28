@@ -1,8 +1,8 @@
 // apps/cli/src/commands/demo.ts
 import { getRuntime } from '../lib/runtime.js';
-import { TaskStatus, TaskPriority } from '@agentx-fast/core-runtime';
+import { TaskStatus, TaskPriority } from '@agent-xai/core-runtime';
 import { randomUUID } from 'crypto';
-import { callLLM } from '@agentx-fast/agent-platform';
+import { callLLM } from '@agent-xai/agent-platform';
 
 /**
  * E2E Demo Command - Demonstrates full AgentX flow

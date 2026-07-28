@@ -1,5 +1,5 @@
 {
-  "name": "@agentx-fast/security",
+  "name": "@agent-xai/security",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -33,6 +33,6 @@
     "vitest": "^3.2.6"
   },
   "dependencies": {
-    "@agentx-fast/shared": "workspace:*"
+    "@agent-xai/shared": "workspace:*"
   }
 }

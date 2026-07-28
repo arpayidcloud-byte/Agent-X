@@ -1,5 +1,5 @@
 {
-  "name": "@agentx-fast/plugin-sdk",
+  "name": "@agent-xai/plugin-sdk",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -34,7 +34,7 @@
     "vitest": "^3.2.6"
   },
   "dependencies": {
-    "@agentx-fast/core-runtime": "workspace:*",
-    "@agentx-fast/shared": "workspace:*"
+    "@agent-xai/core-runtime": "workspace:*",
+    "@agent-xai/shared": "workspace:*"
   }
 }

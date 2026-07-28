@@ -15,7 +15,7 @@ import { createAuthMiddleware } from './middleware/auth.js';
 import { createRBACMiddleware } from './middleware/rbac.js';
 import { createRateLimitMiddleware } from './middleware/rate-limit.js';
 import type { Permission, Role } from './middleware/rbac.js';
-import type { PrometheusExporter } from '@agentx-fast/observability';
+import type { PrometheusExporter } from '@agent-xai/observability';
 
 export { SlackNotifier } from './integrations/slack.js';
 

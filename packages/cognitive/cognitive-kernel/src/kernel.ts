@@ -4,7 +4,7 @@
  */
 
 import type { KernelConfig, SessionMetadata } from './interfaces.js';
-import type { LearningEngine } from '@agentx-fast/cognitive-learning';
+import type { LearningEngine } from '@agent-xai/cognitive-learning';
 import { KernelLifecycle } from './kernel-lifecycle.js';
 import { KernelSupervisor } from './kernel-supervisor.js';
 import { KernelScheduler } from './kernel-scheduler.js';

@@ -16,7 +16,7 @@ import { createRuntimeSession, createExecutionSession } from './runtime-session.
 import type { BootstrapOptions } from './runtime-bootstrap.js';
 import { createBootstrapConfig } from './runtime-bootstrap.js';
 import { RuntimeError } from './errors.js';
-import type { IEventBus } from '@agentx-fast/core-runtime';
+import type { IEventBus } from '@agent-xai/core-runtime';
 import type { IRuntimePipeline } from './runtime-executor.js';
 import type { CoordinatorSession, CoordinatorConfig } from './coordinator/index.js';
 import { ProductionExecutionCoordinator } from './coordinator/index.js';

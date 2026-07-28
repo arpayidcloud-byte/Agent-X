@@ -1,5 +1,5 @@
 import type { AgentRole } from './interfaces.js';
-import type { TaskModel } from '@agentx-fast/core-runtime';
+import type { TaskModel } from '@agent-xai/core-runtime';
 import type { AgentPool } from './agent-pool.js';
 import type { MessageBus } from './message-bus.js';
 

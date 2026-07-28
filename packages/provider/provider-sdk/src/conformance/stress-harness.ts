@@ -3,7 +3,7 @@
  * @description High load validation harness.
  */
 
-import type { IProvider } from '@agentx-fast/runtime-adapters';
+import type { IProvider } from '@agent-xai/runtime-adapters';
 import type { HarnessResult } from './interfaces.js';
 
 export class StressHarness {

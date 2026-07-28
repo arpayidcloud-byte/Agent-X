@@ -8,7 +8,7 @@ importers:
 
   .:
     devDependencies:
-      '@agentx-fast/eslint-plugin':
+      '@agent-xai/eslint-plugin':
         specifier: workspace:*
         version: link:tooling/eslint-plugin-internal
       '@changesets/cli':
@@ -68,22 +68,22 @@ importers:
 
   apps/cli:
     dependencies:
-      '@agentx-fast/agent-platform':
+      '@agent-xai/agent-platform':
         specifier: workspace:*
         version: link:../../packages/agent/agent-platform
-      '@agentx-fast/core-runtime':
+      '@agent-xai/core-runtime':
         specifier: workspace:*
         version: link:../../packages/shared/core-runtime
-      '@agentx-fast/provider-sdk':
+      '@agent-xai/provider-sdk':
         specifier: workspace:*
         version: link:../../packages/provider/provider-sdk
-      '@agentx-fast/runtime-adapters':
+      '@agent-xai/runtime-adapters':
         specifier: workspace:*
         version: link:../../packages/runtime/runtime-adapters
-      '@agentx-fast/runtime-production':
+      '@agent-xai/runtime-production':
         specifier: workspace:*
         version: link:../../packages/runtime/runtime-production
-      '@agentx-fast/tool-sdk':
+      '@agent-xai/tool-sdk':
         specifier: workspace:*
         version: link:../../packages/shared/tool-sdk
       '@prisma/client':
@@ -139,13 +139,13 @@ importers:
 
   packages/agent/agent-platform:
     dependencies:
-      '@agentx-fast/core-runtime':
+      '@agent-xai/core-runtime':
         specifier: workspace:*
         version: link:../../shared/core-runtime
-      '@agentx-fast/multi-agent-collaboration':
+      '@agent-xai/multi-agent-collaboration':
         specifier: workspace:*
         version: link:../multi-agent-collaboration
-      '@agentx-fast/provider-sdk':
+      '@agent-xai/provider-sdk':
         specifier: workspace:*
         version: link:../../provider/provider-sdk
     devDependencies:
@@ -224,10 +224,10 @@ importers:
 
   packages/cognitive/cognitive-kernel:
     dependencies:
-      '@agentx-fast/autonomous-cognition':
+      '@agent-xai/autonomous-cognition':
         specifier: workspace:*
         version: link:../autonomous-cognition
-      '@agentx-fast/cognitive-learning':
+      '@agent-xai/cognitive-learning':
         specifier: workspace:*
         version: link:../cognitive-learning
     devDependencies:
@@ -291,7 +291,7 @@ importers:
 
   packages/planning/planning-engine:
     dependencies:
-      '@agentx-fast/core-runtime':
+      '@agent-xai/core-runtime':
         specifier: workspace:*
         version: link:../../shared/core-runtime
     devDependencies:
@@ -325,7 +325,7 @@ importers:
 
   packages/provider/native-providers:
     dependencies:
-      '@agentx-fast/runtime-adapters':
+      '@agent-xai/runtime-adapters':
         specifier: workspace:*
         version: link:../../runtime/runtime-adapters
     devDependencies:
@@ -344,7 +344,7 @@ importers:
 
   packages/provider/provider-qualification:
     dependencies:
-      '@agentx-fast/runtime-adapters':
+      '@agent-xai/runtime-adapters':
         specifier: workspace:*
         version: link:../../runtime/runtime-adapters
     devDependencies:
@@ -378,13 +378,13 @@ importers:
 
   packages/provider/provider-sdk:
     dependencies:
-      '@agentx-fast/observability':
+      '@agent-xai/observability':
         specifier: workspace:*
         version: link:../../shared/observability
-      '@agentx-fast/runtime-adapters':
+      '@agent-xai/runtime-adapters':
         specifier: workspace:*
         version: link:../../runtime/runtime-adapters
-      '@agentx-fast/secrets':
+      '@agent-xai/secrets':
         specifier: workspace:*
         version: link:../../shared/secrets
       '@anthropic-ai/sdk':
@@ -524,7 +524,7 @@ importers:
 
   packages/runtime/runtime:
     dependencies:
-      '@agentx-fast/core-runtime':
+      '@agent-xai/core-runtime':
         specifier: workspace:*
         version: link:../../shared/core-runtime
     devDependencies:
@@ -543,7 +543,7 @@ importers:
 
   packages/runtime/runtime-adapters:
     dependencies:
-      '@agentx-fast/core-runtime':
+      '@agent-xai/core-runtime':
         specifier: workspace:*
         version: link:../../shared/core-runtime
       bullmq:
@@ -568,16 +568,16 @@ importers:
 
   packages/runtime/runtime-production:
     dependencies:
-      '@agentx-fast/core-runtime':
+      '@agent-xai/core-runtime':
         specifier: workspace:*
         version: link:../../shared/core-runtime
-      '@agentx-fast/persistence':
+      '@agent-xai/persistence':
         specifier: workspace:*
         version: link:../../shared/persistence
-      '@agentx-fast/runtime-adapters':
+      '@agent-xai/runtime-adapters':
         specifier: workspace:*
         version: link:../runtime-adapters
-      '@agentx-fast/tool-sdk':
+      '@agent-xai/tool-sdk':
         specifier: workspace:*
         version: link:../../shared/tool-sdk
       '@prisma/client':
@@ -599,7 +599,7 @@ importers:
 
   packages/shared/cache:
     dependencies:
-      '@agentx-fast/shared':
+      '@agent-xai/shared':
         specifier: workspace:*
         version: link:../shared
     devDependencies:
@@ -615,7 +615,7 @@ importers:
 
   packages/shared/context-engine:
     dependencies:
-      '@agentx-fast/core-runtime':
+      '@agent-xai/core-runtime':
         specifier: workspace:*
         version: link:../core-runtime
     devDependencies:
@@ -634,10 +634,10 @@ importers:
 
   packages/shared/core-runtime:
     dependencies:
-      '@agentx-fast/observability':
+      '@agent-xai/observability':
         specifier: workspace:*
         version: link:../observability
-      '@agentx-fast/shared':
+      '@agent-xai/shared':
         specifier: workspace:*
         version: link:../shared
       bullmq:
@@ -659,7 +659,7 @@ importers:
 
   packages/shared/knowledge-engine:
     dependencies:
-      '@agentx-fast/core-runtime':
+      '@agent-xai/core-runtime':
         specifier: workspace:*
         version: link:../core-runtime
     devDependencies:
@@ -678,7 +678,7 @@ importers:
 
   packages/shared/memory-engine:
     dependencies:
-      '@agentx-fast/core-runtime':
+      '@agent-xai/core-runtime':
         specifier: workspace:*
         version: link:../core-runtime
       '@prisma/client':
@@ -697,7 +697,7 @@ importers:
 
   packages/shared/observability:
     dependencies:
-      '@agentx-fast/shared':
+      '@agent-xai/shared':
         specifier: workspace:*
         version: link:../shared
       '@opentelemetry/api':
@@ -728,7 +728,7 @@ importers:
 
   packages/shared/persistence:
     dependencies:
-      '@agentx-fast/core-runtime':
+      '@agent-xai/core-runtime':
         specifier: workspace:*
         version: link:../core-runtime
       '@prisma/client':
@@ -753,7 +753,7 @@ importers:
 
   packages/shared/secrets:
     dependencies:
-      '@agentx-fast/shared':
+      '@agent-xai/shared':
         specifier: workspace:*
         version: link:../shared
       lru-cache:
@@ -772,7 +772,7 @@ importers:
 
   packages/shared/security:
     dependencies:
-      '@agentx-fast/shared':
+      '@agent-xai/shared':
         specifier: workspace:*
         version: link:../shared
     devDependencies:
@@ -803,10 +803,10 @@ importers:
 
   packages/shared/telemetry:
     dependencies:
-      '@agentx-fast/observability':
+      '@agent-xai/observability':
         specifier: workspace:*
         version: link:../observability
-      '@agentx-fast/shared':
+      '@agent-xai/shared':
         specifier: workspace:*
         version: link:../shared
     devDependencies:
@@ -822,7 +822,7 @@ importers:
 
   packages/shared/tenant:
     dependencies:
-      '@agentx-fast/shared':
+      '@agent-xai/shared':
         specifier: workspace:*
         version: link:../shared
     devDependencies:
@@ -838,19 +838,19 @@ importers:
 
   packages/shared/tool-sdk:
     dependencies:
-      '@agentx-fast/agent-platform':
+      '@agent-xai/agent-platform':
         specifier: workspace:*
         version: link:../../agent/agent-platform
-      '@agentx-fast/cache':
+      '@agent-xai/cache':
         specifier: workspace:*
         version: link:../cache
-      '@agentx-fast/core-runtime':
+      '@agent-xai/core-runtime':
         specifier: workspace:*
         version: link:../core-runtime
-      '@agentx-fast/observability':
+      '@agent-xai/observability':
         specifier: workspace:*
         version: link:../observability
-      '@agentx-fast/provider-sdk':
+      '@agent-xai/provider-sdk':
         specifier: workspace:*
         version: link:../../provider/provider-sdk
       yaml:

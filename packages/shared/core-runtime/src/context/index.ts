@@ -1,4 +1,4 @@
-import type { ILogger } from '@agentx-fast/shared';
+import type { ILogger } from '@agent-xai/shared';
 import type { TaskModel } from '../interfaces/task.js';
 
 export interface ICredentialResolver {

@@ -1,9 +1,9 @@
-import { ProductionRuntime } from '@agentx-fast/runtime-production';
-import { Scheduler, InMemoryEventBus } from '@agentx-fast/core-runtime';
-import type { ITaskRepository, IEventBus } from '@agentx-fast/core-runtime';
+import { ProductionRuntime } from '@agent-xai/runtime-production';
+import { Scheduler, InMemoryEventBus } from '@agent-xai/core-runtime';
+import type { ITaskRepository, IEventBus } from '@agent-xai/core-runtime';
 import { InMemoryTaskRepository } from './in-memory-task-repository.js';
-import { ProviderRegistry, CredentialResolver, ProviderFactory } from '@agentx-fast/provider-sdk';
-import { CoderAgent, ReviewerAgent, TesterAgent, SecurityAgent } from '@agentx-fast/agent-platform';
+import { ProviderRegistry, CredentialResolver, ProviderFactory } from '@agent-xai/provider-sdk';
+import { CoderAgent, ReviewerAgent, TesterAgent, SecurityAgent } from '@agent-xai/agent-platform';
 import { AgentRegistry } from './agent-registry.js';
 
 let _runtime: ProductionRuntime | null = null;

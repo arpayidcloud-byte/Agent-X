@@ -31,7 +31,7 @@ import { HarnessError } from '../src/conformance/errors.js';
 import { FixtureLoader } from '../src/conformance/fixture-loader.js';
 import { GoldenTests } from '../src/conformance/golden-tests.js';
 import { SnapshotValidator } from '../src/conformance/snapshot-validator.js';
-import { MemoryQueueProvider } from '@agentx-fast/runtime-adapters';
+import { MemoryQueueProvider } from '@agent-xai/runtime-adapters';
 import { CredentialResolver } from '../src/conformance/credential-resolver.js';
 import { createQueueTemplate } from '../src/conformance/provider-template.js';
 import { SDKMocks } from '../src/conformance/provider-mocks.js';

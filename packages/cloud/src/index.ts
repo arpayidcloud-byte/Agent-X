@@ -1,4 +1,4 @@
-import { AgentXLoggerFactory } from '@agentx-fast/shared';
+import { AgentXLoggerFactory } from '@agent-xai/shared';
 
 export class CloudRuntime {
   private logger = new AgentXLoggerFactory().createLogger('cloud:runtime');

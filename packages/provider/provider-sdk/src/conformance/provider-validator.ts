@@ -3,7 +3,7 @@
  * @description Master validator for checking pre-PQF compliance.
  */
 
-import type { IProvider } from '@agentx-fast/runtime-adapters';
+import type { IProvider } from '@agent-xai/runtime-adapters';
 import { SchemaValidator } from './schema-validator.js';
 import type { ProviderManifest } from './interfaces.js';
 

@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { AgentOrchestrator } from '../src/orchestrator.js';
-import type { TaskModel, TaskContext } from '@agentx-fast/core-runtime';
-import { TaskStatus, TaskPriority } from '@agentx-fast/core-runtime';
+import type { TaskModel, TaskContext } from '@agent-xai/core-runtime';
+import { TaskStatus, TaskPriority } from '@agent-xai/core-runtime';
 
 describe('AgentOrchestrator', () => {
   it('executes code→review→test→security flow', async () => {

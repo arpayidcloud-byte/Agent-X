@@ -9,7 +9,7 @@ import type {
 import { CircuitBreaker, executeWithRetry } from './resilience.js';
 import { CostCalculator } from './metrics.js';
 import { ProviderTimeoutError } from './errors.js';
-import { Tracer, Metrics } from '@agentx-fast/observability';
+import { Tracer, Metrics } from '@agent-xai/observability';
 
 /**
  * Abstract base class for AI provider implementations.

@@ -7,7 +7,7 @@ import type {
   IContextCompressor,
   ContextMetrics,
 } from './interfaces.js';
-import type { IEventBus } from '@agentx-fast/core-runtime';
+import type { IEventBus } from '@agent-xai/core-runtime';
 
 export class ContextEngine implements IContextEngine {
   private contexts = new Map<string, ContextSnapshot>();

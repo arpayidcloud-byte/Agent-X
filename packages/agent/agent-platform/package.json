@@ -1,5 +1,5 @@
 {
-  "name": "@agentx-fast/agent-platform",
+  "name": "@agent-xai/agent-platform",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -28,9 +28,9 @@
     "lint": "eslint src/"
   },
   "dependencies": {
-    "@agentx-fast/core-runtime": "workspace:*",
-    "@agentx-fast/multi-agent-collaboration": "workspace:*",
-    "@agentx-fast/provider-sdk": "workspace:*"
+    "@agent-xai/core-runtime": "workspace:*",
+    "@agent-xai/multi-agent-collaboration": "workspace:*",
+    "@agent-xai/provider-sdk": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",

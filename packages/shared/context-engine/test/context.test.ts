@@ -5,7 +5,7 @@ import {
   ContextWindowManager,
   ContextCompressor,
 } from '../src/index.js';
-import { InMemoryEventBus } from '@agentx-fast/core-runtime';
+import { InMemoryEventBus } from '@agent-xai/core-runtime';
 
 describe('Context Engine', () => {
   let eventBus: InMemoryEventBus;

@@ -11,10 +11,10 @@ import { MessageBus } from './message-bus.js';
 import { ResourceManager } from './resource-manager.js';
 import { HeartbeatMonitor } from './heartbeat.js';
 import { SubAgentFactory } from './sub-agent-factory.js';
-import type { IEventBus } from '@agentx-fast/core-runtime';
+import type { IEventBus } from '@agent-xai/core-runtime';
 import type { AgentRole } from './interfaces.js';
-import { MultiAgentCollaborationEngine } from '@agentx-fast/multi-agent-collaboration';
-import type { CollaborationSession } from '@agentx-fast/multi-agent-collaboration';
+import { MultiAgentCollaborationEngine } from '@agent-xai/multi-agent-collaboration';
+import type { CollaborationSession } from '@agent-xai/multi-agent-collaboration';
 
 export class MultiAgentOrchestrator implements IMultiAgentOrchestrator {
   private splitter: TaskSplitter;

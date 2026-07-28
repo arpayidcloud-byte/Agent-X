@@ -9,7 +9,7 @@ import type {
   ProviderCapabilities,
   ProviderHealth,
   ProviderMetrics,
-} from '@agentx-fast/runtime-adapters';
+} from '@agent-xai/runtime-adapters';
 import type { IConfigurationProvider, INativeProvider } from '../interfaces.js';
 import { ConfigurationError } from '../errors.js';
 

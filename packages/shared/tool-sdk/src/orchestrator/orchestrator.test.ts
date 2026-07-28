@@ -9,7 +9,7 @@ import type {
   ToolExecutionRequest,
   ToolExecutionResponse,
 } from '../interfaces/index.js';
-import type { CompletionResponse } from '@agentx-fast/provider-sdk';
+import type { CompletionResponse } from '@agent-xai/provider-sdk';
 import type { ToolExecutionContext } from '../interfaces/index.js';
 
 class MockTool implements ITool {

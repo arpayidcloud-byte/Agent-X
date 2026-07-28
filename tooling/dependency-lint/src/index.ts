@@ -7,7 +7,7 @@
  * "Lower-numbered volumes must never depend on higher-numbered ones."
  *
  * Each package is mapped to a volume number. The script scans all .ts source
- * files for `from '@agentx-fast/...'` imports and checks that no package imports
+ * files for `from '@agent-xai/...'` imports and checks that no package imports
  * from a higher-numbered volume.
  */
 

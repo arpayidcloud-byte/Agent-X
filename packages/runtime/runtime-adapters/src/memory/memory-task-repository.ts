@@ -1,4 +1,4 @@
-import type { ITaskRepository, TaskModel } from '@agentx-fast/core-runtime';
+import type { ITaskRepository, TaskModel } from '@agent-xai/core-runtime';
 
 export class InMemoryTaskRepository implements ITaskRepository {
   private tasks = new Map<string, TaskModel>();

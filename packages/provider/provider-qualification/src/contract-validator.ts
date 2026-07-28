@@ -3,7 +3,7 @@
  * @description Validates strict interface implementation.
  */
 
-import type { IProvider } from '@agentx-fast/runtime-adapters';
+import type { IProvider } from '@agent-xai/runtime-adapters';
 import { ContractValidationError } from './errors.js';
 
 export class ContractValidator {

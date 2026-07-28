@@ -5,8 +5,8 @@ import type {
   ITool,
   ToolExecutionResponse,
 } from '../interfaces/index.js';
-import { Tracer, Metrics } from '@agentx-fast/observability';
-import { CacheManager } from '@agentx-fast/cache';
+import { Tracer, Metrics } from '@agent-xai/observability';
+import { CacheManager } from '@agent-xai/cache';
 import { createTimeoutController } from '../shell/timeout.js';
 
 interface CacheKey {
