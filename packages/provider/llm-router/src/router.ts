@@ -1,8 +1,14 @@
 import { RouteRequest, LLMProvider, ModelMetadata } from './types.js';
+import { LLMCacheManager } from './cache-manager.js';
 
 export class LLMRouter {
   private providers: Map<string, LLMProvider> = new Map();
   private models: Map<string, ModelMetadata> = new Map();
+  private cacheManager: LLMCacheManager;
+
+  constructor() {
+    this.cacheManager = new LLMCacheManager();
+  }
 
   registerProvider(provider: LLMProvider) {
     this.providers.set(provider.name, provider);
@@ -11,7 +17,6 @@ export class LLMRouter {
     }
   }
 
-  // Very basic smart routing logic based on the Startup-Book strategy.
   selectBestModel(req: RouteRequest): string {
     const complexity = req.complexity || 'medium';
     const budget = req.budget || 'medium';
@@ -19,8 +24,6 @@ export class LLMRouter {
     
     // Safety fallback
     if (req.security === 'confidential') {
-      // Return a self-hosted or strictly confidential model if we had one
-      // Defaulting to a placeholder for local architecture
       return 'local:llama-3-8b';
     }
 
@@ -42,11 +45,17 @@ export class LLMRouter {
       return 'openai:gpt-4o-mini';
     }
 
-    // Default middle-ground
     return 'deepseek:deepseek-v3'; 
   }
 
   async execute(req: RouteRequest, prompt: string): Promise<any> {
+    // 1. Check cache first
+    const cachedResponse = await this.cacheManager.getCached(req, prompt);
+    if (cachedResponse) {
+      return cachedResponse;
+    }
+
+    // 2. Select Model
     const selectedModelStr = this.selectBestModel(req);
     const parts = selectedModelStr.split(':');
     const providerName = parts[0];
@@ -61,6 +70,12 @@ export class LLMRouter {
       throw new Error(`Provider ${providerName} not found or not registered.`);
     }
 
-    return await provider.generate(modelId, prompt, req);
+    // 3. Execute
+    const response = await provider.generate(modelId, prompt, req);
+
+    // 4. Save to cache
+    await this.cacheManager.setCache(req, prompt, response);
+
+    return response;
   }
 }
