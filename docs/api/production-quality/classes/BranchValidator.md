@@ -1,0 +1,37 @@
+[**agentx-workspace**](../../README.md)
+
+---
+
+[agentx-workspace](../../README.md) / [production-quality](../README.md) / BranchValidator
+
+# Class: BranchValidator
+
+Defined in: [packages/quality/production-quality/src/branch-validator.ts:8](https://github.com/arpayidcloud-byte/Agentx/blob/39f649f26ebb3402d33388e086248595af2b5984/packages/quality/production-quality/src/branch-validator.ts#L8)
+
+## Constructors
+
+### Constructor
+
+> **new BranchValidator**(): `BranchValidator`
+
+#### Returns
+
+`BranchValidator`
+
+## Methods
+
+### validate()
+
+> **validate**(`uncoveredBranches`): [`ValidationResult`](../interfaces/ValidationResult.md)
+
+Defined in: [packages/quality/production-quality/src/branch-validator.ts:9](https://github.com/arpayidcloud-byte/Agentx/blob/39f649f26ebb3402d33388e086248595af2b5984/packages/quality/production-quality/src/branch-validator.ts#L9)
+
+#### Parameters
+
+##### uncoveredBranches
+
+`string`[]
+
+#### Returns
+
+[`ValidationResult`](../interfaces/ValidationResult.md)

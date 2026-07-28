@@ -1,0 +1,21 @@
+# agentx workspace configuration (Volume 9, Chapter 5)
+
+defaultProvider: anthropic
+maxParallelAgents: 2
+retryCapPerNode: 2
+workingDirectory: .
+
+# Volume 7 - Shell configuration
+tools:
+  shell:
+    allowlist:
+      - npm run build
+      - npm run lint
+      - npm test
+      - pnpm build
+      - pnpm test
+
+# Volume 6 - TaskContext boundaries
+memory:
+  taskContext:
+    lastN: 10

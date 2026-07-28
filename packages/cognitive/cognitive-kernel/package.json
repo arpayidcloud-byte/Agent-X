@@ -1,0 +1,40 @@
+{
+  "name": "@agentx-fast/cognitive-kernel",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/arpayidcloud-byte/Agentx.git",
+    "directory": "packages/cognitive/cognitive-kernel"
+  },
+  "version": "1.0.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsc --build",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run test/kernel.test.ts",
+    "test:coverage": "vitest run --coverage",
+    "lint": "eslint src/"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@vitest/coverage-v8": "^3.2.6",
+    "typescript": "5.4.5",
+    "vitest": "^3.2.6"
+  },
+  "dependencies": {
+    "@agentx-fast/autonomous-cognition": "^1.0.0",
+    "@agentx-fast/cognitive-learning": "^1.0.0"
+  }
+}

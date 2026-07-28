@@ -1,0 +1,33 @@
+{
+  "name": "@agentx-fast/cloud",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/arpayidcloud-byte/Agentx.git",
+    "directory": "packages/cloud"
+  },
+  "version": "1.0.0",
+  "deprecated": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "exports": {
+    ".": {
+      "import": "./src/index.ts",
+      "types": "./src/index.ts"
+    }
+  },
+  "files": [
+    "src",
+    "README.md"
+  ],
+  "scripts": {
+    "test": "echo 'skip - deprecated'",
+    "lint": "echo 'skip - deprecated'",
+    "typecheck": "tsc --noEmit",
+    "build": "echo 'skip - deprecated'"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.4.5"
+  }
+}

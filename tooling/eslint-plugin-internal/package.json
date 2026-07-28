@@ -1,0 +1,21 @@
+{
+  "name": "@agentx-fast/eslint-plugin",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/arpayidcloud-byte/Agentx.git",
+    "directory": "tooling/eslint-plugin-internal"
+  },
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "test": "vitest run --passWithNoTests",
+    "test:coverage": "vitest run --coverage --passWithNoTests"
+  },
+  "dependencies": {
+    "eslint": "^8.57.0"
+  },
+  "devDependencies": {
+    "vitest": "^3.2.6"
+  }
+}

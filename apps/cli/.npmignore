@@ -1,0 +1,12 @@
+# Don't ignore dist - we need it for publishing
+!dist/
+
+# Ignore source files
+src/
+**/*.test.ts
+**/*.test.js
+tsconfig.tsbuildinfo
+
+# Ignore dev files
+.env*
+*.log

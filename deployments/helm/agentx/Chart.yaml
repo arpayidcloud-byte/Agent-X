@@ -1,0 +1,9 @@
+apiVersion: v2
+name: agentx
+description: AgentX Agent Orchestration Platform Helm Chart
+type: application
+version: 0.1.0
+appVersion: '0.1.0'
+maintainers:
+  - name: AgentX Team
+    email: team@agentx.dev

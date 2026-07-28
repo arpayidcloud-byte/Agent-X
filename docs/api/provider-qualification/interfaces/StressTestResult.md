@@ -1,0 +1,41 @@
+[**agentx-workspace**](../../README.md)
+
+---
+
+[agentx-workspace](../../README.md) / [provider-qualification](../README.md) / StressTestResult
+
+# Interface: StressTestResult
+
+Defined in: [packages/provider/provider-qualification/src/interfaces.ts:46](https://github.com/arpayidcloud-byte/Agentx/blob/39f649f26ebb3402d33388e086248595af2b5984/packages/provider/provider-qualification/src/interfaces.ts#L46)
+
+## Properties
+
+### durationMs
+
+> **durationMs**: `number`
+
+Defined in: [packages/provider/provider-qualification/src/interfaces.ts:47](https://github.com/arpayidcloud-byte/Agentx/blob/39f649f26ebb3402d33388e086248595af2b5984/packages/provider/provider-qualification/src/interfaces.ts#L47)
+
+---
+
+### errorRate
+
+> **errorRate**: `number`
+
+Defined in: [packages/provider/provider-qualification/src/interfaces.ts:49](https://github.com/arpayidcloud-byte/Agentx/blob/39f649f26ebb3402d33388e086248595af2b5984/packages/provider/provider-qualification/src/interfaces.ts#L49)
+
+---
+
+### saturated
+
+> **saturated**: `boolean`
+
+Defined in: [packages/provider/provider-qualification/src/interfaces.ts:50](https://github.com/arpayidcloud-byte/Agentx/blob/39f649f26ebb3402d33388e086248595af2b5984/packages/provider/provider-qualification/src/interfaces.ts#L50)
+
+---
+
+### totalRequests
+
+> **totalRequests**: `number`
+
+Defined in: [packages/provider/provider-qualification/src/interfaces.ts:48](https://github.com/arpayidcloud-byte/Agentx/blob/39f649f26ebb3402d33388e086248595af2b5984/packages/provider/provider-qualification/src/interfaces.ts#L48)

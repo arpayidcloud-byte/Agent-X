@@ -1,0 +1,17 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "dist",
+    "rootDir": ".",
+    "skipLibCheck": true
+  },
+  "include": ["specs/**/*", "fixtures/**/*", "utils/**/*"],
+  "exclude": ["node_modules", "dist"],
+  "references": [
+    { "path": "../../packages/shared/core-runtime" },
+    { "path": "../../packages/shared/tool-sdk" },
+    { "path": "../../packages/shared/security" },
+    { "path": "../../packages/shared/telemetry" },
+    { "path": "../../packages/shared/observability" }
+  ]
+}

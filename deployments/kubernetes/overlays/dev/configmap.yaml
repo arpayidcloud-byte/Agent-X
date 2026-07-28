@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: agentx-config
+data:
+  NODE_ENV: 'development'
+  LOG_LEVEL: 'debug'
+  MAX_PARALLEL_AGENTS: '3'
+  TASK_HISTORY_MAX: '100'

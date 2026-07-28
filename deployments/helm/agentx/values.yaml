@@ -1,0 +1,56 @@
+replicaCount: 3
+
+image:
+  repository: ghcr.io/arpayidcloud-byte/agentx
+  pullPolicy: IfNotPresent
+  tag: 'latest'
+
+service:
+  type: ClusterIP
+  port: 3000
+
+resources:
+  requests:
+    cpu: 500m
+    memory: 512Mi
+  limits:
+    cpu: 2000m
+    memory: 2Gi
+
+autoscaling:
+  enabled: true
+  minReplicas: 3
+  maxReplicas: 10
+  targetCPUUtilization: 70
+  targetMemoryUtilization: 80
+
+config:
+  nodeEnv: production
+  logLevel: info
+  maxParallelAgents: 10
+  taskHistoryMax: 1000
+
+secrets:
+  databaseUrl: ''
+  redisUrl: ''
+  anthropicApiKey: ''
+  openaiApiKey: ''
+
+ingress:
+  enabled: false
+  className: nginx
+  hosts:
+    - host: agentx.local
+      paths:
+        - path: /
+          pathType: Prefix
+
+postgresql:
+  enabled: true
+  auth:
+    postgresPassword: ''
+    database: agentx
+
+redis:
+  enabled: true
+  architecture: standalone

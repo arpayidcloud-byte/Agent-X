@@ -1,0 +1,102 @@
+[**agentx-workspace**](../README.md)
+
+---
+
+[agentx-workspace](../README.md) / distributed-cognition
+
+# distributed-cognition
+
+## Description
+
+Distributed Cognitive Intelligence barrel exports.
+
+## Classes
+
+- [ClusterCoordinator](classes/ClusterCoordinator.md)
+- [ClusterMembershipManager](classes/ClusterMembershipManager.md)
+- [CrossNodeCollaborationManager](classes/CrossNodeCollaborationManager.md)
+- [DistributedAuditManager](classes/DistributedAuditManager.md)
+- [DistributedCheckpointManager](classes/DistributedCheckpointManager.md)
+- [DistributedCompatibilityValidator](classes/DistributedCompatibilityValidator.md)
+- [DistributedConfigurationManager](classes/DistributedConfigurationManager.md)
+- [DistributedConflictResolver](classes/DistributedConflictResolver.md)
+- [DistributedConsensusEngine](classes/DistributedConsensusEngine.md)
+- [DistributedEventBus](classes/DistributedEventBus.md)
+- [DistributedGoalCoordinator](classes/DistributedGoalCoordinator.md)
+- [DistributedIntegrityValidator](classes/DistributedIntegrityValidator.md)
+- [DistributedLearningSynchronizer](classes/DistributedLearningSynchronizer.md)
+- [DistributedMemoryCoordinator](classes/DistributedMemoryCoordinator.md)
+- [DistributedMetricsCollector](classes/DistributedMetricsCollector.md)
+- [DistributedPlanningCoordinator](classes/DistributedPlanningCoordinator.md)
+- [DistributedRecoveryManager](classes/DistributedRecoveryManager.md)
+- [DistributedReplayEngine](classes/DistributedReplayEngine.md)
+- [DistributedResourceAllocator](classes/DistributedResourceAllocator.md)
+- [DistributedScheduler](classes/DistributedScheduler.md)
+- [DistributedSecurityValidator](classes/DistributedSecurityValidator.md)
+- [DistributedTaskDispatcher](classes/DistributedTaskDispatcher.md)
+- [DistributedTraceManager](classes/DistributedTraceManager.md)
+- [DistributedVersionManager](classes/DistributedVersionManager.md)
+- [DistributedWorkflowCoordinator](classes/DistributedWorkflowCoordinator.md)
+- [InterNodeMessageBus](classes/InterNodeMessageBus.md)
+- [KnowledgeReplicationManager](classes/KnowledgeReplicationManager.md)
+- [KnowledgeSynchronizationEngine](classes/KnowledgeSynchronizationEngine.md)
+- [NodeCapabilityRegistry](classes/NodeCapabilityRegistry.md)
+- [NodeDiscoveryEngine](classes/NodeDiscoveryEngine.md)
+- [NodeHealthMonitor](classes/NodeHealthMonitor.md)
+- [NodeRegistry](classes/NodeRegistry.md)
+- [ReliableMessageQueue](classes/ReliableMessageQueue.md)
+
+## Interfaces
+
+- [AuditEntry](interfaces/AuditEntry.md)
+- [ClusterConfig](interfaces/ClusterConfig.md)
+- [ClusterMembership](interfaces/ClusterMembership.md)
+- [ClusterState](interfaces/ClusterState.md)
+- [CollaborationMessage](interfaces/CollaborationMessage.md)
+- [CompatibilityCheck](interfaces/CompatibilityCheck.md)
+- [ConfigEntry](interfaces/ConfigEntry.md)
+- [ConflictEntry](interfaces/ConflictEntry.md)
+- [ConsensusResult](interfaces/ConsensusResult.md)
+- [ConsensusVote](interfaces/ConsensusVote.md)
+- [CrossNodeSession](interfaces/CrossNodeSession.md)
+- [DistributedCheckpoint](interfaces/DistributedCheckpoint.md)
+- [DistributedEvent](interfaces/DistributedEvent.md)
+- [DistributedProposal](interfaces/DistributedProposal.md)
+- [DistributedTask](interfaces/DistributedTask.md)
+- [GoalPlan](interfaces/GoalPlan.md)
+- [IntegrityRecord](interfaces/IntegrityRecord.md)
+- [KnowledgeEntry](interfaces/KnowledgeEntry.md)
+- [KnowledgeReplica](interfaces/KnowledgeReplica.md)
+- [KnowledgeReplicaInterface](interfaces/KnowledgeReplicaInterface.md)
+- [LearningSyncResult](interfaces/LearningSyncResult.md)
+- [MemoryEntry](interfaces/MemoryEntry.md)
+- [MemorySnapshot](interfaces/MemorySnapshot.md)
+- [MetricPoint](interfaces/MetricPoint.md)
+- [NodeCapability](interfaces/NodeCapability.md)
+- [NodeCapabilityEntry](interfaces/NodeCapabilityEntry.md)
+- [NodeHealth](interfaces/NodeHealth.md)
+- [NodeMetadata](interfaces/NodeMetadata.md)
+- [NodeRegistration](interfaces/NodeRegistration.md)
+- [PlanningResult](interfaces/PlanningResult.md)
+- [PlanNode](interfaces/PlanNode.md)
+- [QueuedMessage](interfaces/QueuedMessage.md)
+- [RecoveryPlan](interfaces/RecoveryPlan.md)
+- [ReplayEntry](interfaces/ReplayEntry.md)
+- [ResourceAllocation](interfaces/ResourceAllocation.md)
+- [SchedulePolicy](interfaces/SchedulePolicy.md)
+- [SecurityToken](interfaces/SecurityToken.md)
+- [SyncResult](interfaces/SyncResult.md)
+- [TaskMigration](interfaces/TaskMigration.md)
+- [TraceSpan](interfaces/TraceSpan.md)
+- [VersionInfo](interfaces/VersionInfo.md)
+- [WorkflowPlan](interfaces/WorkflowPlan.md)
+
+## Type Aliases
+
+- [ClusterStatus](type-aliases/ClusterStatus.md)
+- [CollaborationState](type-aliases/CollaborationState.md)
+- [ConsensusState](type-aliases/ConsensusState.md)
+- [EventListener](type-aliases/EventListener.md)
+- [MessageHandler](type-aliases/MessageHandler.md)
+- [NodeStatus](type-aliases/NodeStatus.md)
+- [TaskState](type-aliases/TaskState.md)

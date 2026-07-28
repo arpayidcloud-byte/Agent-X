@@ -1,0 +1,35 @@
+{
+  "name": "@agentx-fast/cli",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/arpayidcloud-byte/Agentx.git",
+    "directory": "apps/cli"
+  },
+  "version": "1.0.0",
+  "type": "module",
+  "bin": {
+    "agentx": "./bin/agentx"
+  },
+  "scripts": {
+    "build": "tsc --build",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --passWithNoTests",
+    "test:coverage": "vitest run --coverage --passWithNoTests",
+    "lint": "eslint src/"
+  },
+  "devDependencies": {
+    "typescript": "5.4.5",
+    "vitest": "^3.2.6"
+  },
+  "dependencies": {
+    "@agentx-fast/agent-platform": "^2.0.0",
+    "@agentx-fast/core-runtime": "^2.0.0",
+    "@agentx-fast/provider-sdk": "^2.0.0",
+    "@agentx-fast/runtime-adapters": "^2.0.0",
+    "@agentx-fast/runtime-production": "^2.0.0",
+    "@agentx-fast/tool-sdk": "^2.0.0",
+    "@prisma/client": "^7.9.0",
+    "commander": "^15.0.0"
+  }
+}

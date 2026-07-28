@@ -1,0 +1,69 @@
+name: Security Scan
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    # Run daily at 2 AM UTC
+    - cron: '0 2 * * *'
+
+jobs:
+  security:
+    name: Security Scans
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 11.13.0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate Prisma Client
+        run: pnpm --filter @agentx/persistence db:generate
+
+      - name: Dependency Audit
+        run: pnpm audit --audit-level=high
+        continue-on-error: true
+
+      - name: Run Security Scan Script
+        run: ./scripts/security-scan.sh
+
+      - name: Run Security Tests (OWASP Top 10)
+        run: pnpm vitest run tests/e2e/specs/security-owasp.test.ts
+        continue-on-error: true
+
+      - name: Check for Secrets
+        run: |
+          echo "Checking for hardcoded secrets..."
+          if grep -r --include="*.ts" --include="*.js" --include="*.json" \
+            --exclude-dir=node_modules --exclude-dir=dist --exclude-dir=.git \
+            -E "(api_key|password|secret)\s*[=:]\s*['\"][^'\"]{10,}['\"]" . \
+            | grep -v ".env.example" | grep -v test; then
+            echo "::error::Hardcoded secrets detected!"
+            exit 1
+          fi
+          echo "✅ No hardcoded secrets found"
+
+      - name: Upload Security Results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: security-scan-results
+          path: |
+            security-report.json
+            npm-audit-results.json
+        continue-on-error: true

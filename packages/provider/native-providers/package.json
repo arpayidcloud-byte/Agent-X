@@ -1,0 +1,41 @@
+{
+  "name": "@agentx-fast/native-providers",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/arpayidcloud-byte/Agentx.git",
+    "directory": "packages/provider/native-providers"
+  },
+  "version": "1.0.0",
+  "deprecated": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "types": "./dist/index.d.ts",
+  "description": "[DEPRECATED] Use @agentx/provider-sdk instead",
+  "scripts": {
+    "build": "tsc --build",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run test/native-providers.test.ts",
+    "test:coverage": "vitest run --coverage",
+    "lint": "eslint src/"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@vitest/coverage-v8": "^3.2.6",
+    "typescript": "5.4.5",
+    "vitest": "^3.2.6"
+  },
+  "dependencies": {
+    "@agentx-fast/runtime-adapters": "^1.0.0"
+  }
+}

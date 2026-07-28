@@ -1,0 +1,41 @@
+[**agentx-workspace**](../../README.md)
+
+---
+
+[agentx-workspace](../../README.md) / [autonomous-cognition](../README.md) / GoalDecomposition
+
+# Interface: GoalDecomposition
+
+Defined in: [packages/cognitive/autonomous-cognition/src/domain/goal/interfaces.ts:32](https://github.com/arpayidcloud-byte/Agentx/blob/39f649f26ebb3402d33388e086248595af2b5984/packages/cognitive/autonomous-cognition/src/domain/goal/interfaces.ts#L32)
+
+## Properties
+
+### checksum
+
+> `readonly` **checksum**: `string`
+
+Defined in: [packages/cognitive/autonomous-cognition/src/domain/goal/interfaces.ts:36](https://github.com/arpayidcloud-byte/Agentx/blob/39f649f26ebb3402d33388e086248595af2b5984/packages/cognitive/autonomous-cognition/src/domain/goal/interfaces.ts#L36)
+
+---
+
+### dependencies
+
+> `readonly` **dependencies**: readonly readonly `string`[][]
+
+Defined in: [packages/cognitive/autonomous-cognition/src/domain/goal/interfaces.ts:35](https://github.com/arpayidcloud-byte/Agentx/blob/39f649f26ebb3402d33388e086248595af2b5984/packages/cognitive/autonomous-cognition/src/domain/goal/interfaces.ts#L35)
+
+---
+
+### goalId
+
+> `readonly` **goalId**: `string`
+
+Defined in: [packages/cognitive/autonomous-cognition/src/domain/goal/interfaces.ts:33](https://github.com/arpayidcloud-byte/Agentx/blob/39f649f26ebb3402d33388e086248595af2b5984/packages/cognitive/autonomous-cognition/src/domain/goal/interfaces.ts#L33)
+
+---
+
+### subGoals
+
+> `readonly` **subGoals**: readonly `string`[]
+
+Defined in: [packages/cognitive/autonomous-cognition/src/domain/goal/interfaces.ts:34](https://github.com/arpayidcloud-byte/Agentx/blob/39f649f26ebb3402d33388e086248595af2b5984/packages/cognitive/autonomous-cognition/src/domain/goal/interfaces.ts#L34)
