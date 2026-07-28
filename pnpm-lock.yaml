@@ -142,6 +142,9 @@ importers:
       '@agent-xai/core-runtime':
         specifier: workspace:*
         version: link:../../shared/core-runtime
+      '@agent-xai/llm-router':
+        specifier: workspace:*
+        version: link:../../provider/llm-router
       '@agent-xai/multi-agent-collaboration':
         specifier: workspace:*
         version: link:../multi-agent-collaboration
@@ -321,6 +324,31 @@ importers:
         version: 5.4.5
       vitest:
         specifier: ^3.2.6
+        version: 3.2.7(@types/node@20.19.43)(jiti@2.7.0)(lightningcss@1.32.0)(yaml@2.9.0)
+
+  packages/provider/llm-router:
+    dependencies:
+      '@agent-xai/cache':
+        specifier: workspace:*
+        version: link:../../shared/cache
+      '@agent-xai/core-runtime':
+        specifier: workspace:*
+        version: link:../../shared/core-runtime
+      '@agent-xai/observability':
+        specifier: workspace:*
+        version: link:../../shared/observability
+      '@agent-xai/shared':
+        specifier: workspace:*
+        version: link:../../shared/shared
+    devDependencies:
+      '@types/node':
+        specifier: ^20.19.43
+        version: 20.19.43
+      typescript:
+        specifier: 5.4.5
+        version: 5.4.5
+      vitest:
+        specifier: ^3.2.7
         version: 3.2.7(@types/node@20.19.43)(jiti@2.7.0)(lightningcss@1.32.0)(yaml@2.9.0)
 
   packages/provider/native-providers:

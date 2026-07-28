@@ -1,7 +1,6 @@
 // packages/agent/agent-platform/src/agent.ts
 import type { TaskModel, TaskContext } from '@agent-xai/core-runtime';
-import type { CompletionRequest } from '@agent-xai/provider-sdk';
-import { ProviderRegistry } from '@agent-xai/provider-sdk';
+import { LLMRouter, RouteRequest, DeepSeekMock, OpenAIMock, AnthropicMock } from '@agent-xai/llm-router';
 
 export type AgentRole = 'coding' | 'review' | 'test' | 'security';
 
@@ -23,23 +22,31 @@ export interface Agent {
   run(task: TaskModel, context: TaskContext): Promise<AgentResult>;
 }
 
-// Helper function to call LLM provider
-export async function callLLM(prompt: string, modelId?: string): Promise<string> {
-  const registry = new ProviderRegistry();
-  const providers = registry.list();
-  const provider = providers[0];
-  if (!provider) {
-    throw new Error('No provider configured');
-  }
+// Instantiate global router and register mock providers for early beta testing
+const router = new LLMRouter();
+router.registerProvider(DeepSeekMock);
+router.registerProvider(OpenAIMock);
+router.registerProvider(AnthropicMock);
 
-  const request: CompletionRequest = {
-    systemPrompt: '',
-    userPrompt: prompt,
-    modelId: modelId || 'claude-sonnet-4-20250514',
+// Helper function to call LLM via Smart Router
+export async function callLLM(prompt: string, taskId: string = "default", modelId?: string): Promise<string> {
+  // Translate to routing request
+  const request: RouteRequest = {
+    taskId,
+    description: prompt.substring(0, 100),
+    complexity: 'medium', // dynamically computed based on prompt length or heuristics in production
+    type: 'reasoning',
+    budget: 'medium',
+    context: modelId ? { overrideModel: modelId } : undefined
   };
 
-  const response = await registry.complete(provider.id, request);
-  return response.text;
+  try {
+    const result = await router.execute(request, prompt);
+    return result.message;
+  } catch (error) {
+    console.warn("LLM Router failed, returning mock string:", error);
+    return `[Fallback] LLM encountered an error: ${String(error)}`;
+  }
 }
 
 // Specialized agent implementations
@@ -48,23 +55,11 @@ export class CodingAgent implements Agent {
 
   async run(task: TaskModel, _context: TaskContext): Promise<AgentResult> {
     try {
-      const prompt = `You are an expert software engineer. Implement the following task:
-
-Task: ${task.goal}
-
-Provide clean, production-ready code with proper error handling.`;
-
-      const output = await callLLM(prompt);
-
-      return {
-        success: true,
-        output,
-      };
+      const prompt = `You are an expert software engineer. Implement the following task:\n\nTask: ${task.goal}\n\nProvide clean, production-ready code with proper error handling.`;
+      const output = await callLLM(prompt, task.id);
+      return { success: true, output };
     } catch (error) {
-      return {
-        success: false,
-        output: error instanceof Error ? error.message : String(error),
-      };
+      return { success: false, output: error instanceof Error ? error.message : String(error) };
     }
   }
 }
@@ -74,30 +69,11 @@ export class ReviewAgent implements Agent {
 
   async run(task: TaskModel, _context: TaskContext): Promise<AgentResult> {
     try {
-      const prompt = `You are a senior code reviewer. Review the following code:
-
-${task.goal}
-
-Check for:
-- Code quality and best practices
-- Potential bugs
-- Security issues
-- Performance concerns
-- Maintainability
-
-Provide specific, actionable feedback.`;
-
-      const output = await callLLM(prompt);
-
-      return {
-        success: true,
-        output,
-      };
+      const prompt = `You are a senior code reviewer. Review the following code:\n\n${task.goal}\n\nCheck for:\n- Code quality and best practices\n- Potential bugs\n- Security issues\n- Performance concerns\n- Maintainability\n\nProvide specific, actionable feedback.`;
+      const output = await callLLM(prompt, task.id);
+      return { success: true, output };
     } catch (error) {
-      return {
-        success: false,
-        output: error instanceof Error ? error.message : String(error),
-      };
+      return { success: false, output: error instanceof Error ? error.message : String(error) };
     }
   }
 }
@@ -107,29 +83,11 @@ export class TestAgent implements Agent {
 
   async run(task: TaskModel, _context: TaskContext): Promise<AgentResult> {
     try {
-      const prompt = `You are an expert test engineer. Generate comprehensive tests for:
-
-${task.goal}
-
-Include:
-- Unit tests
-- Edge cases
-- Error handling
-- Integration tests where appropriate
-
-Use appropriate testing frameworks and best practices.`;
-
-      const output = await callLLM(prompt);
-
-      return {
-        success: true,
-        output,
-      };
+      const prompt = `You are an expert test engineer. Generate comprehensive tests for:\n\n${task.goal}\n\nInclude:\n- Unit tests\n- Edge cases\n- Error handling\n- Integration tests where appropriate\n\nUse appropriate testing frameworks and best practices.`;
+      const output = await callLLM(prompt, task.id);
+      return { success: true, output };
     } catch (error) {
-      return {
-        success: false,
-        output: error instanceof Error ? error.message : String(error),
-      };
+      return { success: false, output: error instanceof Error ? error.message : String(error) };
     }
   }
 }
@@ -139,30 +97,11 @@ export class SecurityAgent implements Agent {
 
   async run(task: TaskModel, _context: TaskContext): Promise<AgentResult> {
     try {
-      const prompt = `You are a security expert. Analyze the following code for vulnerabilities:
-
-${task.goal}
-
-Check for:
-- Injection attacks (SQL, XSS, command injection)
-- Authentication/authorization issues
-- Data exposure and privacy concerns
-- Insecure dependencies
-- Security misconfigurations
-
-List vulnerabilities by severity (Critical, High, Medium, Low).`;
-
-      const output = await callLLM(prompt);
-
-      return {
-        success: true,
-        output,
-      };
+      const prompt = `You are a security expert. Analyze the following code for vulnerabilities:\n\n${task.goal}\n\nCheck for:\n- Injection attacks (SQL, XSS, command injection)\n- Authentication/authorization issues\n- Data exposure and privacy concerns\n- Insecure dependencies\n- Security misconfigurations\n\nList vulnerabilities by severity (Critical, High, Medium, Low).`;
+      const output = await callLLM(prompt, task.id);
+      return { success: true, output };
     } catch (error) {
-      return {
-        success: false,
-        output: error instanceof Error ? error.message : String(error),
-      };
+      return { success: false, output: error instanceof Error ? error.message : String(error) };
     }
   }
 }
