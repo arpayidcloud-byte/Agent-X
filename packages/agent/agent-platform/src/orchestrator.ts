@@ -19,10 +19,7 @@ export class AgentOrchestrator {
   private testAgent = new TestAgent();
   private securityAgent = new SecurityAgent();
 
-  async executeFlow(
-    task: TaskModel,
-    context: TaskContext,
-  ): Promise<OrchestrationResult> {
+  async executeFlow(task: TaskModel, context: TaskContext): Promise<OrchestrationResult> {
     const results: OrchestrationResult['results'] = {};
 
     try {

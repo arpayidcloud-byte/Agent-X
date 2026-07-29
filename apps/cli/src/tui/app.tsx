@@ -7,11 +7,19 @@ function StatusBar({ taskCount, cost }: { taskCount: number; cost: string }) {
   return (
     <Box borderStyle="single" borderColor="cyan" marginTop={1}>
       <Box flexDirection="row" justifyContent="space-between" width="100%">
-        <Text bold color="cyan">Agent-X v2.0.0</Text>
+        <Text bold color="cyan">
+          Agent-X v2.0.0
+        </Text>
         <Text>
-          Tasks: <Text bold color="yellow">{taskCount}</Text>
+          Tasks:{' '}
+          <Text bold color="yellow">
+            {taskCount}
+          </Text>
           {'  '}
-          Cost: <Text bold color="green">{cost}</Text>
+          Cost:{' '}
+          <Text bold color="green">
+            {cost}
+          </Text>
         </Text>
       </Box>
     </Box>
@@ -28,7 +36,9 @@ function TaskList() {
 
   return (
     <Box flexDirection="column" marginTop={1}>
-      <Text bold underline>Recent Tasks</Text>
+      <Text bold underline>
+        Recent Tasks
+      </Text>
       {tasks.map((t) => (
         <Box key={t.id} flexDirection="row" gap={2}>
           <Text dimColor>[{t.id}]</Text>
@@ -47,7 +57,10 @@ function CommandBar({ onSubmit }: { onSubmit: (cmd: string) => void }) {
 
   return (
     <Box borderStyle="single" borderColor="green" marginTop={1}>
-      <Text bold color="green"> {'>'} </Text>
+      <Text bold color="green">
+        {' '}
+        {'>'}{' '}
+      </Text>
       <TextInput
         value={value}
         onChange={setValue}
@@ -100,9 +113,7 @@ export default function AgentXTUI() {
 
       {/* Footer */}
       <Box marginTop={1}>
-        <Text dimColor>
-          [ESC: exit TUI] | Commands: submit, status, config, cost, help
-        </Text>
+        <Text dimColor>[ESC: exit TUI] | Commands: submit, status, config, cost, help</Text>
       </Box>
     </Box>
   );

@@ -1,4 +1,4 @@
-import { LLMProvider, ModelMetadata, LLMResponse } from '../types.js';
+import type { LLMProvider, ModelMetadata, LLMResponse, RouteRequest } from '../types.js';
 
 export class MockProvider implements LLMProvider {
   name: string;
@@ -9,7 +9,7 @@ export class MockProvider implements LLMProvider {
     this.models = models;
   }
 
-  async generate(model: string, prompt: string, _options?: any): Promise<LLMResponse> {
+  async generate(model: string, prompt: string, _options?: RouteRequest): Promise<LLMResponse> {
     const modelMeta = this.models[model];
     if (!modelMeta) {
       throw new Error(`Model ${model} not supported by provider ${this.name}`);
@@ -17,8 +17,9 @@ export class MockProvider implements LLMProvider {
 
     const inputTokens = Math.floor(prompt.length / 4);
     const outputTokens = 100; // mock
-    const cost = (inputTokens / 1_000_000 * modelMeta.pricing.inputCostPerMillion) + 
-                 (outputTokens / 1_000_000 * modelMeta.pricing.outputCostPerMillion);
+    const cost =
+      (inputTokens / 1_000_000) * modelMeta.pricing.inputCostPerMillion +
+      (outputTokens / 1_000_000) * modelMeta.pricing.outputCostPerMillion;
 
     return {
       message: `[MOCK] This is a response from ${this.name} using ${model}.`,
@@ -27,11 +28,11 @@ export class MockProvider implements LLMProvider {
       usage: {
         inputTokens,
         outputTokens,
-        totalTokens: inputTokens + outputTokens
+        totalTokens: inputTokens + outputTokens,
       },
       cost,
       latencyMs: 500, // mock
-      cached: false
+      cached: false,
     };
   }
 }
@@ -44,8 +45,8 @@ export const DeepSeekMock = new MockProvider('deepseek', {
     provider: 'deepseek',
     pricing: { inputCostPerMillion: 0.1, outputCostPerMillion: 0.1 },
     capabilities: ['code', 'reasoning', 'fast'],
-    complexityRating: 'medium'
-  }
+    complexityRating: 'medium',
+  },
 });
 
 export const OpenAIMock = new MockProvider('openai', {
@@ -54,15 +55,15 @@ export const OpenAIMock = new MockProvider('openai', {
     provider: 'openai',
     pricing: { inputCostPerMillion: 5.0, outputCostPerMillion: 15.0 },
     capabilities: ['code', 'reasoning', 'vision'],
-    complexityRating: 'complex'
+    complexityRating: 'complex',
   },
   'gpt-4o-mini': {
     name: 'GPT-4 Omni Mini',
     provider: 'openai',
-    pricing: { inputCostPerMillion: 0.15, outputCostPerMillion: 0.60 },
+    pricing: { inputCostPerMillion: 0.15, outputCostPerMillion: 0.6 },
     capabilities: ['reasoning', 'fast'],
-    complexityRating: 'simple'
-  }
+    complexityRating: 'simple',
+  },
 });
 
 export const AnthropicMock = new MockProvider('anthropic', {
@@ -71,6 +72,6 @@ export const AnthropicMock = new MockProvider('anthropic', {
     provider: 'anthropic',
     pricing: { inputCostPerMillion: 3.0, outputCostPerMillion: 15.0 },
     capabilities: ['code', 'reasoning', 'vision'],
-    complexityRating: 'complex'
-  }
+    complexityRating: 'complex',
+  },
 });

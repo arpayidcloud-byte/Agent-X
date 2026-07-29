@@ -12,7 +12,7 @@ export interface RouteRequest {
   budget?: UserBudget;
   latency?: LatencyPreference;
   security?: SecurityLevel;
-  context?: Record<string, any>;
+  context?: Record<string, unknown>;
 }
 
 export interface TokenUsage {
@@ -47,5 +47,5 @@ export interface ModelMetadata {
 export interface LLMProvider {
   name: string;
   models: Record<string, ModelMetadata>;
-  generate(model: string, prompt: string, options?: any): Promise<LLMResponse>;
+  generate(model: string, prompt: string, options?: RouteRequest): Promise<LLMResponse>;
 }
