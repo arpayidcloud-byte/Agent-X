@@ -2,7 +2,7 @@
 module.exports = {
   root: true,
   parser: "@typescript-eslint/parser",
-  plugins: ["@typescript-eslint", "prettier", "@agentx"],
+  plugins: ["@typescript-eslint", "prettier", "agentx-internal"],
   extends: [
     "eslint:recommended",
     "plugin:@typescript-eslint/recommended",
@@ -42,9 +42,9 @@ module.exports = {
     "@typescript-eslint/no-unused-vars": ["error", { argsIgnorePattern: "^_", varsIgnorePattern: "^_", destructuredArrayIgnorePattern: "^_" }],
     "@typescript-eslint/consistent-type-imports": ["error", { prefer: "type-imports" }],
     "@typescript-eslint/no-floating-promises": "error",
-    "@agentx/no-credential-logging": "error",
-    "@agentx/no-secret-prefix-logging": "error",
-    "@agentx/no-vendor-sdk-import": "error",
+    "agentx-internal/no-credential-logging": "error",
+    "agentx-internal/no-secret-prefix-logging": "error",
+    "agentx-internal/no-vendor-sdk-import": "error",
     "@typescript-eslint/require-await": "off"
   },
   ignorePatterns: ["dist/", "node_modules/", "*.js", "*.cjs", "*.mjs"]
