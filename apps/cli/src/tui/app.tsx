@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import { render, Box, Text, useApp, useInput } from 'ink';
 import TextInput from 'ink-text-input';
 
@@ -78,7 +78,7 @@ export default function AgentXTUI() {
 
   useInput(
     useCallback(
-      (input, key) => {
+      (_input, key) => {
         if (key.escape) exit();
       },
       [exit],
