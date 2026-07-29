@@ -10,7 +10,7 @@ export class Exporters {
         url:
           traceUrl ||
           process.env.OTEL_EXPORTER_OTLP_TRACES_ENDPOINT ||
-          'http://localhost:4318/v1/traces',
+          process.env.OTEL_TRACE_URL || 'http://localhost:4318/v1/traces',
       });
 
       this.sdk = new NodeSDK({

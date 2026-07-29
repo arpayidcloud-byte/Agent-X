@@ -23,7 +23,7 @@ export interface OTelBootstrapConfig {
 const DEFAULT_CONFIG: Required<OTelBootstrapConfig> = {
   serviceName: 'agentx',
   serviceVersion: '0.1.0',
-  otlpEndpoint: process.env.OTEL_EXPORTER_OTLP_TRACES_ENDPOINT || 'http://localhost:4318/v1/traces',
+  otlpEndpoint: process.env.OTEL_TRACE_URL || 'http://localhost:4318/v1/traces',
   enabled: true,
 };
 
