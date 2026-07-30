@@ -32,7 +32,8 @@
     "@agent-xai/runtime-adapters": "workspace:*",
     "@agent-xai/core-runtime": "workspace:*",
     "@agent-xai/tool-sdk": "workspace:*",
-    "@prisma/client": "^5.14.0"
+    "@prisma/client": "^5.14.0",
+    "@agent-xai/auth": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
