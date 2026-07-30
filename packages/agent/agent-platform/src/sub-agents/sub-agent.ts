@@ -10,7 +10,12 @@ export class BaseSubAgent implements SubAgent {
   protected readonly promptTemplate?: string;
   protected readonly providerRegistry: ProviderRegistry;
 
-  constructor(id: string, role: AgentRole, config?: AgentConfig, providerRegistry?: ProviderRegistry) {
+  constructor(
+    id: string,
+    role: AgentRole,
+    config?: AgentConfig,
+    providerRegistry?: ProviderRegistry,
+  ) {
     this.id = id;
     this.role = role;
     this.providerId = config?.providerId;
@@ -28,7 +33,11 @@ export class BaseSubAgent implements SubAgent {
     return `Execute task ${task.id}: ${task.goal} as ${this.role}`;
   }
 
-  protected async callLLM(prompt: string, systemPrompt?: string, modelId?: string): Promise<CompletionResponse> {
+  protected async callLLM(
+    prompt: string,
+    systemPrompt?: string,
+    modelId?: string,
+  ): Promise<CompletionResponse> {
     const providers = this.providerRegistry.list();
     const provider = providers[0];
     if (!provider) {
@@ -46,7 +55,7 @@ export class BaseSubAgent implements SubAgent {
 
   public async execute(task: TaskModel, _context: unknown): Promise<unknown> {
     const prompt = this.buildPrompt(task);
-    
+
     try {
       const response = await this.callLLM(prompt);
       return {

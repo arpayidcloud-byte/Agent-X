@@ -1,6 +1,7 @@
 // packages/agent/agent-platform/src/agent.ts
 import type { TaskModel, TaskContext } from '@agent-xai/core-runtime';
-import { LLMRouter, RouteRequest, DeepSeekMock, OpenAIMock, AnthropicMock } from '@agent-xai/llm-router';
+import type { RouteRequest } from '@agent-xai/llm-router';
+import { LLMRouter, DeepSeekMock, OpenAIMock, AnthropicMock } from '@agent-xai/llm-router';
 
 export type AgentRole = 'coding' | 'review' | 'test' | 'security';
 
@@ -29,7 +30,11 @@ router.registerProvider(OpenAIMock);
 router.registerProvider(AnthropicMock);
 
 // Helper function to call LLM via Smart Router
-export async function callLLM(prompt: string, taskId: string = "default", modelId?: string): Promise<string> {
+export async function callLLM(
+  prompt: string,
+  taskId: string = 'default',
+  modelId?: string,
+): Promise<string> {
   // Translate to routing request
   const request: RouteRequest = {
     taskId,
@@ -37,14 +42,14 @@ export async function callLLM(prompt: string, taskId: string = "default", modelI
     complexity: 'medium', // dynamically computed based on prompt length or heuristics in production
     type: 'reasoning',
     budget: 'medium',
-    context: modelId ? { overrideModel: modelId } : undefined
+    context: modelId ? { overrideModel: modelId } : undefined,
   };
 
   try {
     const result = await router.execute(request, prompt);
     return result.message;
   } catch (error) {
-    console.warn("LLM Router failed, returning mock string:", error);
+    console.warn('LLM Router failed, returning mock string:', error);
     return `[Fallback] LLM encountered an error: ${String(error)}`;
   }
 }

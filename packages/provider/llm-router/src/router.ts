@@ -1,4 +1,4 @@
-import { RouteRequest, LLMProvider, ModelMetadata } from './types.js';
+import type { RouteRequest, LLMProvider, ModelMetadata, LLMResponse } from './types.js';
 import { LLMCacheManager } from './cache-manager.js';
 
 export class LLMRouter {
@@ -21,7 +21,7 @@ export class LLMRouter {
     const complexity = req.complexity || 'medium';
     const budget = req.budget || 'medium';
     const type = req.type || 'reasoning';
-    
+
     // Safety fallback
     if (req.security === 'confidential') {
       return 'local:llama-3-8b';
@@ -33,7 +33,8 @@ export class LLMRouter {
 
     if (type === 'code') {
       if (complexity === 'simple') return 'anthropic:claude-3-haiku-20240307';
-      if (complexity === 'complex' || complexity === 'expert') return 'anthropic:claude-3-7-sonnet-20250219';
+      if (complexity === 'complex' || complexity === 'expert')
+        return 'anthropic:claude-3-7-sonnet-20250219';
       return 'anthropic:claude-3-5-sonnet-20241022';
     }
 
@@ -45,10 +46,10 @@ export class LLMRouter {
       return 'openai:gpt-4o-mini';
     }
 
-    return 'deepseek:deepseek-v3'; 
+    return 'deepseek:deepseek-v3';
   }
 
-  async execute(req: RouteRequest, prompt: string): Promise<any> {
+  async execute(req: RouteRequest, prompt: string): Promise<LLMResponse> {
     // 1. Check cache first
     const cachedResponse = await this.cacheManager.getCached(req, prompt);
     if (cachedResponse) {

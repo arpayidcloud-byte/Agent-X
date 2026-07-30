@@ -12,6 +12,7 @@ import { plugin } from './commands/plugin.js';
 import { watch } from './commands/watch.js';
 import { dlq } from './commands/dlq.js';
 import { shutdown } from './commands/shutdown.js';
+import { tui as tuiCommand } from './commands/tui.js';
 
 const require = createRequire(import.meta.url);
 const pkg = require('../package.json');
@@ -160,6 +161,18 @@ program
   .action(async (reason: string[]) => {
     try {
       await shutdown(reason);
+    } catch (error) {
+      console.error(error instanceof Error ? error.message : String(error));
+      process.exit(1);
+    }
+  });
+
+program
+  .command('tui')
+  .description('Launch interactive Terminal UI')
+  .action(async () => {
+    try {
+      await tuiCommand();
     } catch (error) {
       console.error(error instanceof Error ? error.message : String(error));
       process.exit(1);

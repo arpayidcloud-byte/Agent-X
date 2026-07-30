@@ -1,11 +1,12 @@
-import { RouteRequest, LLMResponse } from './types.js';
+import type { RouteRequest, LLMResponse } from './types.js';
 import crypto from 'crypto';
 
 export class LLMCacheManager {
   private cache: Map<string, { response: LLMResponse; expiresAt: number }> = new Map();
   private ttlMs: number;
 
-  constructor(ttlMs: number = 1000 * 60 * 60 * 24) { // Default 24 hours
+  constructor(ttlMs: number = 1000 * 60 * 60 * 24) {
+    // Default 24 hours
     this.ttlMs = ttlMs;
   }
 
@@ -14,7 +15,7 @@ export class LLMCacheManager {
       taskId: req.taskId, // Often task is isolated, but let's hash prompt + complexity
       complexity: req.complexity,
       type: req.type,
-      prompt
+      prompt,
     });
     return crypto.createHash('sha256').update(payload).digest('hex');
   }
@@ -22,7 +23,7 @@ export class LLMCacheManager {
   async getCached(req: RouteRequest, prompt: string): Promise<LLMResponse | null> {
     const key = this.hashRequest(req, prompt);
     const entry = this.cache.get(key);
-    
+
     if (entry) {
       if (Date.now() < entry.expiresAt) {
         // Return cloned response flagged as cached
@@ -38,7 +39,7 @@ export class LLMCacheManager {
     const key = this.hashRequest(req, prompt);
     this.cache.set(key, {
       response,
-      expiresAt: Date.now() + this.ttlMs
+      expiresAt: Date.now() + this.ttlMs,
     });
   }
 }

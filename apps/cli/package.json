@@ -20,7 +20,8 @@
   },
   "devDependencies": {
     "typescript": "5.4.5",
-    "vitest": "^3.2.6"
+    "vitest": "^3.2.6",
+    "@types/react": "^18.3.0"
   },
   "dependencies": {
     "@agent-xai/agent-platform": "workspace:*",
@@ -30,6 +31,9 @@
     "@agent-xai/runtime-production": "workspace:*",
     "@agent-xai/tool-sdk": "workspace:*",
     "@prisma/client": "^7.9.0",
-    "commander": "^15.0.0"
+    "commander": "^15.0.0",
+    "ink": "^7.1.0",
+    "ink-text-input": "^6.0.0",
+    "react": "^18.3.0"
   }
 }

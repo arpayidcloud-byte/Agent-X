@@ -26,10 +26,7 @@ export abstract class BaseAgent {
     this.defaultProviderId = provider.id;
   }
 
-  protected async callProvider(
-    prompt: string,
-    modelId?: string,
-  ): Promise<string> {
+  protected async callProvider(prompt: string, modelId?: string): Promise<string> {
     if (!this.defaultProviderId) {
       throw new Error('No provider configured');
     }

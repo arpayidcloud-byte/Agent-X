@@ -22,8 +22,11 @@
       "esbuild": ">=0.25.0",
       "uuid": ">=11.1.1",
       "fast-uri": ">=3.1.4",
-      "minimatch": "^10.2.5"
-      ,"@agentx-cli/shared": "workspace:*"
+      "minimatch": "^10.2.5",
+      "@agentx-cli/shared": "workspace:*",
+      "sharp": ">=0.35.0",
+      "postcss": ">=8.5.18",
+      "@opentelemetry/core": ">=2.8.0"
     }
   },
   "packageManager": "pnpm@11.13.0",
@@ -60,6 +63,7 @@
     "@changesets/cli": "^2.27.5",
     "@commitlint/cli": "^19.3.0",
     "@commitlint/config-conventional": "^19.2.2",
+    "@prisma/client": "^7.9.1",
     "@types/node": "^20.19.43",
     "@typescript-eslint/eslint-plugin": "^7.12.0",
     "@typescript-eslint/parser": "^7.12.0",
@@ -70,6 +74,7 @@
     "husky": "^9.0.11",
     "lint-staged": "^15.2.5",
     "prettier": "^3.3.0",
+    "prisma": "^5.14.0",
     "turbo": "^2.0.4",
     "typedoc": "^0.28.20",
     "typedoc-plugin-markdown": "^4.12.0",

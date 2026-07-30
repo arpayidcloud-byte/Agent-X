@@ -41,11 +41,7 @@ export class AgentDelegationProtocol {
     return await targetAgent.run(request.task, delegationContext);
   }
 
-  async chain(
-    task: TaskModel,
-    context: TaskContext,
-    roles: AgentRole[],
-  ): Promise<AgentResult[]> {
+  async chain(task: TaskModel, context: TaskContext, roles: AgentRole[]): Promise<AgentResult[]> {
     const results: AgentResult[] = [];
     let currentContext = context;
     let currentGoal = task.goal;
@@ -53,7 +49,7 @@ export class AgentDelegationProtocol {
     for (const role of roles) {
       const agent = this.agents[role];
       const currentTask = { ...task, goal: currentGoal };
-      
+
       const result = await agent.run(currentTask, currentContext);
       results.push(result);
 

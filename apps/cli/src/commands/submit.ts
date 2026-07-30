@@ -7,7 +7,7 @@ export async function submit(args: string[]): Promise<string> {
   const roleIndex = args.findIndex((a) => a === '--role');
   const assignedRole = roleIndex >= 0 ? args[roleIndex + 1] : 'coder';
   const goal = args.filter((a) => !a.startsWith('--') && a !== '--role').join(' ');
-  
+
   if (!goal) {
     throw new Error('Usage: agentx submit "<goal>" [--role <agent-role>]');
   }
