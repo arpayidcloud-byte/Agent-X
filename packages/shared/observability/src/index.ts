@@ -4,3 +4,6 @@ export * from './logger.js';
 export * from './exporters.js';
 export * from './health.js';
 export * from './prometheus-exporter.js';
+export * from './llm-metrics.js';
+export * from './alerting.js';
+export * from './health-check.js';
