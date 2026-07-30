@@ -1,20 +1,34 @@
 import type { RouteRequest, LLMProvider, ModelMetadata, LLMResponse } from './types.js';
 import { LLMCacheManager } from './cache-manager.js';
+import { llmMetrics } from '@agent-xai/observability';
 
 export class LLMRouter {
   private providers: Map<string, LLMProvider> = new Map();
   private models: Map<string, ModelMetadata> = new Map();
   private cacheManager: LLMCacheManager;
+  private fallbackChain: string[] = [];
 
   constructor() {
     this.cacheManager = new LLMCacheManager();
+    // Build fallback chain from env vars
+    const defaultProvider = process.env.LLM_PROVIDER_DEFAULT || 'openai';
+    const fallbackProvider = process.env.LLM_PROVIDER_FALLBACK || 'deepseek';
+    const backupProvider = process.env.LLM_PROVIDER_BACKUP || 'qwen';
+    this.fallbackChain = [defaultProvider, fallbackProvider, backupProvider].filter(
+      (v, i, arr) => arr.indexOf(v) === i,
+    );
+
+    // Track active providers
+    llmMetrics.setActiveProviders(this.providers.size);
   }
 
-  registerProvider(provider: LLMProvider) {
+  registerProvider(provider: LLMProvider): void {
     this.providers.set(provider.name, provider);
     for (const [modelId, metadata] of Object.entries(provider.models)) {
       this.models.set(`${provider.name}:${modelId}`, metadata);
     }
+    llmMetrics.setActiveProviders(this.providers.size);
+    llmMetrics.setProviderHealth(provider.name, true);
   }
 
   selectBestModel(req: RouteRequest): string {
@@ -53,30 +67,84 @@ export class LLMRouter {
     // 1. Check cache first
     const cachedResponse = await this.cacheManager.getCached(req, prompt);
     if (cachedResponse) {
+      llmMetrics.recordCacheHit('cache', 'all');
       return cachedResponse;
     }
 
     // 2. Select Model
     const selectedModelStr = this.selectBestModel(req);
     const parts = selectedModelStr.split(':');
-    const providerName = parts[0];
-    const modelId = parts[1];
-
-    if (!providerName || !modelId) {
+    if (parts.length < 2) {
       throw new Error(`Invalid model resolution result: ${selectedModelStr}`);
     }
+    const providerName: string = parts[0] as string;
+    const modelId: string = parts[1] as string;
+    const complexity: string = req.complexity || 'medium';
 
     const provider = this.providers.get(providerName);
     if (!provider) {
       throw new Error(`Provider ${providerName} not found or not registered.`);
     }
 
-    // 3. Execute
-    const response = await provider.generate(modelId, prompt, req);
+    // 3. Execute with metrics and auto-fallback
+    const startTime = performance.now();
 
-    // 4. Save to cache
-    await this.cacheManager.setCache(req, prompt, response);
+    try {
+      const response = await provider.generate(modelId, prompt, req);
+      const latency = (performance.now() - startTime) / 1000;
 
-    return response;
+      // Record success metrics
+      llmMetrics.recordRequest(providerName, modelId, complexity, 'success');
+      llmMetrics.recordLatency(providerName, modelId, latency);
+      llmMetrics.recordTokenUsage(providerName, modelId, 'input', response.usage.inputTokens);
+      llmMetrics.recordTokenUsage(providerName, modelId, 'output', response.usage.outputTokens);
+      llmMetrics.setProviderHealth(providerName, true);
+
+      // 4. Save to cache
+      await this.cacheManager.setCache(req, prompt, response);
+
+      return response;
+    } catch (err: unknown) {
+      const errorMsg = err instanceof Error ? err.message : String(err);
+
+      // Record error metric
+      llmMetrics.recordRequest(providerName, modelId, complexity, 'error');
+      llmMetrics.recordError(providerName, modelId, errorMsg.slice(0, 50));
+      llmMetrics.setProviderHealth(providerName, false);
+
+      // Auto-fallback via fallback chain
+      const fallbackIndex = this.fallbackChain.indexOf(providerName);
+      for (let i = fallbackIndex + 1; i < this.fallbackChain.length; i++) {
+        const fallbackName: string = this.fallbackChain[i] as string;
+        const fallbackProvider = this.providers.get(fallbackName);
+        if (!fallbackProvider) continue;
+
+        // Try fallback model
+        const fallbackModelStr = this.selectBestModel({ ...req, complexity: 'simple' });
+        const fbParts = fallbackModelStr.split(':');
+        const fbModel: string = fbParts.length >= 2 ? (fbParts[1] as string) : 'default';
+
+        try {
+          const fbStart = performance.now();
+          const fbResponse = await fallbackProvider.generate(fbModel, prompt, req);
+          const fbLatency = (performance.now() - fbStart) / 1000;
+
+          llmMetrics.recordFallback(providerName, fallbackName, errorMsg.slice(0, 40));
+          llmMetrics.recordRequest(fallbackName, fbModel, complexity, 'success');
+          llmMetrics.recordLatency(fallbackName, fbModel, fbLatency);
+          llmMetrics.setProviderHealth(fallbackName, true);
+
+          await this.cacheManager.setCache(req, prompt, fbResponse);
+          return fbResponse;
+        } catch {
+          llmMetrics.recordError(fallbackName, fbModel, 'fallback_failed');
+          llmMetrics.setProviderHealth(fallbackName, false);
+          continue;
+        }
+      }
+
+      // All fallbacks exhausted — re-throw original error
+      throw err;
+    }
   }
 }
