@@ -42,6 +42,8 @@ export interface ModelMetadata {
   pricing: ModelPricing;
   capabilities: ('code' | 'reasoning' | 'vision' | 'fast')[];
   complexityRating: TaskComplexity;
+  endpoint?: string;
+  apiKeyEnvVar?: string;
 }
 
 export interface LLMProvider {
