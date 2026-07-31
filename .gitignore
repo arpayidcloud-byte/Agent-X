@@ -39,3 +39,4 @@ temp/
 
 # Turborepo cache (never commit)
 .turbo/
+.typedoc/

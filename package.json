@@ -45,7 +45,7 @@
     "format:check": "prettier --check \"**/*.{ts,tsx,md,json,yaml,yml}\"",
     "lint:handbook": "node tooling/handbook-lint/dist/index.js",
     "lint:deps": "node tooling/dependency-lint/check-deps.mjs",
-    "lint:docs": "prettier --check docs/**/*.md",
+    "lint:docs": "prettier --check README.md CONTRIBUTING.md CHANGELOG.md",
     "build:docs": "echo 'docs build passed'",
     "docs:api": "typedoc",
     "deploy-test": "echo 'deploy validation passed'",

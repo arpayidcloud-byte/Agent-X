@@ -309,7 +309,7 @@ agentx/
 ├── tooling/                 # Development tools
 │   └── eslint-plugin/      # Custom ESLint rules
 ├── tests/                   # End-to-end tests
-└── docs/                    # Documentation
+└── ...                      # (Documentation lives in Agent-X-Plan repo → Documentation/)
 ```
 
 ### Adding New Packages
@@ -428,9 +428,9 @@ Each package should have a README.md with:
 
 Major architectural decisions should be documented in:
 
-- `ARCHITECTURE.md` - High-level system architecture
-- `docs/design/` - Detailed design documents
-- `docs/guides/` - Development guides
+- `ARCHITECTURE.md` - High-level system architecture (Agent-X-Plan → `Documentation/ARCHITECTURE.md`)
+- `Documentation/design/` - Detailed design documents (Agent-X-Plan repo)
+- `Documentation/guides/` - Development guides (Agent-X-Plan repo)
 
 ## 7. PR Checklist
 
@@ -452,7 +452,8 @@ Before submitting a PR, ensure:
 
 - **Issues**: Report bugs or request features via GitHub Issues
 - **Discussions**: Use GitHub Discussions for questions and ideas
-- **Documentation**: Check `docs/` directory for detailed guides
+- **Documentation**: Check the `Documentation/` directory in the
+  [Agent-X-Plan](https://github.com/arpayidcloud-byte/Agent-X-Plan) repository for detailed guides
 
 ## Code of Conduct
 
