@@ -30,8 +30,6 @@ services:
     image: prom/alertmanager:v0.27.0
     container_name: agentx-alertmanager
     restart: unless-stopped
-    environment:
-      - ALERTMANAGER_WEBHOOK_URL=${ALERTMANAGER_WEBHOOK_URL:-http://localhost:9999/alert}
     volumes:
       - ./deployments/monitoring/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
     command:

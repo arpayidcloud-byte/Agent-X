@@ -18,8 +18,11 @@ route:
 
 receivers:
   - name: agentx-webhook
+    # NOTE: Alertmanager does NOT expand environment variables in its config.
+    # Replace this URL with your webhook endpoint (e.g. your Slack/Teams/Opsgenie
+    # webhook URL or a small receiver service).
     webhook_configs:
-      - url: ${ALERTMANAGER_WEBHOOK_URL}
+      - url: http://localhost:9999/alert
         send_resolved: true
     # Uncomment and configure for Slack:
     # slack_configs:
