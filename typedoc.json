@@ -1,7 +1,7 @@
 {
   "entryPoints": ["packages/*/src/index.ts", "packages/*/*/src/index.ts"],
   "entryPointStrategy": "resolve",
-  "out": "docs/api",
+  "out": ".typedoc/api",
   "plugin": ["typedoc-plugin-markdown"],
   "readme": "none",
   "excludePrivate": true
