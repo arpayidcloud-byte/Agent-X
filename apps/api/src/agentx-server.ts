@@ -1,6 +1,6 @@
 import express from 'express';
 import { llmMetrics, alertManager, healthChecker, Logger } from '@agent-xai/observability';
-import { LLMRouter } from '@agent-xai/llm-router';
+import { LLMRouter, OpenAIMock, DeepSeekMock, AnthropicMock } from '@agent-xai/llm-router';
 import { createRequestLogger } from './request-logger.js';
 
 const logger = new Logger('agentx-api');
@@ -13,6 +13,18 @@ const PORT = process.env.PORT || 4000;
 
 // ─── Router instance (singleton) ────
 export const router = new LLMRouter();
+
+// ─── Dev/demo providers (no API keys required) ────
+// Set ENABLE_MOCK_PROVIDER=true to register mock providers so the API is
+// fully usable locally for development, testing and monitoring demos.
+if (process.env.ENABLE_MOCK_PROVIDER === 'true') {
+  router.registerProvider(OpenAIMock);
+  router.registerProvider(DeepSeekMock);
+  router.registerProvider(AnthropicMock);
+  logger.info('Mock providers registered (ENABLE_MOCK_PROVIDER=true)', {
+    providers: ['openai', 'deepseek', 'anthropic'],
+  });
+}
 
 // ─── Metrics endpoint (Prometheus scrape) ────
 app.get('/metrics', async (_req, res) => {
