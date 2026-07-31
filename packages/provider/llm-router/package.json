@@ -19,7 +19,8 @@
     "build": "tsc --build",
     "lint": "eslint src/",
     "test": "vitest run",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "bench": "tsc --build && node dist/bench/benchmark.js"
   },
   "repository": {
     "type": "git",

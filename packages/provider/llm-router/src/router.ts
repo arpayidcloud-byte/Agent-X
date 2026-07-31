@@ -132,10 +132,16 @@ export class LLMRouter {
         const fallbackProvider = this.providers.get(fallbackName);
         if (!fallbackProvider) continue;
 
-        // Try fallback model
-        const fallbackModelStr = this.selectBestModel({ ...req, complexity: 'simple' });
-        const fbParts = fallbackModelStr.split(':');
-        const fbModel: string = fbParts.length >= 2 ? (fbParts[1] as string) : 'default';
+        // Pick the cheapest model the fallback provider actually offers.
+        // (selectBestModel resolves to a GLOBAL provider:model string that may
+        // not exist on the fallback provider — resolve per-provider instead.)
+        const fbCandidate = Object.entries(fallbackProvider.models).sort(
+          (a, b) =>
+            a[1].pricing.inputCostPerMillion +
+            a[1].pricing.outputCostPerMillion -
+            (b[1].pricing.inputCostPerMillion + b[1].pricing.outputCostPerMillion),
+        )[0];
+        const fbModel: string = fbCandidate?.[0] ?? 'default';
 
         try {
           const fbStart = performance.now();
