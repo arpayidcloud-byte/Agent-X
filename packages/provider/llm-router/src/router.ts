@@ -1,6 +1,6 @@
 import type { RouteRequest, LLMProvider, ModelMetadata, LLMResponse } from './types.js';
 import { LLMCacheManager } from './cache-manager.js';
-import { llmMetrics } from '@agent-xai/observability';
+import { llmMetrics, alertManager, healthChecker } from '@agent-xai/observability';
 
 export class LLMRouter {
   private providers: Map<string, LLMProvider> = new Map();
@@ -29,6 +29,7 @@ export class LLMRouter {
     }
     llmMetrics.setActiveProviders(this.providers.size);
     llmMetrics.setProviderHealth(provider.name, true);
+    healthChecker.registerProvider(provider.name, 'healthy');
   }
 
   selectBestModel(req: RouteRequest): string {
@@ -111,6 +112,18 @@ export class LLMRouter {
       llmMetrics.recordRequest(providerName, modelId, complexity, 'error');
       llmMetrics.recordError(providerName, modelId, errorMsg.slice(0, 50));
       llmMetrics.setProviderHealth(providerName, false);
+      healthChecker.registerProvider(providerName, 'unhealthy');
+
+      // Send alert for provider failure
+      await alertManager.sendAlert(
+        'warning',
+        `Provider ${providerName} failed: ${errorMsg.slice(0, 80)}`,
+        {
+          provider: providerName,
+          model: modelId,
+          error: errorMsg,
+        },
+      );
 
       // Auto-fallback via fallback chain
       const fallbackIndex = this.fallbackChain.indexOf(providerName);
