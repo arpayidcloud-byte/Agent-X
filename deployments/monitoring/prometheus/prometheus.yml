@@ -1,0 +1,30 @@
+# Agent-X Prometheus configuration
+# Scrapes the Agent-X API server (/metrics endpoint) and evaluates alerting rules.
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    cluster: agentx
+
+rule_files:
+  - /etc/prometheus/alerting-rules.yml
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+            - alertmanager:9093
+
+scrape_configs:
+  - job_name: agentx-api
+    metrics_path: /metrics
+    static_configs:
+      - targets:
+          - agentx-api:4000
+        labels:
+          service: agentx-api
+
+  - job_name: prometheus
+    static_configs:
+      - targets:
+          - localhost:9090

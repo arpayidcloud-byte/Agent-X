@@ -1,0 +1,77 @@
+# Agent-X Prometheus alerting rules
+# Aligned with the metrics exposed by the Agent-X API server:
+#   llm_requests_total, llm_errors_total, llm_fallbacks_total,
+#   llm_request_latency_seconds, llm_token_usage, llm_provider_health,
+#   http_requests_total, process_*, nodejs_*
+groups:
+  - name: agentx-llm
+    rules:
+      # Service down: no /metrics scrape from the API server
+      - alert: AgentXApiDown
+        expr: up{job="agentx-api"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: 'Agent-X API server is down'
+          description: 'Prometheus cannot scrape {{ $labels.job }} for 1m. Service may be unreachable.'
+
+      # Provider marked unhealthy by the router health checker
+      - alert: LLMProviderUnhealthy
+        expr: llm_provider_health == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: 'LLM provider {{ $labels.provider }} is unhealthy'
+          description: 'Provider {{ $labels.provider }} has been marked unhealthy for 2m. Requests will fall back to the next provider in the chain.'
+
+      # Error rate > 5% over 5 minutes (per provider)
+      - alert: LLMErrorRateHigh
+        expr: |
+          sum by (provider) (rate(llm_requests_total{status="error"}[5m]))
+            / clamp_min(sum by (provider) (rate(llm_requests_total[5m])), 1)
+          > 0.05
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: 'LLM error rate above 5% ({{ $labels.provider }})'
+          description: 'Provider {{ $labels.provider }} error rate is {{ $value | humanizePercentage }} over the last 5 minutes (threshold: 5%).'
+
+      # p95 latency > 1s over 5 minutes (per provider)
+      - alert: LLMLatencyP95High
+        expr: |
+          histogram_quantile(
+            0.95,
+            sum by (le, provider) (rate(llm_request_latency_seconds_bucket[5m]))
+          ) > 1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: 'LLM p95 latency above 1s ({{ $labels.provider }})'
+          description: 'Provider {{ $labels.provider }} p95 latency is {{ $value }}s over the last 5 minutes (threshold: 1s).'
+
+      # Sustained fallback activity signals primary provider degradation
+      - alert: LLMFallbackRateHigh
+        expr: sum(rate(llm_fallbacks_total[5m])) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: 'High LLM fallback rate'
+          description: 'Fallback rate is {{ $value }} fallbacks/sec over the last 5 minutes (threshold: 0.1/sec). Primary providers are likely failing.'
+
+      # HTTP 5xx rate > 5% over 5 minutes on the API server
+      - alert: Http5xxRateHigh
+        expr: |
+          sum by (route) (rate(http_requests_total{status=~"5.."}[5m]))
+            / clamp_min(sum by (route) (rate(http_requests_total[5m])), 1)
+          > 0.05
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: 'HTTP 5xx rate above 5% ({{ $labels.route }})'
+          description: 'Route {{ $labels.route }} returned 5xx at {{ $value | humanizePercentage }} over the last 5 minutes.'

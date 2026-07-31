@@ -1,9 +1,13 @@
 import express from 'express';
-import { llmMetrics, alertManager, healthChecker } from '@agent-xai/observability';
+import { llmMetrics, alertManager, healthChecker, Logger } from '@agent-xai/observability';
 import { LLMRouter } from '@agent-xai/llm-router';
+import { createRequestLogger } from './request-logger.js';
+
+const logger = new Logger('agentx-api');
 
 const app = express();
 app.use(express.json());
+app.use(createRequestLogger());
 
 const PORT = process.env.PORT || 4000;
 
@@ -81,7 +85,7 @@ setInterval(() => {
         );
       }
     } catch (e) {
-      console.error('[HealthMonitor] error:', e);
+      logger.error('[HealthMonitor] error:', e instanceof Error ? e : new Error(String(e)));
     }
   })();
 }, HEALTH_MONITOR_INTERVAL_MS);
@@ -120,20 +124,21 @@ setInterval(() => {
 
       await alertManager.checkThresholds(parsed);
     } catch (e) {
-      console.error('[ThresholdMonitor] error:', e);
+      logger.error('[ThresholdMonitor] error:', e instanceof Error ? e : new Error(String(e)));
     }
   })();
 }, THRESHOLD_CHECK_INTERVAL_MS);
 
 // ─── Start server ────
 const server = app.listen(PORT, () => {
-  console.log(`Agent-X server running at http://localhost:${PORT}`);
-  console.log('Endpoints:');
-  console.log('  GET  /metrics          — Prometheus metrics');
-  console.log('  GET  /health           — provider health report');
-  console.log('  POST /v1/agentx/run    — LLM router execution');
-  console.log(`Health monitor: every ${HEALTH_MONITOR_INTERVAL_MS}ms`);
-  console.log(`Threshold check: every ${THRESHOLD_CHECK_INTERVAL_MS}ms`);
+  logger.info(`Agent-X server running at http://localhost:${PORT}`, { port: PORT });
+  logger.info('Endpoints:', { endpoints: ['/metrics', '/health', '/v1/agentx/run'] });
+  logger.info(`Health monitor: every ${HEALTH_MONITOR_INTERVAL_MS}ms`, {
+    intervalMs: HEALTH_MONITOR_INTERVAL_MS,
+  });
+  logger.info(`Threshold check: every ${THRESHOLD_CHECK_INTERVAL_MS}ms`, {
+    intervalMs: THRESHOLD_CHECK_INTERVAL_MS,
+  });
 });
 
 export default server;
