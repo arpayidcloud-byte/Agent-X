@@ -5,11 +5,36 @@ import { createRequestLogger } from './request-logger.js';
 
 const logger = new Logger('agentx-api');
 
-const app = express();
+const app: express.Express = express();
 app.use(express.json());
 app.use(createRequestLogger());
 
 const PORT = process.env.PORT || 4000;
+
+// ─── In-memory task store (dashboard API) ────
+export interface TaskRecord {
+  id: string;
+  prompt: string;
+  description: string;
+  status: 'pending' | 'success' | 'error';
+  provider?: string;
+  model?: string;
+  response?: string;
+  error?: string;
+  createdAt: string;
+  completedAt?: string;
+}
+
+export const taskStore = new Map<string, TaskRecord>();
+
+function recordTask(task: TaskRecord): void {
+  taskStore.set(task.id, task);
+  // Cap the store to the latest 200 tasks (memory-friendly)
+  if (taskStore.size > 200) {
+    const oldest = [...taskStore.keys()].shift();
+    if (oldest) taskStore.delete(oldest);
+  }
+}
 
 // ─── Router instance (singleton) ────
 export const router = new LLMRouter();
@@ -65,11 +90,70 @@ app.post('/v1/agentx/run', async (req, res): Promise<void> => {
       budget: budget ?? 'medium',
     };
 
-    const response = await router.execute(request, prompt);
-    res.json(response);
+    const startedAt = new Date().toISOString();
+    recordTask({
+      id: request.taskId,
+      prompt,
+      description: request.description,
+      status: 'pending',
+      createdAt: startedAt,
+    });
+
+    try {
+      const response = await router.execute(request, prompt);
+      const completed = taskStore.get(request.taskId);
+      if (completed) {
+        completed.status = 'success';
+        completed.completedAt = new Date().toISOString();
+        completed.provider = response.provider;
+        completed.model = response.model;
+        completed.response = response.message;
+      }
+      res.json(response);
+    } catch (runErr) {
+      const err = runErr instanceof Error ? runErr.message : String(runErr);
+      const failed = taskStore.get(request.taskId);
+      if (failed) {
+        failed.status = 'error';
+        failed.completedAt = new Date().toISOString();
+        failed.error = err;
+      }
+      res.status(500).json({ error: err });
+    }
   } catch (e) {
     const err = e instanceof Error ? e.message : String(e);
     res.status(500).json({ error: err });
+  }
+});
+
+// ─── Task list endpoint (dashboard) ────
+app.get('/v1/agentx/tasks', async (_req, res) => {
+  try {
+    const limitRaw = Number(_req.query.limit ?? 50);
+    const limit =
+      Number.isFinite(limitRaw) && limitRaw > 0 ? Math.min(Math.floor(limitRaw), 200) : 50;
+    const tasks = [...taskStore.values()]
+      .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1))
+      .slice(0, limit);
+    res.json({ tasks, total: taskStore.size });
+  } catch (e) {
+    res.status(500).json({ error: String(e) });
+  }
+});
+
+// ─── Compact stats endpoint (dashboard) ────
+app.get('/v1/agentx/stats', async (_req, res) => {
+  try {
+    const registry = llmMetrics.getRegistry();
+    const json = await registry.getMetricsAsJSON();
+    const stats: Record<string, number> = {};
+    for (const metric of json) {
+      const total = metric.values.reduce((acc, v) => acc + (Number(v.value) || 0), 0);
+      stats[metric.name] = total;
+    }
+    res.json({ stats, generatedAt: new Date().toISOString() });
+  } catch (e) {
+    res.status(500).json({ error: String(e) });
   }
 });
 
@@ -142,15 +226,19 @@ setInterval(() => {
 }, THRESHOLD_CHECK_INTERVAL_MS);
 
 // ─── Start server ────
-const server = app.listen(PORT, () => {
-  logger.info(`Agent-X server running at http://localhost:${PORT}`, { port: PORT });
-  logger.info('Endpoints:', { endpoints: ['/metrics', '/health', '/v1/agentx/run'] });
-  logger.info(`Health monitor: every ${HEALTH_MONITOR_INTERVAL_MS}ms`, {
-    intervalMs: HEALTH_MONITOR_INTERVAL_MS,
-  });
-  logger.info(`Threshold check: every ${THRESHOLD_CHECK_INTERVAL_MS}ms`, {
-    intervalMs: THRESHOLD_CHECK_INTERVAL_MS,
-  });
-});
+export { app };
 
-export default server;
+if (process.env.NODE_ENV !== 'test') {
+  app.listen(PORT, () => {
+    logger.info(`Agent-X server running at http://localhost:${PORT}`, { port: PORT });
+    logger.info('Endpoints:', {
+      endpoints: ['/metrics', '/health', '/v1/agentx/run', '/v1/agentx/tasks', '/v1/agentx/stats'],
+    });
+    logger.info(`Health monitor: every ${HEALTH_MONITOR_INTERVAL_MS}ms`, {
+      intervalMs: HEALTH_MONITOR_INTERVAL_MS,
+    });
+    logger.info(`Threshold check: every ${THRESHOLD_CHECK_INTERVAL_MS}ms`, {
+      intervalMs: THRESHOLD_CHECK_INTERVAL_MS,
+    });
+  });
+}
