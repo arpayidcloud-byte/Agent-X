@@ -1,0 +1,23 @@
+{
+  "name": "@agent-xai/api",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "main": "dist/agentx-server.js",
+  "types": "dist/agentx-server.d.ts",
+  "scripts": {
+    "build": "tsc --build",
+    "dev": "tsx src/agentx-server.ts",
+    "start": "node dist/agentx-server.js"
+  },
+  "dependencies": {
+    "@agent-xai/observability": "workspace:*",
+    "@agent-xai/llm-router": "workspace:*",
+    "express": "^4.21.0"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0"
+  }
+}
