@@ -23,7 +23,7 @@
   "scripts": {
     "build": "tsc --build",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run test/multi-agent-collaboration.test.ts",
+    "test": "vitest run test/multi-agent-collaboration.test.ts test/specialist-agents.test.ts",
     "test:coverage": "vitest run --coverage",
     "lint": "eslint src/"
   },
