@@ -8,16 +8,19 @@
   "scripts": {
     "build": "tsc --build",
     "dev": "tsx src/agentx-server.ts",
-    "start": "node dist/agentx-server.js"
+    "start": "node dist/agentx-server.js",
+    "test": "vitest run"
   },
   "dependencies": {
-    "@agent-xai/observability": "workspace:*",
     "@agent-xai/llm-router": "workspace:*",
-    "express": "^4.21.0"
+    "@agent-xai/observability": "workspace:*",
+    "express": "^4.21.0",
+    "prom-client": "15.1.3"
   },
   "devDependencies": {
     "@types/express": "^5.0.0",
     "tsx": "^4.19.0",
-    "typescript": "^5.7.0"
+    "typescript": "^5.7.0",
+    "vitest": "^3.2.6"
   }
 }

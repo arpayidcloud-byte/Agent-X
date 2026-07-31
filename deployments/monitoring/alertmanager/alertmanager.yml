@@ -1,0 +1,35 @@
+# Agent-X Alertmanager configuration
+# Routes all Agent-X alerts to a single receiver. Configure webhook/slack/email
+# via environment variables when deploying (see docker-compose.monitoring.yml).
+route:
+  group_by: ['alertname', 'severity']
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 4h
+  receiver: agentx-webhook
+  routes:
+    - matchers:
+        - severity = "critical"
+      receiver: agentx-webhook
+      continue: true
+    - matchers:
+        - severity = "warning"
+      receiver: agentx-webhook
+
+receivers:
+  - name: agentx-webhook
+    webhook_configs:
+      - url: ${ALERTMANAGER_WEBHOOK_URL}
+        send_resolved: true
+    # Uncomment and configure for Slack:
+    # slack_configs:
+    #   - api_url: ${SLACK_WEBHOOK_URL}
+    #     channel: '#agentx-alerts'
+    #     send_resolved: true
+    # Uncomment and configure for email:
+    # email_configs:
+    #   - to: ${ALERT_EMAIL_TO}
+    #     from: ${ALERT_EMAIL_FROM}
+    #     smarthost: ${SMTP_HOST}:${SMTP_PORT}
+    #     auth_username: ${SMTP_USER}
+    #     auth_password: ${SMTP_PASSWORD}

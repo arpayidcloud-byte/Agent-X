@@ -1,0 +1,69 @@
+# Agent-X Monitoring Stack — Prometheus + Alertmanager + Grafana
+#
+# Usage:
+#   docker compose -f docker-compose.monitoring.yml up -d
+#
+# Requires the Agent-X API server to be reachable as host "agentx-api" on port 4000.
+# When running the API locally (not in Docker), add to /etc/hosts:
+#   127.0.0.1 agentx-api
+# or override the target in deployments/monitoring/prometheus/prometheus.yml.
+
+services:
+  prometheus:
+    image: prom/prometheus:v2.53.0
+    container_name: agentx-prometheus
+    restart: unless-stopped
+    volumes:
+      - ./deployments/monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./deployments/monitoring/prometheus/alerting-rules.yml:/etc/prometheus/alerting-rules.yml:ro
+      - prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.enable-lifecycle'
+    ports:
+      - '9090:9090'
+    networks:
+      - agentx-monitoring
+
+  alertmanager:
+    image: prom/alertmanager:v0.27.0
+    container_name: agentx-alertmanager
+    restart: unless-stopped
+    environment:
+      - ALERTMANAGER_WEBHOOK_URL=${ALERTMANAGER_WEBHOOK_URL:-http://localhost:9999/alert}
+    volumes:
+      - ./deployments/monitoring/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+    command:
+      - '--config.file=/etc/alertmanager/alertmanager.yml'
+    ports:
+      - '9093:9093'
+    networks:
+      - agentx-monitoring
+
+  grafana:
+    image: grafana/grafana:11.1.0
+    container_name: agentx-grafana
+    restart: unless-stopped
+    environment:
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER:-admin}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-admin}
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - ./deployments/monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./deployments/monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+    ports:
+      - '3000:3000'
+    networks:
+      - agentx-monitoring
+    depends_on:
+      - prometheus
+
+volumes:
+  prometheus-data:
+  grafana-data:
+
+networks:
+  agentx-monitoring:
+    driver: bridge

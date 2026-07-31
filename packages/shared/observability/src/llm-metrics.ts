@@ -1,4 +1,4 @@
-import { Counter, Histogram, Gauge, Registry } from 'prom-client';
+import { Counter, Histogram, Gauge, Registry, collectDefaultMetrics } from 'prom-client';
 
 export class LLMMetrics {
   private registry: Registry;
@@ -19,6 +19,9 @@ export class LLMMetrics {
 
   constructor() {
     this.registry = new Registry();
+
+    // Node.js runtime + process resource metrics (CPU, memory, event loop, GC)
+    collectDefaultMetrics({ register: this.registry });
 
     // Counter: Total LLM requests
     this.llmRequestsTotal = new Counter({
