@@ -26,6 +26,45 @@ configuration for monitoring the Agent-X platform.
 docker compose -f docker-compose.monitoring.yml up -d
 ```
 
+## Run Without Docker (native binaries)
+
+Prometheus, Alertmanager and Grafana all ship as static Linux binaries — no
+Docker required. Verified on linux-amd64:
+
+```bash
+# 1. Download & extract (adjust versions as needed)
+mkdir -p /opt/monitoring && cd /opt/monitoring
+curl -sL -o prometheus.tar.gz https://github.com/prometheus/prometheus/releases/download/v2.53.0/prometheus-2.53.0.linux-amd64.tar.gz
+curl -sL -o alertmanager.tar.gz https://github.com/prometheus/alertmanager/releases/download/v0.27.0/alertmanager-0.27.0.linux-amd64.tar.gz
+curl -sL -o grafana.tar.gz https://dl.grafana.com/oss/release/grafana-11.1.0.linux-amd64.tar.gz
+tar xzf prometheus.tar.gz && tar xzf alertmanager.tar.gz && tar xzf grafana.tar.gz
+
+# 2. Make the API server resolvable as agentx-api (matches prometheus.yml target)
+echo '127.0.0.1 agentx-api' >> /etc/hosts
+
+# 3. Run the API server with dev mock providers (no API keys needed)
+cd /root/Agent-X && ENABLE_MOCK_PROVIDER=true node apps/api/dist/agentx-server.js
+
+# 4. Prometheus needs the rules file at the path referenced in prometheus.yml
+#    (only when running natively; Docker mounts it at /etc/prometheus)
+mkdir -p /etc/prometheus && cp deployments/monitoring/prometheus/alerting-rules.yml /etc/prometheus/
+
+# 5. Start the stack
+/opt/monitoring/prometheus-2.53.0.linux-amd64/prometheus \
+  --config.file=deployments/monitoring/prometheus/prometheus.yml \
+  --storage.tsdb.path=/opt/monitoring/data/prometheus
+/opt/monitoring/alertmanager-0.27.0.linux-amd64/alertmanager \
+  --config.file=deployments/monitoring/alertmanager/alertmanager.yml \
+  --storage.path=/opt/monitoring/data/alertmanager
+/opt/monitoring/grafana-v11.1.0/bin/grafana server \
+  --homepath=/opt/monitoring/grafana-v11.1.0 \
+  --config=/opt/monitoring/grafana-v11.1.0/conf/defaults.ini
+```
+
+For Grafana provisioning, copy `grafana/provisioning/` into
+`/opt/monitoring/grafana-v11.1.0/conf/provisioning/` and point the dashboards
+provider path at your dashboards directory.
+
 The API server must be reachable as `agentx-api:4000` for Prometheus scraping:
 
 ```bash
@@ -45,7 +84,7 @@ and alerts at `http://localhost:9090/alerts`.
 - Grafana: `http://localhost:3000` (default `admin` / `admin`, override with `GRAFANA_ADMIN_USER` / `GRAFANA_ADMIN_PASSWORD`)
 - Prometheus: `http://localhost:9090`
 - Alertmanager: `http://localhost:9093`
-- Alert webhook target: `ALERTMANAGER_WEBHOOK_URL` env var (defaults to a local placeholder)
+- Alert webhook target: edit `alertmanager/alertmanager.yml` (receiver `agentx-webhook`) — ganti `http://localhost:9999/alert` dengan endpoint webhook kamu (Slack/Teams/Opsgenie). Alertmanager TIDAK mendukung env var substitution di config.
 
 ## Alert Rules
 
