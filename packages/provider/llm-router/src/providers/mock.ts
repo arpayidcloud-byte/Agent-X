@@ -64,6 +64,13 @@ export const OpenAIMock = new MockProvider('openai', {
     capabilities: ['reasoning', 'fast'],
     complexityRating: 'simple',
   },
+  'o1-preview': {
+    name: 'OpenAI o1 Preview',
+    provider: 'openai',
+    pricing: { inputCostPerMillion: 15.0, outputCostPerMillion: 60.0 },
+    capabilities: ['reasoning'],
+    complexityRating: 'expert',
+  },
 });
 
 export const AnthropicMock = new MockProvider('anthropic', {
@@ -73,5 +80,19 @@ export const AnthropicMock = new MockProvider('anthropic', {
     pricing: { inputCostPerMillion: 3.0, outputCostPerMillion: 15.0 },
     capabilities: ['code', 'reasoning', 'vision'],
     complexityRating: 'complex',
+  },
+  'claude-3-5-sonnet-20241022': {
+    name: 'Claude 3.5 Sonnet',
+    provider: 'anthropic',
+    pricing: { inputCostPerMillion: 3.0, outputCostPerMillion: 15.0 },
+    capabilities: ['code', 'reasoning', 'vision'],
+    complexityRating: 'medium',
+  },
+  'claude-3-haiku-20240307': {
+    name: 'Claude 3 Haiku',
+    provider: 'anthropic',
+    pricing: { inputCostPerMillion: 0.25, outputCostPerMillion: 1.25 },
+    capabilities: ['code', 'reasoning', 'fast'],
+    complexityRating: 'simple',
   },
 });
