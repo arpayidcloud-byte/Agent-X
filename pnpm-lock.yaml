@@ -92,6 +92,9 @@ importers:
       '@agent-xai/observability':
         specifier: workspace:*
         version: link:../../packages/shared/observability
+      '@agent-xai/persistence':
+        specifier: workspace:^
+        version: link:../../packages/shared/persistence
       express:
         specifier: ^4.21.0
         version: 4.22.2

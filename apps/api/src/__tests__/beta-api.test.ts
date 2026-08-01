@@ -3,6 +3,8 @@ import type { Server } from 'node:http';
 
 // Mock providers must be registered before the server module initializes.
 process.env.ENABLE_MOCK_PROVIDER = 'true';
+// Tests are DB-less: force the in-memory beta backend regardless of DATABASE_URL.
+delete process.env.DATABASE_URL;
 const { app, waitlistStore, feedbackStore } = await import('../agentx-server.js');
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
