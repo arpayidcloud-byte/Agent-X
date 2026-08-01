@@ -3,6 +3,10 @@ import { llmMetrics, alertManager, healthChecker, Logger } from '@agent-xai/obse
 import { LLMRouter, OpenAIMock, DeepSeekMock, AnthropicMock } from '@agent-xai/llm-router';
 import { createRequestLogger } from './request-logger.js';
 import { notifySlack } from './slack.js';
+import { getBetaBackend } from './beta-store.js';
+import type { WaitlistEntry, FeedbackEntry } from './beta-store.js';
+
+export { waitlistStore, feedbackStore, resetBetaStores } from './beta-store.js';
 
 const logger = new Logger('agentx-api');
 
@@ -158,37 +162,9 @@ app.get('/v1/agentx/stats', async (_req, res) => {
   }
 });
 
-// ─── Beta waitlist store (Phase 3 Week 19-20: beta recruitment) ────
-export interface WaitlistEntry {
-  id: string;
-  email: string;
-  name?: string;
-  source?: string;
-  status: 'pending' | 'invited' | 'active';
-  createdAt: string;
-}
-
-export interface FeedbackEntry {
-  id: string;
-  email?: string;
-  category: string;
-  message: string;
-  rating?: number;
-  createdAt: string;
-}
-
-export const waitlistStore = new Map<string, WaitlistEntry>();
-export const feedbackStore = new Map<string, FeedbackEntry>();
-
-const WAITLIST_CAP = 2000;
-const FEEDBACK_CAP = 2000;
-
-function capStore<K, V>(store: Map<K, V>, cap: number): void {
-  if (store.size > cap) {
-    const oldest = [...store.keys()].shift();
-    if (oldest) store.delete(oldest);
-  }
-}
+// ─── Beta waitlist & feedback (Phase 3 Week 19-20: beta recruitment) ────
+// Storage backend: Prisma/PostgreSQL when DATABASE_URL is reachable,
+// otherwise in-memory Maps (see beta-store.ts). Tests stay DB-less.
 
 // ─── Beta waitlist: signup ────
 app.post('/v1/beta/waitlist', async (req, res): Promise<void> => {
@@ -199,7 +175,8 @@ app.post('/v1/beta/waitlist', async (req, res): Promise<void> => {
       return;
     }
     const normalized = email.trim().toLowerCase();
-    const existing = [...waitlistStore.values()].find((e) => e.email === normalized);
+    const backend = await getBetaBackend();
+    const existing = await backend.waitlistFindByEmail(normalized);
     if (existing) {
       res.status(409).json({ error: 'Email already on waitlist', entry: existing });
       return;
@@ -212,8 +189,8 @@ app.post('/v1/beta/waitlist', async (req, res): Promise<void> => {
       status: 'pending',
       createdAt: new Date().toISOString(),
     };
-    waitlistStore.set(entry.id, entry);
-    capStore(waitlistStore, WAITLIST_CAP);
+    await backend.waitlistCreate(entry);
+    const { total } = await backend.waitlistStats();
     logger.info('Beta waitlist signup', { id: entry.id, email: normalized });
     void notifySlack(`:tada: New beta waitlist signup: ${normalized}`, [
       {
@@ -224,7 +201,7 @@ app.post('/v1/beta/waitlist', async (req, res): Promise<void> => {
         },
       },
     ]);
-    res.status(201).json({ entry, total: waitlistStore.size });
+    res.status(201).json({ entry, total });
   } catch (e) {
     res.status(500).json({ error: String(e) });
   }
@@ -236,10 +213,12 @@ app.get('/v1/beta/waitlist', async (_req, res) => {
     const limitRaw = Number(_req.query.limit ?? 100);
     const limit =
       Number.isFinite(limitRaw) && limitRaw > 0 ? Math.min(Math.floor(limitRaw), 1000) : 100;
-    const entries = [...waitlistStore.values()]
-      .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1))
-      .slice(0, limit);
-    res.json({ entries, total: waitlistStore.size });
+    const backend = await getBetaBackend();
+    const [entries, { total }] = await Promise.all([
+      backend.waitlistFindAll(limit),
+      backend.waitlistStats(),
+    ]);
+    res.json({ entries, total });
   } catch (e) {
     res.status(500).json({ error: String(e) });
   }
@@ -257,12 +236,12 @@ app.patch('/v1/beta/waitlist/:id/status', async (req, res): Promise<void> => {
         .json({ error: `Invalid status. Must be one of: ${validStatuses.join(', ')}` });
       return;
     }
-    const entry = waitlistStore.get(id);
+    const backend = await getBetaBackend();
+    const entry = await backend.waitlistUpdateStatus(id, status);
     if (!entry) {
       res.status(404).json({ error: 'Waitlist entry not found' });
       return;
     }
-    entry.status = status;
     logger.info('Beta waitlist status updated', { id, email: entry.email, status });
     void notifySlack(`:envelope: Waitlist update: ${entry.email} -> *${status}*`, [
       {
@@ -282,23 +261,15 @@ app.patch('/v1/beta/waitlist/:id/status', async (req, res): Promise<void> => {
 // ─── Beta waitlist: stats (dashboard) ────
 app.get('/v1/beta/waitlist/stats', async (_req, res) => {
   try {
-    const entries = [...waitlistStore.values()];
-    const byStatus: Record<string, number> = {};
-    for (const e of entries) byStatus[e.status] = (byStatus[e.status] ?? 0) + 1;
-    res.json({
-      total: entries.length,
-      byStatus,
-      bySource: entries.reduce<Record<string, number>>((acc, e) => {
-        const s = e.source ?? 'direct';
-        acc[s] = (acc[s] ?? 0) + 1;
-        return acc;
-      }, {}),
-      generatedAt: new Date().toISOString(),
-    });
+    const backend = await getBetaBackend();
+    const stats = await backend.waitlistStats();
+    res.json({ ...stats, generatedAt: new Date().toISOString() });
   } catch (e) {
     res.status(500).json({ error: String(e) });
   }
 });
+
+// ─── Beta feedback: submit ────
 app.post('/v1/beta/feedback', async (req, res): Promise<void> => {
   try {
     const { email, category, message, rating } = req.body ?? {};
@@ -330,8 +301,9 @@ app.post('/v1/beta/feedback', async (req, res): Promise<void> => {
       rating: ratingNum === undefined ? undefined : Math.round(ratingNum),
       createdAt: new Date().toISOString(),
     };
-    feedbackStore.set(entry.id, entry);
-    capStore(feedbackStore, FEEDBACK_CAP);
+    const backend = await getBetaBackend();
+    await backend.feedbackCreate(entry);
+    const total = await backend.feedbackCount();
     logger.info('Beta feedback submitted', { id: entry.id, category: cat });
     void notifySlack(
       `:speech_balloon: New beta feedback [${cat}]: ${entry.message.slice(0, 120)}`,
@@ -345,7 +317,7 @@ app.post('/v1/beta/feedback', async (req, res): Promise<void> => {
         },
       ],
     );
-    res.status(201).json({ entry, total: feedbackStore.size });
+    res.status(201).json({ entry, total });
   } catch (e) {
     res.status(500).json({ error: String(e) });
   }
@@ -357,10 +329,12 @@ app.get('/v1/beta/feedback', async (_req, res) => {
     const limitRaw = Number(_req.query.limit ?? 100);
     const limit =
       Number.isFinite(limitRaw) && limitRaw > 0 ? Math.min(Math.floor(limitRaw), 1000) : 100;
-    const entries = [...feedbackStore.values()]
-      .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1))
-      .slice(0, limit);
-    res.json({ entries, total: feedbackStore.size });
+    const backend = await getBetaBackend();
+    const [entries, total] = await Promise.all([
+      backend.feedbackFindAll(limit),
+      backend.feedbackCount(),
+    ]);
+    res.json({ entries, total });
   } catch (e) {
     res.status(500).json({ error: String(e) });
   }

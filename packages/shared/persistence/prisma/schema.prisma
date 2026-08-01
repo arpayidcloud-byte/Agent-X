@@ -73,3 +73,36 @@ model Memory {
   @@index([sessionId])
   @@index([taskId])
 }
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  roles        String[]
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model WaitlistEntry {
+  id        String   @id
+  email     String   @unique
+  name      String?
+  source    String?
+  status    String   @default("pending")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status, createdAt])
+}
+
+model FeedbackEntry {
+  id        String   @id
+  email     String?
+  category  String
+  message   String
+  rating    Int?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([category, createdAt])
+}
