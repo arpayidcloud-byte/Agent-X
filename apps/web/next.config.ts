@@ -1,7 +1,8 @@
-import type { NextConfig } from "next";
+import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  // Standalone output so the app can run in a minimal container (see Dockerfile.web).
+  output: 'standalone',
 };
 
 export default nextConfig;
