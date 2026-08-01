@@ -7,6 +7,9 @@ WORKDIR /app
 RUN npm install -g pnpm@9.15.0
 COPY . .
 RUN pnpm install --frozen-lockfile
+# Generate the Prisma client (schema: packages/shared/persistence) so the
+# production image ships a ready-to-query client (no .prisma/client otherwise).
+RUN pnpm --filter @agent-xai/persistence db:generate
 RUN pnpm --filter @agent-xai/api build
 
 FROM node:22-alpine
