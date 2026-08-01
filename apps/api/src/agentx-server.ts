@@ -5,6 +5,8 @@ import { createRequestLogger } from './request-logger.js';
 import { notifySlack } from './slack.js';
 import { getBetaBackend } from './beta-store.js';
 import type { WaitlistEntry, FeedbackEntry } from './beta-store.js';
+import { maybeRequireAdmin } from './auth.js';
+import { registerAuthRoutes } from './auth-routes.js';
 
 export { waitlistStore, feedbackStore, resetBetaStores } from './beta-store.js';
 
@@ -13,6 +15,8 @@ const logger = new Logger('agentx-api');
 const app: express.Express = express();
 app.use(express.json());
 app.use(createRequestLogger());
+
+registerAuthRoutes(app);
 
 const PORT = process.env.PORT || 4000;
 
@@ -208,7 +212,7 @@ app.post('/v1/beta/waitlist', async (req, res): Promise<void> => {
 });
 
 // ─── Beta waitlist: admin list ────
-app.get('/v1/beta/waitlist', async (_req, res) => {
+app.get('/v1/beta/waitlist', maybeRequireAdmin, async (_req, res) => {
   try {
     const limitRaw = Number(_req.query.limit ?? 100);
     const limit =
@@ -225,9 +229,10 @@ app.get('/v1/beta/waitlist', async (_req, res) => {
 });
 
 // ─── Beta waitlist: admin invite (update status) ────
-app.patch('/v1/beta/waitlist/:id/status', async (req, res): Promise<void> => {
+app.patch('/v1/beta/waitlist/:id/status', maybeRequireAdmin, async (req, res): Promise<void> => {
   try {
     const { id } = req.params;
+    const idStr = typeof id === 'string' ? id : '';
     const { status } = req.body ?? {};
     const validStatuses = ['invited', 'active'];
     if (!validStatuses.includes(status)) {
@@ -237,7 +242,7 @@ app.patch('/v1/beta/waitlist/:id/status', async (req, res): Promise<void> => {
       return;
     }
     const backend = await getBetaBackend();
-    const entry = await backend.waitlistUpdateStatus(id, status);
+    const entry = await backend.waitlistUpdateStatus(idStr, status);
     if (!entry) {
       res.status(404).json({ error: 'Waitlist entry not found' });
       return;
@@ -324,7 +329,7 @@ app.post('/v1/beta/feedback', async (req, res): Promise<void> => {
 });
 
 // ─── Beta feedback: list ────
-app.get('/v1/beta/feedback', async (_req, res) => {
+app.get('/v1/beta/feedback', maybeRequireAdmin, async (_req, res) => {
   try {
     const limitRaw = Number(_req.query.limit ?? 100);
     const limit =
