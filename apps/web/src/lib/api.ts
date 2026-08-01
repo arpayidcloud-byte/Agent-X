@@ -80,3 +80,92 @@ export async function runTask(prompt: string): Promise<RunResponse> {
   }
   return body;
 }
+
+// ─── Beta recruitment API (Phase 3 Week 19-20) ────
+
+export interface WaitlistEntry {
+  id: string;
+  email: string;
+  name?: string;
+  source?: string;
+  status: 'pending' | 'invited' | 'active';
+  createdAt: string;
+}
+
+export interface WaitlistStats {
+  total: number;
+  byStatus: Record<string, number>;
+  bySource: Record<string, number>;
+  generatedAt: string;
+}
+
+export interface FeedbackEntry {
+  id: string;
+  email?: string;
+  category: string;
+  message: string;
+  rating?: number;
+  createdAt: string;
+}
+
+export interface WaitlistResponse {
+  entry: WaitlistEntry;
+  total: number;
+}
+
+export interface WaitlistListResponse {
+  entries: WaitlistEntry[];
+  total: number;
+}
+
+export interface FeedbackResponse {
+  entry: FeedbackEntry;
+  total: number;
+}
+
+export async function signupWaitlist(input: {
+  email: string;
+  name?: string;
+  source?: string;
+}): Promise<WaitlistResponse> {
+  const res = await fetch(`${API_URL}/v1/beta/waitlist`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(input),
+    cache: 'no-store',
+  });
+  const body = (await res.json()) as WaitlistResponse & { error?: string };
+  if (!res.ok) {
+    throw new Error(body.error ?? `POST /v1/beta/waitlist failed: ${res.status}`);
+  }
+  return body;
+}
+
+export async function fetchWaitlistStats(): Promise<WaitlistStats> {
+  return getJson<WaitlistStats>('/v1/beta/waitlist/stats');
+}
+
+export async function fetchFeedback(
+  limit = 20,
+): Promise<{ entries: FeedbackEntry[]; total: number }> {
+  return getJson<{ entries: FeedbackEntry[]; total: number }>(`/v1/beta/feedback?limit=${limit}`);
+}
+
+export async function submitFeedback(input: {
+  email?: string;
+  category: string;
+  message: string;
+  rating?: number;
+}): Promise<FeedbackResponse> {
+  const res = await fetch(`${API_URL}/v1/beta/feedback`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(input),
+    cache: 'no-store',
+  });
+  const body = (await res.json()) as FeedbackResponse & { error?: string };
+  if (!res.ok) {
+    throw new Error(body.error ?? `POST /v1/beta/feedback failed: ${res.status}`);
+  }
+  return body;
+}
