@@ -16,6 +16,18 @@ spec:
         app.kubernetes.io/name: {{ include "agentx.fullname" . }}
         app.kubernetes.io/component: api
     spec:
+      initContainers:
+        - name: prisma-migrate
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          env:
+            - name: DATABASE_URL
+              value: {{ .Values.env.DATABASE_URL | quote }}
+          command: ["sh", "-c"]
+          args:
+            - >-
+              npx prisma migrate deploy
+              --schema packages/shared/persistence/prisma/schema.prisma
       containers:
         - name: api
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
