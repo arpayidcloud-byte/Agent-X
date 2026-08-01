@@ -1,1 +1,2 @@
 deployments/helm/agentx/templates/
+deploy/helm/agentx/templates/
