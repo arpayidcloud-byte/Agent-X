@@ -3,6 +3,8 @@
 
 FROM node:22-slim AS build
 WORKDIR /app
+# openssl CLI lets prisma generate detect the right engine target.
+RUN apt-get update && apt-get install -y --no-install-recommends openssl && rm -rf /var/lib/apt/lists/*
 # Match the pnpm version that produced pnpm-lock.yaml (host: 9.15.0).
 RUN npm install -g pnpm@9.15.0
 COPY . .
