@@ -1,0 +1,37 @@
+# Agent-X Helm chart default values.
+# Deploy: helm install agentx deploy/helm/agentx -n agentx --create-namespace
+
+replicaCount: 1
+
+image:
+  repository: agentx-api
+  tag: dev
+  # IfNotPresent is REQUIRED for locally-imported images (k3s containerd).
+  pullPolicy: IfNotPresent
+
+service:
+  type: NodePort
+  port: 4000
+  # NodePort exposed on the cluster node for host-side verification.
+  nodePort: 30400
+
+env:
+  # Dev-mode mock providers so the API works without external API keys.
+  ENABLE_MOCK_PROVIDER: 'true'
+  PORT: '4000'
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
+
+livenessProbe:
+  path: /health
+  port: 4000
+
+readinessProbe:
+  path: /health
+  port: 4000

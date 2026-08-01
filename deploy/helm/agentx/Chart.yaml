@@ -1,0 +1,14 @@
+apiVersion: v2
+name: agentx
+description: Agent-X Enterprise AI Agent Platform — API server Helm chart
+type: application
+version: 0.1.0
+appVersion: '1.0.0'
+keywords:
+  - agentx
+  - ai
+  - llm-router
+  - api
+maintainers:
+  - name: Agent-X Team
+    email: team@agentx.dev
