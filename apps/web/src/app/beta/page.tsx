@@ -1,6 +1,7 @@
 import { fetchWaitlistStats, fetchFeedback, API_URL } from '../../lib/api';
 import BetaSignupForm from '../../components/beta-signup-form';
 import BetaFeedbackForm from '../../components/beta-feedback-form';
+import BetaAuthSection from '../../components/beta-auth-section';
 
 export const dynamic = 'force-dynamic';
 
@@ -81,6 +82,8 @@ export default async function BetaPage() {
             <BetaSignupForm />
           </div>
         </section>
+
+        <BetaAuthSection />
 
         <section className="mb-8">
           <h2 className="text-xl font-semibold mb-3">Submit Feedback</h2>

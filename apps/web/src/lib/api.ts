@@ -169,3 +169,101 @@ export async function submitFeedback(input: {
   }
   return body;
 }
+
+// ─── Auth API (Phase 3: web auth) ────
+
+const TOKEN_KEY = 'agentx_token';
+
+export function getToken(): string | null {
+  if (typeof window === 'undefined') return null;
+  return window.localStorage.getItem(TOKEN_KEY);
+}
+
+export function setToken(token: string): void {
+  if (typeof window === 'undefined') return;
+  window.localStorage.setItem(TOKEN_KEY, token);
+}
+
+export function clearToken(): void {
+  if (typeof window === 'undefined') return;
+  window.localStorage.removeItem(TOKEN_KEY);
+}
+
+export function isAuthed(): boolean {
+  return getToken() !== null;
+}
+
+async function authJson<T>(path: string, options: RequestInit = {}, withAuth = false): Promise<T> {
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    ...(options.headers as Record<string, string> | undefined),
+  };
+  if (withAuth) {
+    const token = getToken();
+    if (token) headers.Authorization = `Bearer ${token}`;
+  }
+  const res = await fetch(`${API_URL}${path}`, { ...options, headers, cache: 'no-store' });
+  const body = (await res.json()) as T & { error?: string };
+  if (!res.ok) {
+    const err = new Error(body.error ?? `${options.method ?? 'GET'} ${path} failed: ${res.status}`);
+    (err as Error & { status?: number }).status = res.status;
+    throw err;
+  }
+  return body;
+}
+
+export interface AuthUser {
+  id: string;
+  email: string;
+  roles: string[];
+  createdAt: string;
+}
+
+export interface AuthTokens {
+  accessToken: string;
+  refreshToken: string;
+  expiresIn: number;
+}
+
+export interface AuthResponse {
+  user: AuthUser;
+  tokens: AuthTokens;
+}
+
+export async function registerAccount(email: string, password: string): Promise<AuthResponse> {
+  return authJson<AuthResponse>('/v1/auth/register', {
+    method: 'POST',
+    body: JSON.stringify({ email, password }),
+  });
+}
+
+export async function loginAccount(email: string, password: string): Promise<AuthResponse> {
+  return authJson<AuthResponse>('/v1/auth/login', {
+    method: 'POST',
+    body: JSON.stringify({ email, password }),
+  });
+}
+
+export async function fetchMe(): Promise<{ user: AuthUser }> {
+  return authJson<{ user: AuthUser }>('/v1/auth/me', {}, true);
+}
+
+/** Admin-only (AUTH_ENABLED): list waitlist entries. */
+export async function fetchWaitlistAdmin(limit = 100): Promise<WaitlistListResponse> {
+  return authJson<WaitlistListResponse>(`/v1/beta/waitlist?limit=${limit}`, {}, true);
+}
+
+/** Admin-only (AUTH_ENABLED): invite / activate a waitlist entry. */
+export async function inviteWaitlistEntry(
+  id: string,
+  status: 'invited' | 'active',
+): Promise<{ entry: WaitlistEntry }> {
+  return authJson<{ entry: WaitlistEntry }>(
+    `/v1/beta/waitlist/${id}/status`,
+    {
+      method: 'PATCH',
+      body: JSON.stringify({ status }),
+    },
+    true,
+  );
+}
