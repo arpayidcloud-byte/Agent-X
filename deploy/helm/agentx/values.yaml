@@ -25,7 +25,7 @@ env:
   ADMIN_EMAILS: 'admin@agentx.dev'
   # Dev secret only — override with a real secret in production.
   JWT_SECRET: 'change-me-in-production'
-  DATABASE_URL: 'postgresql://agentx:agentx@agentx-postgres:5432/agentx?schema=public'
+  DATABASE_URL: 'postgresql://agentx:agentx@agentx-api-postgres:5432/agentx?schema=public'
 
 # In-cluster PostgreSQL (single node demo).
 postgres:
