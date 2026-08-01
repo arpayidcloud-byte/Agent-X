@@ -9,6 +9,7 @@ spec:
   type: {{ .Values.service.type }}
   selector:
     app.kubernetes.io/name: {{ include "agentx.fullname" . }}
+    app.kubernetes.io/component: api
   ports:
     - name: http
       port: {{ .Values.service.port }}

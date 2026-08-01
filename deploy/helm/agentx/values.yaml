@@ -35,3 +35,24 @@ livenessProbe:
 readinessProbe:
   path: /health
   port: 4000
+
+# Web dashboard (Next.js standalone).
+web:
+  replicaCount: 1
+  image:
+    repository: agentx-web
+    tag: dev
+    # IfNotPresent is REQUIRED for locally-imported images (k3s containerd).
+    pullPolicy: IfNotPresent
+  service:
+    type: NodePort
+    port: 3000
+    # NodePort for the web dashboard on the cluster node.
+    nodePort: 30500
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
