@@ -1,5 +1,9 @@
 generator client {
   provider = "prisma-client-js"
+  // Pin the engine binary explicitly: prisma generate can't detect the
+  // openssl version during docker builds (no openssl CLI) and would emit a
+  // 1.1.x engine that fails at runtime on Debian bookworm (openssl 3).
+  binaryTargets = ["native", "debian-openssl-3.0.x"]
 }
 
 datasource db {
