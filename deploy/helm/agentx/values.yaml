@@ -21,7 +21,7 @@ env:
   PORT: '4000'
   # Auth + persistence (Phase 3): enable admin guard & point at the in-cluster postgres.
   AUTH_ENABLED: 'true'
-  DATABASE_URL: 'postgresql://agentx:***@agentx-api-postgres:5432/agentx?schema=public'
+  DATABASE_URL: 'postgresql://agentx:agentx@agentx-api-postgres:5432/agentx?schema=public'
   # Secrets are NOT stored in git. Create the secret first, then deploy:
   #   kubectl create secret generic agentx-secrets -n agentx \
   #     --from-literal=JWT_SECRET="$(openssl rand -base64 48)" \
