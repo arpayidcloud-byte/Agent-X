@@ -2,6 +2,7 @@ import express from 'express';
 import { llmMetrics, alertManager, healthChecker, Logger } from '@agent-xai/observability';
 import { LLMRouter, OpenAIMock, DeepSeekMock, AnthropicMock } from '@agent-xai/llm-router';
 import { createRequestLogger } from './request-logger.js';
+import { notifySlack } from './slack.js';
 
 const logger = new Logger('agentx-api');
 
@@ -214,6 +215,15 @@ app.post('/v1/beta/waitlist', async (req, res): Promise<void> => {
     waitlistStore.set(entry.id, entry);
     capStore(waitlistStore, WAITLIST_CAP);
     logger.info('Beta waitlist signup', { id: entry.id, email: normalized });
+    void notifySlack(`:tada: New beta waitlist signup: ${normalized}`, [
+      {
+        type: 'section',
+        text: {
+          type: 'mrkdwn',
+          text: `*New waitlist signup*\nEmail: ${normalized}\nSource: ${entry.source ?? 'direct'}`,
+        },
+      },
+    ]);
     res.status(201).json({ entry, total: waitlistStore.size });
   } catch (e) {
     res.status(500).json({ error: String(e) });
@@ -230,6 +240,40 @@ app.get('/v1/beta/waitlist', async (_req, res) => {
       .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1))
       .slice(0, limit);
     res.json({ entries, total: waitlistStore.size });
+  } catch (e) {
+    res.status(500).json({ error: String(e) });
+  }
+});
+
+// ─── Beta waitlist: admin invite (update status) ────
+app.patch('/v1/beta/waitlist/:id/status', async (req, res): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body ?? {};
+    const validStatuses = ['invited', 'active'];
+    if (!validStatuses.includes(status)) {
+      res
+        .status(400)
+        .json({ error: `Invalid status. Must be one of: ${validStatuses.join(', ')}` });
+      return;
+    }
+    const entry = waitlistStore.get(id);
+    if (!entry) {
+      res.status(404).json({ error: 'Waitlist entry not found' });
+      return;
+    }
+    entry.status = status;
+    logger.info('Beta waitlist status updated', { id, email: entry.email, status });
+    void notifySlack(`:envelope: Waitlist update: ${entry.email} -> *${status}*`, [
+      {
+        type: 'section',
+        text: {
+          type: 'mrkdwn',
+          text: `*Waitlist update*\nEmail: ${entry.email}\nStatus: ${status}`,
+        },
+      },
+    ]);
+    res.json({ entry });
   } catch (e) {
     res.status(500).json({ error: String(e) });
   }
@@ -255,8 +299,6 @@ app.get('/v1/beta/waitlist/stats', async (_req, res) => {
     res.status(500).json({ error: String(e) });
   }
 });
-
-// ─── Beta feedback: submit ────
 app.post('/v1/beta/feedback', async (req, res): Promise<void> => {
   try {
     const { email, category, message, rating } = req.body ?? {};
@@ -291,6 +333,18 @@ app.post('/v1/beta/feedback', async (req, res): Promise<void> => {
     feedbackStore.set(entry.id, entry);
     capStore(feedbackStore, FEEDBACK_CAP);
     logger.info('Beta feedback submitted', { id: entry.id, category: cat });
+    void notifySlack(
+      `:speech_balloon: New beta feedback [${cat}]: ${entry.message.slice(0, 120)}`,
+      [
+        {
+          type: 'section',
+          text: {
+            type: 'mrkdwn',
+            text: `*New beta feedback*\nCategory: ${cat}\nRating: ${entry.rating ?? '-'}/5\n\n${entry.message.slice(0, 500)}`,
+          },
+        },
+      ],
+    );
     res.status(201).json({ entry, total: feedbackStore.size });
   } catch (e) {
     res.status(500).json({ error: String(e) });

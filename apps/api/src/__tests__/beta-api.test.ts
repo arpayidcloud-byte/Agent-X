@@ -105,6 +105,56 @@ describe('Beta recruitment API (waitlist + feedback)', () => {
     expect(body.bySource.producthunt).toBe(1);
   });
 
+  it('PATCH /v1/beta/waitlist/:id/status invites an entry (pending -> invited)', async () => {
+    const signup = await fetch(`${baseUrl}/v1/beta/waitlist`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: 'invite@example.com' }),
+    });
+    const signupBody = await asJson(signup);
+    const id = signupBody.entry.id;
+
+    const res = await fetch(`${baseUrl}/v1/beta/waitlist/${id}/status`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: 'invited' }),
+    });
+    expect(res.status).toBe(200);
+    const body = await asJson(res);
+    expect(body.entry.id).toBe(id);
+    expect(body.entry.status).toBe('invited');
+  });
+
+  it('PATCH /v1/beta/waitlist/:id/status rejects invalid status (400)', async () => {
+    const signup = await fetch(`${baseUrl}/v1/beta/waitlist`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: 'invite2@example.com' }),
+    });
+    const signupBody = await asJson(signup);
+    const id = signupBody.entry.id;
+
+    const res = await fetch(`${baseUrl}/v1/beta/waitlist/${id}/status`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: 'bogus' }),
+    });
+    expect(res.status).toBe(400);
+    const body = await asJson(res);
+    expect(body.error).toContain('status');
+  });
+
+  it('PATCH /v1/beta/waitlist/:id/status returns 404 for unknown id', async () => {
+    const res = await fetch(`${baseUrl}/v1/beta/waitlist/nonexistent/status`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: 'active' }),
+    });
+    expect(res.status).toBe(404);
+    const body = await asJson(res);
+    expect(body.error).toContain('not found');
+  });
+
   it('POST /v1/beta/feedback creates entry (201) with rating', async () => {
     const res = await fetch(`${baseUrl}/v1/beta/feedback`, {
       method: 'POST',
