@@ -28,6 +28,14 @@ spec:
               value: {{ .Values.env.ENABLE_MOCK_PROVIDER | quote }}
             - name: PORT
               value: {{ .Values.env.PORT | quote }}
+            - name: AUTH_ENABLED
+              value: {{ .Values.env.AUTH_ENABLED | quote }}
+            - name: ADMIN_EMAILS
+              value: {{ .Values.env.ADMIN_EMAILS | quote }}
+            - name: JWT_SECRET
+              value: {{ .Values.env.JWT_SECRET | quote }}
+            - name: DATABASE_URL
+              value: {{ .Values.env.DATABASE_URL | quote }}
           livenessProbe:
             httpGet:
               path: {{ .Values.livenessProbe.path }}

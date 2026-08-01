@@ -19,6 +19,24 @@ env:
   # Dev-mode mock providers so the API works without external API keys.
   ENABLE_MOCK_PROVIDER: 'true'
   PORT: '4000'
+  # Auth + persistence (Phase 3): enable admin guard & point at the in-cluster postgres.
+  AUTH_ENABLED: 'true'
+  # Comma-separated admin emails (lowercase). Owner should change this per env.
+  ADMIN_EMAILS: 'admin@agentx.dev'
+  # Dev secret only — override with a real secret in production.
+  JWT_SECRET: 'change-me-in-production'
+  DATABASE_URL: 'postgresql://agentx:agentx@agentx-postgres:5432/agentx?schema=public'
+
+# In-cluster PostgreSQL (single node demo).
+postgres:
+  image: postgres:16-alpine
+  pullPolicy: IfNotPresent
+  port: 5432
+  user: agentx
+  password: agentx
+  database: agentx
+  storage:
+    size: 2Gi
 
 resources:
   requests:
