@@ -40,6 +40,14 @@ export default async function AgentXDashboard() {
               {API_URL}
             </code>
           </p>
+          <nav className="mt-4 flex gap-4 text-sm">
+            <a
+              href="/beta"
+              className="rounded-lg border border-emerald-500/40 bg-emerald-950/40 px-4 py-2 font-medium text-emerald-300 transition hover:bg-emerald-900/40"
+            >
+              🚀 Beta Recruitment — waitlist &amp; feedback
+            </a>
+          </nav>
           {apiError && (
             <p className="mt-3 rounded-lg border border-amber-500/20 bg-amber-950/30 p-3 text-sm text-amber-300">
               ⚠ API unreachable: {apiError} — start the server with{' '}

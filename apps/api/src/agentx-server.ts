@@ -157,6 +157,161 @@ app.get('/v1/agentx/stats', async (_req, res) => {
   }
 });
 
+// ─── Beta waitlist store (Phase 3 Week 19-20: beta recruitment) ────
+export interface WaitlistEntry {
+  id: string;
+  email: string;
+  name?: string;
+  source?: string;
+  status: 'pending' | 'invited' | 'active';
+  createdAt: string;
+}
+
+export interface FeedbackEntry {
+  id: string;
+  email?: string;
+  category: string;
+  message: string;
+  rating?: number;
+  createdAt: string;
+}
+
+export const waitlistStore = new Map<string, WaitlistEntry>();
+export const feedbackStore = new Map<string, FeedbackEntry>();
+
+const WAITLIST_CAP = 2000;
+const FEEDBACK_CAP = 2000;
+
+function capStore<K, V>(store: Map<K, V>, cap: number): void {
+  if (store.size > cap) {
+    const oldest = [...store.keys()].shift();
+    if (oldest) store.delete(oldest);
+  }
+}
+
+// ─── Beta waitlist: signup ────
+app.post('/v1/beta/waitlist', async (req, res): Promise<void> => {
+  try {
+    const { email, name, source } = req.body ?? {};
+    if (!email || typeof email !== 'string' || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      res.status(400).json({ error: 'Missing or invalid field: email (valid string required)' });
+      return;
+    }
+    const normalized = email.trim().toLowerCase();
+    const existing = [...waitlistStore.values()].find((e) => e.email === normalized);
+    if (existing) {
+      res.status(409).json({ error: 'Email already on waitlist', entry: existing });
+      return;
+    }
+    const entry: WaitlistEntry = {
+      id: `wl-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      email: normalized,
+      name: typeof name === 'string' ? name.slice(0, 120) : undefined,
+      source: typeof source === 'string' ? source.slice(0, 60) : undefined,
+      status: 'pending',
+      createdAt: new Date().toISOString(),
+    };
+    waitlistStore.set(entry.id, entry);
+    capStore(waitlistStore, WAITLIST_CAP);
+    logger.info('Beta waitlist signup', { id: entry.id, email: normalized });
+    res.status(201).json({ entry, total: waitlistStore.size });
+  } catch (e) {
+    res.status(500).json({ error: String(e) });
+  }
+});
+
+// ─── Beta waitlist: admin list ────
+app.get('/v1/beta/waitlist', async (_req, res) => {
+  try {
+    const limitRaw = Number(_req.query.limit ?? 100);
+    const limit =
+      Number.isFinite(limitRaw) && limitRaw > 0 ? Math.min(Math.floor(limitRaw), 1000) : 100;
+    const entries = [...waitlistStore.values()]
+      .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1))
+      .slice(0, limit);
+    res.json({ entries, total: waitlistStore.size });
+  } catch (e) {
+    res.status(500).json({ error: String(e) });
+  }
+});
+
+// ─── Beta waitlist: stats (dashboard) ────
+app.get('/v1/beta/waitlist/stats', async (_req, res) => {
+  try {
+    const entries = [...waitlistStore.values()];
+    const byStatus: Record<string, number> = {};
+    for (const e of entries) byStatus[e.status] = (byStatus[e.status] ?? 0) + 1;
+    res.json({
+      total: entries.length,
+      byStatus,
+      bySource: entries.reduce<Record<string, number>>((acc, e) => {
+        const s = e.source ?? 'direct';
+        acc[s] = (acc[s] ?? 0) + 1;
+        return acc;
+      }, {}),
+      generatedAt: new Date().toISOString(),
+    });
+  } catch (e) {
+    res.status(500).json({ error: String(e) });
+  }
+});
+
+// ─── Beta feedback: submit ────
+app.post('/v1/beta/feedback', async (req, res): Promise<void> => {
+  try {
+    const { email, category, message, rating } = req.body ?? {};
+    if (!message || typeof message !== 'string' || message.trim().length < 3) {
+      res.status(400).json({ error: 'Missing or invalid field: message (min 3 chars)' });
+      return;
+    }
+    const validCategories = ['bug', 'feature', 'performance', 'ux', 'other'];
+    const cat = typeof category === 'string' ? category.toLowerCase() : 'other';
+    if (!validCategories.includes(cat)) {
+      res
+        .status(400)
+        .json({ error: `Invalid category. Must be one of: ${validCategories.join(', ')}` });
+      return;
+    }
+    const ratingNum = rating === undefined ? undefined : Number(rating);
+    if (
+      ratingNum !== undefined &&
+      (!Number.isFinite(ratingNum) || ratingNum < 1 || ratingNum > 5)
+    ) {
+      res.status(400).json({ error: 'Invalid rating. Must be integer 1-5' });
+      return;
+    }
+    const entry: FeedbackEntry = {
+      id: `fb-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      email: typeof email === 'string' ? email.trim().toLowerCase().slice(0, 200) : undefined,
+      category: cat,
+      message: message.trim().slice(0, 2000),
+      rating: ratingNum === undefined ? undefined : Math.round(ratingNum),
+      createdAt: new Date().toISOString(),
+    };
+    feedbackStore.set(entry.id, entry);
+    capStore(feedbackStore, FEEDBACK_CAP);
+    logger.info('Beta feedback submitted', { id: entry.id, category: cat });
+    res.status(201).json({ entry, total: feedbackStore.size });
+  } catch (e) {
+    res.status(500).json({ error: String(e) });
+  }
+});
+
+// ─── Beta feedback: list ────
+app.get('/v1/beta/feedback', async (_req, res) => {
+  try {
+    const limitRaw = Number(_req.query.limit ?? 100);
+    const limit =
+      Number.isFinite(limitRaw) && limitRaw > 0 ? Math.min(Math.floor(limitRaw), 1000) : 100;
+    const entries = [...feedbackStore.values()]
+      .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1))
+      .slice(0, limit);
+    res.json({ entries, total: feedbackStore.size });
+  } catch (e) {
+    res.status(500).json({ error: String(e) });
+  }
+});
+
 // ─── Blocker 2: Dynamic health monitor (setInterval) ────
 const HEALTH_MONITOR_INTERVAL_MS = Number(process.env.HEALTH_MONITOR_INTERVAL_MS ?? 30_000);
 
