@@ -7,6 +7,7 @@ import { agentConfigStore, AGENT_MODEL_OPTIONS } from './agent-config.js';
 import { notifySlack } from './slack.js';
 import { getBetaBackend } from './beta-store.js';
 import { maybeRequireAdmin, listUsers } from './auth.js';
+import { createHttpServer } from './ws-bridge.js';
 import type { WaitlistEntry, FeedbackEntry } from './beta-store.js';
 import { registerAuthRoutes } from './auth-routes.js';
 import {
@@ -743,7 +744,9 @@ setInterval(() => {
 export { app };
 
 if (process.env.NODE_ENV !== 'test') {
-  app.listen(PORT, () => {
+  // HTTP + WebSocket fallback on the same port (SSE primary, WS fallback).
+  const server = createHttpServer(app);
+  server.listen(PORT, () => {
     logger.info(`Agent-X server running at http://localhost:${PORT}`, { port: PORT });
     logger.info('Endpoints:', {
       endpoints: ['/metrics', '/health', '/v1/agentx/run', '/v1/agentx/tasks', '/v1/agentx/stats'],

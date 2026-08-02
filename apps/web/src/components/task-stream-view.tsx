@@ -1,8 +1,9 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { API_URL, startStreamTask, type TaskStreamEvent } from '@/lib/api';
+import { startStreamTask, type TaskStreamEvent } from '@/lib/api';
 import { notifyTaskComplete, requestNotifyPermission } from '@/lib/notify';
+import { openEventStream, type StreamHandle } from '@/lib/stream';
 
 const STAGE_LABEL: Record<TaskStreamEvent['type'], string> = {
   accepted: '📥 Accepted',
@@ -11,13 +12,13 @@ const STAGE_LABEL: Record<TaskStreamEvent['type'], string> = {
 };
 
 // Live task execution demo: POST /v1/agentx/run/stream (202) then subscribe
-// to the task's SSE event stream (GET /v1/agentx/tasks/:id/events).
+// to the task's event stream (SSE with automatic WebSocket fallback).
 export default function TaskStreamView() {
   const [prompt, setPrompt] = useState('');
   const [events, setEvents] = useState<TaskStreamEvent[]>([]);
   const [status, setStatus] = useState<'idle' | 'running' | 'done' | 'error'>('idle');
   const [error, setError] = useState<string | null>(null);
-  const sourceRef = useRef<EventSource | null>(null);
+  const sourceRef = useRef<StreamHandle | null>(null);
 
   useEffect(() => {
     // Ask for notification permission once, on first interaction with the
@@ -36,25 +37,18 @@ export default function TaskStreamView() {
     setStatus('running');
     try {
       const { taskId } = await startStreamTask(prompt.trim());
-      const source = new EventSource(`${API_URL}/v1/agentx/tasks/${taskId}/events`);
-      sourceRef.current = source;
-      source.onmessage = (msg) => {
-        const ev = JSON.parse(msg.data as string) as TaskStreamEvent;
+      const handle = openEventStream(`task:${taskId}`, (raw) => {
+        const ev = raw as TaskStreamEvent;
         setEvents((prev) => [...prev, ev]);
         if (ev.type === 'complete') {
           setStatus(ev.status === 'success' ? 'done' : 'error');
           if (ev.status === 'error') setError(ev.error ?? 'unknown error');
           notifyTaskComplete(ev.status === 'success', ev.taskId ?? '');
-          source.close();
+          handle.close();
           sourceRef.current = null;
         }
-      };
-      source.onerror = () => {
-        source.close();
-        sourceRef.current = null;
-        setStatus((prev) => (prev === 'running' ? 'error' : prev));
-        setError('Stream connection lost — task may still be running server-side.');
-      };
+      });
+      sourceRef.current = handle;
     } catch (err) {
       setStatus('error');
       setError(err instanceof Error ? err.message : String(err));
@@ -66,11 +60,13 @@ export default function TaskStreamView() {
   return (
     <div className="rounded-xl border border-violet-500/20 bg-slate-900/40 p-6">
       <h2 className="mb-1 text-lg font-semibold text-violet-400">
-        Live Task Stream <span className="text-xs font-normal text-slate-500">(SSE)</span>
+        Live Task Stream{' '}
+        <span className="text-xs font-normal text-slate-500">(SSE + WS fallback)</span>
       </h2>
       <p className="mb-4 text-xs text-slate-500">
         Runs the task asynchronously (202 Accepted) and streams lifecycle events over{' '}
-        <code className="rounded bg-slate-800 px-1 py-0.5">Server-Sent Events</code>.
+        <code className="rounded bg-slate-800 px-1 py-0.5">Server-Sent Events</code> with automatic{' '}
+        <code className="rounded bg-slate-800 px-1 py-0.5">WebSocket</code> fallback.
       </p>
       <form onSubmit={(e) => void handleRun(e)} className="flex flex-col gap-3">
         <textarea
