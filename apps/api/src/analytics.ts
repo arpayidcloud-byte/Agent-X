@@ -24,6 +24,7 @@ export interface AnalyticsSummary {
     inputTokens: number;
     outputTokens: number;
     totalTokens: number;
+    totalCostUsd: number;
   };
   byProvider: Array<{
     provider: string;
@@ -31,8 +32,9 @@ export interface AnalyticsSummary {
     errors: number;
     avgLatencyMs: number;
     tokens: number;
+    costUsd: number;
   }>;
-  byModel: Array<{ model: string; requests: number }>;
+  byModel: Array<{ model: string; requests: number; costUsd: number }>;
 }
 
 export function findMetric(snapshot: unknown[], name: string): MetricJson | undefined {
@@ -133,6 +135,7 @@ export function computeAnalyticsSummary(
   const activeProviders = findMetric(snapshot, 'llm_active_providers');
   const latency = findMetric(snapshot, 'llm_request_latency_seconds');
   const tokens = findMetric(snapshot, 'llm_token_usage');
+  const cost = findMetric(snapshot, 'llm_cost_usd_total');
 
   const totalRequests = sumValues(requests);
   const totalErrors = sumValues(errors);
@@ -192,12 +195,16 @@ export function computeAnalyticsSummary(
       }
     }
   }
+  const providerCost = groupByLabel(cost, 'provider');
+  const modelCost = groupByLabel(cost, 'model');
+  const totalCostUsd = sumValues(cost);
 
   const providers = new Set([
     ...providerRequests.keys(),
     ...providerErrors.keys(),
     ...providerLatencyCount.keys(),
     ...providerTokens.keys(),
+    ...providerCost.keys(),
   ]);
   const byProvider = [...providers]
     .map((provider) => {
@@ -209,12 +216,17 @@ export function computeAnalyticsSummary(
         errors: providerErrors.get(provider) ?? 0,
         avgLatencyMs: count > 0 ? Math.round((sum / count) * 1000) : 0,
         tokens: providerTokens.get(provider) ?? 0,
+        costUsd: providerCost.get(provider) ?? 0,
       };
     })
     .sort((a, b) => b.requests - a.requests);
 
   const byModel = [...groupByLabel(requests, 'model').entries()]
-    .map(([model, count]) => ({ model, requests: count }))
+    .map(([model, count]) => ({
+      model,
+      requests: count,
+      costUsd: modelCost.get(model) ?? 0,
+    }))
     .sort((a, b) => b.requests - a.requests);
 
   const activeCount = sumValues(activeProviders);
@@ -240,6 +252,7 @@ export function computeAnalyticsSummary(
       inputTokens,
       outputTokens,
       totalTokens: inputTokens + outputTokens,
+      totalCostUsd,
     },
     byProvider,
     byModel,

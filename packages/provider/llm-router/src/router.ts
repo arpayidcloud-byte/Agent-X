@@ -99,6 +99,7 @@ export class LLMRouter {
       llmMetrics.recordLatency(providerName, modelId, latency);
       llmMetrics.recordTokenUsage(providerName, modelId, 'input', response.usage.inputTokens);
       llmMetrics.recordTokenUsage(providerName, modelId, 'output', response.usage.outputTokens);
+      llmMetrics.recordCost(providerName, modelId, response.cost);
       llmMetrics.setProviderHealth(providerName, true);
 
       // 4. Save to cache

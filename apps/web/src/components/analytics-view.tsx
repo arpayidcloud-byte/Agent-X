@@ -8,6 +8,12 @@ function fmt(n: number): string {
   return String(n);
 }
 
+function fmtUsd(n: number): string {
+  if (n >= 1) return `$${n.toFixed(2)}`;
+  if (n >= 0.001) return `$${n.toFixed(4)}`;
+  return `$${n.toFixed(6)}`;
+}
+
 // Horizontal bar chart rendered with pure CSS (no chart library).
 function BarChart({
   rows,
@@ -95,9 +101,13 @@ export default function AnalyticsView() {
   const providerBars = data.byProvider.map((p) => ({
     label: p.provider,
     value: p.requests,
-    sub: `${p.errors} err · ${p.avgLatencyMs}ms · ${fmt(p.tokens)} tok`,
+    sub: `${p.errors} err · ${p.avgLatencyMs}ms · ${fmt(p.tokens)} tok · ${fmtUsd(p.costUsd)}`,
   }));
   const modelBars = data.byModel.map((m) => ({ label: m.model, value: m.requests }));
+  const costBars = data.byProvider
+    .map((p) => ({ label: p.provider, value: p.costUsd }))
+    .filter((r) => r.value > 0)
+    .sort((a, b) => b.value - a.value);
 
   return (
     <div className="space-y-6">
@@ -124,6 +134,16 @@ export default function AnalyticsView() {
         />
       </div>
 
+      <div className="rounded-xl border border-emerald-500/30 bg-emerald-950/20 p-5">
+        <h3 className="mb-2 text-sm font-semibold text-emerald-300">Total cost</h3>
+        <p className="text-3xl font-bold text-emerald-200">{fmtUsd(o.totalCostUsd)}</p>
+        <p className="mt-1 text-xs text-slate-500">
+          accrued across {fmt(o.totalRequests)} requests · avg{' '}
+          {o.totalRequests > 0 ? `$${(o.totalCostUsd / o.totalRequests).toFixed(6)}` : '$0'} /
+          request
+        </p>
+      </div>
+
       <div className="grid gap-6 md:grid-cols-2">
         <div className="rounded-xl border border-slate-700/50 bg-slate-900/50 p-5">
           <h3 className="mb-4 text-sm font-semibold text-slate-200">Requests by provider</h3>
@@ -139,6 +159,11 @@ export default function AnalyticsView() {
           <h3 className="mb-4 text-sm font-semibold text-slate-200">Requests by model</h3>
           <BarChart rows={modelBars} format={fmt} color="bg-violet-500" />
         </div>
+      </div>
+
+      <div className="rounded-xl border border-slate-700/50 bg-slate-900/50 p-5">
+        <h3 className="mb-4 text-sm font-semibold text-slate-200">Cost by provider</h3>
+        <BarChart rows={costBars} format={fmtUsd} color="bg-emerald-500" />
       </div>
     </div>
   );

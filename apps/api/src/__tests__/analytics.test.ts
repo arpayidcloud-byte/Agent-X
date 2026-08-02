@@ -116,6 +116,14 @@ function makeSnapshot(): MetricJson[] {
         },
       ],
     },
+    {
+      name: 'llm_cost_usd_total',
+      type: 'counter',
+      values: [
+        { labels: { provider: 'deepseek', model: 'deepseek-v3' }, value: 0.000234 },
+        { labels: { provider: 'anthropic', model: 'claude-3-5' }, value: 0.000512 },
+      ],
+    },
   ];
 }
 
@@ -177,6 +185,7 @@ describe('computeAnalyticsSummary', () => {
     expect(summary.overview.inputTokens).toBe(9);
     expect(summary.overview.outputTokens).toBe(4);
     expect(summary.overview.totalTokens).toBe(13);
+    expect(summary.overview.totalCostUsd).toBeCloseTo(0.000234 + 0.000512, 10);
     // avg latency = 8.75 / 11 s → ~795ms
     expect(summary.overview.avgLatencyMs).toBeGreaterThan(700);
     expect(summary.overview.avgLatencyMs).toBeLessThan(900);
@@ -191,13 +200,15 @@ describe('computeAnalyticsSummary', () => {
     expect(deepseek.requests).toBe(9);
     expect(deepseek.errors).toBe(1);
     expect(deepseek.tokens).toBe(13); // 9 input + 4 output
+    expect(deepseek.costUsd).toBeCloseTo(0.000234, 10);
     expect(deepseek.avgLatencyMs).toBeGreaterThan(0);
     const anthropic = summary.byProvider.find((p) => p.provider === 'anthropic')!;
     expect(anthropic.requests).toBe(2);
     expect(anthropic.errors).toBe(0);
+    expect(anthropic.costUsd).toBeCloseTo(0.000512, 10);
     expect(summary.byModel).toEqual([
-      { model: 'deepseek-v3', requests: 9 },
-      { model: 'claude-3-5', requests: 2 },
+      { model: 'deepseek-v3', requests: 9, costUsd: 0.000234 },
+      { model: 'claude-3-5', requests: 2, costUsd: 0.000512 },
     ]);
   });
 

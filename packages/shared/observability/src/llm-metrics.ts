@@ -8,6 +8,7 @@ export class LLMMetrics {
   private llmErrorsTotal: Counter;
   private llmFallbacksTotal: Counter;
   private llmCacheHitsTotal: Counter;
+  private llmCostUsdTotal: Counter;
 
   // Histograms
   private llmLatencyHistogram: Histogram;
@@ -51,6 +52,14 @@ export class LLMMetrics {
     this.llmCacheHitsTotal = new Counter({
       name: 'llm_cache_hits_total',
       help: 'Total number of cache hits',
+      labelNames: ['provider', 'model'],
+      registers: [this.registry],
+    });
+
+    // Counter: Cost in USD
+    this.llmCostUsdTotal = new Counter({
+      name: 'llm_cost_usd_total',
+      help: 'Total LLM cost in USD',
       labelNames: ['provider', 'model'],
       registers: [this.registry],
     });
@@ -103,6 +112,10 @@ export class LLMMetrics {
 
   recordCacheHit(provider: string, model: string) {
     this.llmCacheHitsTotal.inc({ provider, model });
+  }
+
+  recordCost(provider: string, model: string, usd: number) {
+    this.llmCostUsdTotal.inc({ provider, model }, usd);
   }
 
   recordLatency(provider: string, model: string, seconds: number) {

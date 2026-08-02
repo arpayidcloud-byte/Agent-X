@@ -197,6 +197,7 @@ export interface AnalyticsSummary {
     inputTokens: number;
     outputTokens: number;
     totalTokens: number;
+    totalCostUsd: number;
   };
   byProvider: Array<{
     provider: string;
@@ -204,8 +205,9 @@ export interface AnalyticsSummary {
     errors: number;
     avgLatencyMs: number;
     tokens: number;
+    costUsd: number;
   }>;
-  byModel: Array<{ model: string; requests: number }>;
+  byModel: Array<{ model: string; requests: number; costUsd: number }>;
 }
 
 /** Fetch the analytics summary (aggregated LLM metrics). */
