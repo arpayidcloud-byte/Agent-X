@@ -114,6 +114,71 @@ export async function startStreamTask(prompt: string): Promise<StreamRunResponse
   return body;
 }
 
+// ─── Web Pro: chat ────
+
+export interface ChatMessage {
+  role: 'user' | 'assistant';
+  content: string;
+}
+
+export interface ChatResponse {
+  message: string;
+  provider: string;
+  model: string;
+  cached: boolean;
+  latencyMs: number;
+  cost: number;
+  taskId: string;
+}
+
+export interface ChatStreamResponse {
+  chatId: string;
+  status: 'accepted';
+}
+
+export type ChatStreamEvent =
+  | { type: 'start'; chatId: string; provider: string; model: string; at: string }
+  | { type: 'chunk'; chatId: string; text: string; at: string }
+  | {
+      type: 'complete';
+      chatId: string;
+      usage: { inputTokens: number; outputTokens: number; totalTokens: number };
+      cost: number;
+      latencyMs: number;
+      at: string;
+    }
+  | { type: 'error'; chatId: string; error: string; at: string };
+
+/** Single-turn chat with transcript context (sync response). */
+export async function sendChat(messages: ChatMessage[]): Promise<ChatResponse> {
+  const res = await fetch(`${API_URL}/v1/agentx/chat`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ messages }),
+    cache: 'no-store',
+  });
+  const body = (await res.json()) as ChatResponse & { error?: string };
+  if (!res.ok) {
+    throw new Error(body.error ?? `POST /v1/agentx/chat failed: ${res.status}`);
+  }
+  return body;
+}
+
+/** Start a streamed chat; consume events via GET /v1/agentx/chat/:id/events. */
+export async function startChatStream(messages: ChatMessage[]): Promise<ChatStreamResponse> {
+  const res = await fetch(`${API_URL}/v1/agentx/chat/stream`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ messages }),
+    cache: 'no-store',
+  });
+  const body = (await res.json()) as ChatStreamResponse & { error?: string };
+  if (!res.ok) {
+    throw new Error(body.error ?? `POST /v1/agentx/chat/stream failed: ${res.status}`);
+  }
+  return body;
+}
+
 // ─── Beta recruitment API (Phase 3 Week 19-20) ────
 
 export interface WaitlistEntry {
