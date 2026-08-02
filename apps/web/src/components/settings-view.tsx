@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { LogOut, KeyRound } from 'lucide-react';
 import {
   fetchMe,
@@ -119,6 +120,12 @@ export default function SettingsView() {
             Sign in
           </Button>
         </form>
+        <p className="mt-4 text-center text-xs text-slate-500">
+          New here?{' '}
+          <Link href="/signup" className="font-medium text-accent-300 hover:text-accent-200">
+            Create an account
+          </Link>
+        </p>
       </div>
     );
   }

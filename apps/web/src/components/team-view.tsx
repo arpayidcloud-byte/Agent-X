@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { LogOut } from 'lucide-react';
 import {
   fetchTeam,
@@ -64,8 +65,8 @@ export default function TeamView() {
 
   if (!authed) {
     return (
-      <div className="mx-auto max-w-md rounded-xl border border-surface-3 bg-surface-1 p-6">
-        <h2 className="mb-4 text-base font-semibold text-slate-100">Admin sign in</h2>
+      <div className="mx-auto w-full max-w-md rounded-2xl border border-surface-3 bg-surface-1 p-6 sm:p-8">
+        <h2 className="mb-1 text-lg font-semibold text-slate-100">Sign in</h2>
         <p className="mb-4 text-xs text-slate-500">
           Team management lists registered users. Only accounts with the{' '}
           <code className="text-amber-300">admin</code> role can view it.
@@ -94,6 +95,12 @@ export default function TeamView() {
             Sign in
           </Button>
         </form>
+        <p className="mt-4 text-center text-xs text-slate-500">
+          New here?{' '}
+          <Link href="/signup" className="font-medium text-accent-300 hover:text-accent-200">
+            Create an account
+          </Link>
+        </p>
       </div>
     );
   }
