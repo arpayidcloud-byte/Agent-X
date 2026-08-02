@@ -1,6 +1,12 @@
 import type { RouteRequest, LLMProvider, ModelMetadata, LLMResponse } from './types.js';
 import { LLMCacheManager } from './cache-manager.js';
 import { llmMetrics, alertManager, healthChecker } from '@agent-xai/observability';
+import {
+  pickCheapestAdequate,
+  pickCheapestOverall,
+  requiredCapabilities,
+  resolveComplexityFloor,
+} from './cost-model.js';
 
 export class LLMRouter {
   private providers: Map<string, LLMProvider> = new Map();
@@ -32,36 +38,48 @@ export class LLMRouter {
     healthChecker.registerProvider(provider.name, 'healthy');
   }
 
+  /**
+   * Cost-aware model selection (roadmap OKR: 70% cost reduction).
+   *
+   * Strategy — pick the CHEAPEST ADEQUATE model across every registered
+   * provider instead of hard-coded provider:model strings:
+   * - `security: confidential` → local model when a `local` provider is
+   *   registered, otherwise the cheapest registered model (data never
+   *   leaves the box only when a local provider exists; cheapest otherwise).
+   * - `budget: low` → cheapest registered model overall.
+   * - otherwise → cheapest model meeting the complexity floor (expert maps
+   *   to the strongest tier that exists) + capabilities required by `type`
+   *   (code → `code`, reasoning/analysis → `reasoning`).
+   * - `budget: high`/`unlimited` → strongest tier (complex), still cheapest
+   *   within it.
+   */
   selectBestModel(req: RouteRequest): string {
-    const complexity = req.complexity || 'medium';
-    const budget = req.budget || 'medium';
-    const type = req.type || 'reasoning';
-
-    // Safety fallback
+    // Confidential data: prefer on-device inference; fall back to the
+    // cheapest registered model if no local provider is available.
     if (req.security === 'confidential') {
-      return 'local:llama-3-8b';
-    }
-
-    if (budget === 'low') {
+      if (this.providers.has('local')) return 'local:llama-3-8b';
+      const cheapest = pickCheapestOverall(this.models);
+      if (cheapest) return `${cheapest.provider}:${cheapest.model}`;
       return 'deepseek:deepseek-v3';
     }
 
-    if (type === 'code') {
-      if (complexity === 'simple') return 'anthropic:claude-3-haiku-20240307';
-      if (complexity === 'complex' || complexity === 'expert')
-        return 'anthropic:claude-3-7-sonnet-20250219';
-      return 'anthropic:claude-3-5-sonnet-20241022';
+    if (req.budget === 'low') {
+      const cheapest = pickCheapestOverall(this.models);
+      if (cheapest) return `${cheapest.provider}:${cheapest.model}`;
+      return 'deepseek:deepseek-v3';
     }
 
-    if (complexity === 'expert') {
-      return 'openai:o1-preview';
-    } else if (complexity === 'complex') {
-      return 'openai:gpt-4o';
-    } else if (complexity === 'simple') {
-      return 'openai:gpt-4o-mini';
-    }
+    const floor = resolveComplexityFloor(req);
+    const caps = requiredCapabilities(req.type);
+    const chosen = pickCheapestAdequate(this.models, {
+      complexityFloor: floor,
+      capabilities: caps,
+    });
+    if (chosen) return `${chosen.provider}:${chosen.model}`;
 
-    return 'deepseek:deepseek-v3';
+    // No model meets the floor/capabilities — last resort: cheapest overall.
+    const any = pickCheapestOverall(this.models);
+    return any ? `${any.provider}:${any.model}` : 'deepseek:deepseek-v3';
   }
 
   async execute(req: RouteRequest, prompt: string): Promise<LLMResponse> {
