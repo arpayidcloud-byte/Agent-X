@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { API_URL, startChatStream, type ChatMessage, type ChatStreamEvent } from '@/lib/api';
+import { startChatStream, type ChatMessage, type ChatStreamEvent } from '@/lib/api';
+import { openEventStream, type StreamHandle } from '@/lib/stream';
 
 interface Bubble {
   role: 'user' | 'assistant';
@@ -18,7 +19,7 @@ export default function ChatView() {
   const [input, setInput] = useState('');
   const [streaming, setStreaming] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const sourceRef = useRef<EventSource | null>(null);
+  const sourceRef = useRef<StreamHandle | null>(null);
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const assistantRef = useRef('');
 
@@ -50,11 +51,8 @@ export default function ChatView() {
       setStreaming(true);
       assistantRef.current = '';
 
-      const source = new EventSource(`${API_URL}/v1/agentx/chat/${chatId}/events`);
-      sourceRef.current = source;
-      let done = false;
-      source.onmessage = (msg) => {
-        const ev = JSON.parse(msg.data as string) as ChatStreamEvent;
+      const handle = openEventStream(`chat:${chatId}`, (raw) => {
+        const ev = raw as ChatStreamEvent;
         if (ev.type === 'start') {
           setBubbles((prev) => {
             const next = [...prev];
@@ -71,7 +69,6 @@ export default function ChatView() {
             return next;
           });
         } else if (ev.type === 'complete') {
-          done = true;
           const finalContent = assistantRef.current.trim();
           setBubbles((prev) => {
             const next = [...prev];
@@ -83,11 +80,10 @@ export default function ChatView() {
             return next;
           });
           setMessages((prev) => [...prev, { role: 'assistant', content: finalContent }]);
-          source.close();
+          handle.close();
           sourceRef.current = null;
           setStreaming(false);
         } else if (ev.type === 'error') {
-          done = true;
           setBubbles((prev) => {
             const next = [...prev];
             const last = next[next.length - 1];
@@ -98,18 +94,12 @@ export default function ChatView() {
             return next;
           });
           setError(ev.error);
-          source.close();
+          handle.close();
           sourceRef.current = null;
           setStreaming(false);
         }
-      };
-      source.onerror = () => {
-        if (done) return;
-        source.close();
-        sourceRef.current = null;
-        setStreaming(false);
-        setError('Stream connection lost — the chat may still be running server-side.');
-      };
+      });
+      sourceRef.current = handle;
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     }
@@ -119,7 +109,8 @@ export default function ChatView() {
     <div className="mx-auto flex h-[calc(100vh-8rem)] max-w-3xl flex-col rounded-xl border border-slate-700/50 bg-slate-900/40">
       <div className="border-b border-slate-800 px-6 py-4">
         <h2 className="text-lg font-semibold text-cyan-400">
-          Chat <span className="text-xs font-normal text-slate-500">(Web Pro · SSE streaming)</span>
+          Chat{' '}
+          <span className="text-xs font-normal text-slate-500">(Web Pro · SSE + WS fallback)</span>
         </h2>
       </div>
 
