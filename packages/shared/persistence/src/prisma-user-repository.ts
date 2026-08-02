@@ -46,4 +46,13 @@ export class PrismaUserRepository {
     const row = await this.prisma.user.findUnique({ where: { id } });
     return row ? toRecord(row) : undefined;
   }
+
+  async findAll(): Promise<UserRecord[]> {
+    const rows = await this.prisma.user.findMany({ orderBy: { createdAt: 'desc' } });
+    return rows.map(toRecord);
+  }
+
+  async updatePassword(id: string, passwordHash: string): Promise<void> {
+    await this.prisma.user.update({ where: { id }, data: { passwordHash } });
+  }
 }

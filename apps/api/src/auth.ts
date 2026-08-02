@@ -55,6 +55,8 @@ interface UserBackend {
   }): Promise<UserRecord>;
   findByEmail(email: string): Promise<UserRecord | undefined>;
   findById(id: string): Promise<UserRecord | undefined>;
+  list(): Promise<UserRecord[]>;
+  updatePassword(id: string, passwordHash: string): Promise<void>;
 }
 
 const memoryUserBackend: UserBackend = {
@@ -69,6 +71,13 @@ const memoryUserBackend: UserBackend = {
   async findById(id) {
     return userStore.get(id);
   },
+  async list() {
+    return [...userStore.values()];
+  },
+  async updatePassword(id, passwordHash) {
+    const user = userStore.get(id);
+    if (user) user.passwordHash = passwordHash;
+  },
 };
 
 function prismaUserBackend(prisma: NonNullable<ReturnType<typeof getPrisma>>): UserBackend {
@@ -82,6 +91,12 @@ function prismaUserBackend(prisma: NonNullable<ReturnType<typeof getPrisma>>): U
     },
     async findById(id) {
       return repo.findById(id);
+    },
+    async list() {
+      return repo.findAll();
+    },
+    async updatePassword(id, passwordHash) {
+      await repo.updatePassword(id, passwordHash);
     },
   };
 }
@@ -180,6 +195,38 @@ export async function refresh(refreshToken: string): Promise<AuthTokens> {
   refreshTokens.delete(refreshToken);
   const tokens = issueTokens(user);
   return tokens;
+}
+
+export async function changePassword(
+  userId: string,
+  currentPassword: string,
+  newPassword: string,
+): Promise<void> {
+  if (!currentPassword || typeof currentPassword !== 'string') {
+    throw new AuthError('Missing field: currentPassword', 400);
+  }
+  if (!newPassword || typeof newPassword !== 'string' || newPassword.length < 8) {
+    throw new AuthError('Missing or invalid field: newPassword (min 8 chars)', 400);
+  }
+  const backend = await getUserBackend();
+  const user = await backend.findById(userId);
+  if (!user) {
+    throw new AuthError('User not found', 401);
+  }
+  const valid = await bcrypt.compare(currentPassword, user.passwordHash);
+  if (!valid) {
+    throw new AuthError('Invalid current password', 401);
+  }
+  const passwordHash = await bcrypt.hash(newPassword, 10);
+  await backend.updatePassword(user.id, passwordHash);
+  logger.info('Password changed', { email: user.email });
+}
+
+/** All registered users (password hashes stripped) — for team management. */
+export async function listUsers(): Promise<Array<Omit<UserRecord, 'passwordHash'>>> {
+  const backend = await getUserBackend();
+  const users = await backend.list();
+  return users.map(({ passwordHash: _ph, ...rest }) => rest);
 }
 
 export function verifyToken(token: string): JWTPayload {

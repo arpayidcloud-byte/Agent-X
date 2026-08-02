@@ -6,8 +6,8 @@ import { computeAnalyticsSummary } from './analytics.js';
 import { agentConfigStore, AGENT_MODEL_OPTIONS } from './agent-config.js';
 import { notifySlack } from './slack.js';
 import { getBetaBackend } from './beta-store.js';
+import { maybeRequireAdmin, listUsers } from './auth.js';
 import type { WaitlistEntry, FeedbackEntry } from './beta-store.js';
-import { maybeRequireAdmin } from './auth.js';
 import { registerAuthRoutes } from './auth-routes.js';
 import {
   publishEvent,
@@ -410,6 +410,19 @@ app.get('/v1/agentx/chat/:id/events', (req, res) => {
     clearInterval(heartbeat);
     unsubscribe();
   });
+});
+
+// ─── Team management (Web Pro, basic) ────
+// List registered users; admin-only when AUTH_ENABLED (password hashes never
+// leave the server).
+app.get('/v1/team', maybeRequireAdmin, async (_req, res) => {
+  try {
+    const users = await listUsers();
+    res.json({ users });
+  } catch (e) {
+    const err = e instanceof Error ? e.message : String(e);
+    res.status(500).json({ error: err });
+  }
 });
 
 // ─── Analytics summary (Web Pro) ────
