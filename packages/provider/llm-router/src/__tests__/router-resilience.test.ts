@@ -68,23 +68,26 @@ describe('Router resilience (benchmark findings)', () => {
     ).rejects.toThrow(/DOWN/);
   });
 
-  it('resolves expert complexity to an existing model (o1-preview)', async () => {
+  it('resolves expert complexity to the cheapest adequate model (no o1-preview hardcode)', async () => {
     const router = new LLMRouter();
     router.registerProvider(OpenAIMock);
     router.registerProvider(DeepSeekMock);
 
+    // expert maps to the strongest tier that exists (complex). With
+    // OpenAIMock + DeepSeekMock, deepseek-v3 is medium-rated (excluded at
+    // floor 3) so the cheapest adequate complex model is gpt-4o.
     const model = router.selectBestModel({
       taskId: 'r4',
       description: 'x',
       complexity: 'expert',
     });
-    expect(model).toBe('openai:o1-preview');
+    expect(model).toBe('openai:gpt-4o');
 
     const res = await router.execute(
       { taskId: 'r5', description: 'x', complexity: 'expert' },
       PROMPT,
     );
-    expect(res.model).toBe('o1-preview');
+    expect(res.model).toBe('gpt-4o');
   });
 
   it('resolves code-type requests to models present on AnthropicMock', async () => {

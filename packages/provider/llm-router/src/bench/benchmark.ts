@@ -15,7 +15,14 @@
  * All numbers are produced by actual code execution — no fixtures.
  */
 
-import { LLMRouter, MockProvider, DeepSeekMock, OpenAIMock, AnthropicMock } from '../index.js';
+import {
+  LLMRouter,
+  MockProvider,
+  DeepSeekMock,
+  OpenAIMock,
+  AnthropicMock,
+  QwenMock,
+} from '../index.js';
 import type { LLMProvider, RouteRequest, LLMResponse } from '../types.js';
 
 const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
@@ -88,7 +95,7 @@ async function runScenarioA(): Promise<void> {
     { label: 'type=code, complex', req: { ...REQ, type: 'code', complexity: 'complex' } },
   ];
   for (const { label, req } of tiers) {
-    const router = routerWith(OpenAIMock, DeepSeekMock, AnthropicMock);
+    const router = routerWith(OpenAIMock, DeepSeekMock, AnthropicMock, QwenMock);
     const latencies: number[] = [];
     let totalCost = 0;
     let model = '';
@@ -177,7 +184,7 @@ async function runScenarioE(): Promise<void> {
 
 function runScenarioF(): void {
   console.log('\n=== F. Cost baseline per scenario (OKR "70% cost reduction") ===');
-  const router = routerWith(OpenAIMock, DeepSeekMock, AnthropicMock);
+  const router = routerWith(OpenAIMock, DeepSeekMock, AnthropicMock, QwenMock);
   const combos: Array<{ label: string; req: RouteRequest }> = [];
   const complexities: Array<RouteRequest['complexity']> = ['simple', 'medium', 'complex', 'expert'];
   const budgets: Array<RouteRequest['budget']> = ['low', 'medium', 'high'];

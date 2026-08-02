@@ -96,3 +96,20 @@ export const AnthropicMock = new MockProvider('anthropic', {
     complexityRating: 'simple',
   },
 });
+
+export const QwenMock = new MockProvider('qwen', {
+  'qwen-max': {
+    name: 'Qwen Max',
+    provider: 'qwen',
+    pricing: { inputCostPerMillion: 0.5, outputCostPerMillion: 1.0 },
+    capabilities: ['code', 'reasoning'],
+    complexityRating: 'complex',
+  },
+  'qwen-plus': {
+    name: 'Qwen Plus',
+    provider: 'qwen',
+    pricing: { inputCostPerMillion: 0.2, outputCostPerMillion: 0.8 },
+    capabilities: ['reasoning', 'fast'],
+    complexityRating: 'medium',
+  },
+});
