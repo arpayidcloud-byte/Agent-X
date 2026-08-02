@@ -89,6 +89,9 @@ importers:
       '@agent-xai/llm-router':
         specifier: workspace:*
         version: link:../../packages/provider/llm-router
+      '@agent-xai/multi-agent-collaboration':
+        specifier: workspace:^
+        version: link:../../packages/agent/multi-agent-collaboration
       '@agent-xai/observability':
         specifier: workspace:*
         version: link:../../packages/shared/observability
