@@ -1,5 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import SubmitForm from '@/components/submit-form';
+import TaskStreamView from '@/components/task-stream-view';
 import { API_URL, fetchHealth, fetchStats, fetchTasks } from '@/lib/api';
 
 // Always render on the server per request — the dashboard is a live view of the
@@ -141,6 +142,10 @@ export default async function AgentXDashboard() {
             )}
           </div>
         </div>
+
+        <section className="mb-12">
+          <TaskStreamView />
+        </section>
 
         <section>
           <h2 className="mb-4 text-2xl font-bold text-slate-200">Recent tasks</h2>

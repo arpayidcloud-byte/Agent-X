@@ -81,6 +81,39 @@ export async function runTask(prompt: string): Promise<RunResponse> {
   return body;
 }
 
+// ─── Web Pro: async stream run (SSE) ────
+
+export interface StreamRunResponse {
+  taskId: string;
+  status: 'accepted';
+}
+
+export interface TaskStreamEvent {
+  type: 'accepted' | 'generating' | 'complete';
+  taskId: string;
+  at: string;
+  status?: 'success' | 'error';
+  provider?: string;
+  model?: string;
+  response?: string;
+  error?: string;
+}
+
+/** Start an async task; consume progress via GET /v1/agentx/tasks/:id/events. */
+export async function startStreamTask(prompt: string): Promise<StreamRunResponse> {
+  const res = await fetch(`${API_URL}/v1/agentx/run/stream`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ prompt }),
+    cache: 'no-store',
+  });
+  const body = (await res.json()) as StreamRunResponse & { error?: string };
+  if (!res.ok) {
+    throw new Error(body.error ?? `POST /v1/agentx/run/stream failed: ${res.status}`);
+  }
+  return body;
+}
+
 // ─── Beta recruitment API (Phase 3 Week 19-20) ────
 
 export interface WaitlistEntry {
