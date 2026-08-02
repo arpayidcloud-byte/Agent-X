@@ -3,6 +3,7 @@ import { llmMetrics, alertManager, healthChecker, Logger } from '@agent-xai/obse
 import { LLMRouter, OpenAIMock, DeepSeekMock, AnthropicMock } from '@agent-xai/llm-router';
 import { createRequestLogger } from './request-logger.js';
 import { computeAnalyticsSummary } from './analytics.js';
+import { agentConfigStore, AGENT_MODEL_OPTIONS } from './agent-config.js';
 import { notifySlack } from './slack.js';
 import { getBetaBackend } from './beta-store.js';
 import type { WaitlistEntry, FeedbackEntry } from './beta-store.js';
@@ -419,6 +420,31 @@ app.get('/v1/analytics/summary', async (_req, res) => {
     res.json(computeAnalyticsSummary(snapshot));
   } catch (e) {
     res.status(500).json({ error: String(e) });
+  }
+});
+
+// ─── Agent configuration (Web Pro) ────
+// GET is public (read-only view); PATCH requires admin (config is a
+// management action).
+app.get('/v1/agents', (_req, res) => {
+  res.json({ agents: agentConfigStore.list(), modelOptions: AGENT_MODEL_OPTIONS });
+});
+
+app.patch('/v1/agents/:id', maybeRequireAdmin, (req, res) => {
+  try {
+    const { id } = req.params;
+    const agentId = typeof id === 'string' ? id : '';
+    const { enabled, model, complexity } = req.body ?? {};
+    const updated = agentConfigStore.update(agentId, { enabled, model, complexity });
+    if (!updated) {
+      res.status(404).json({ error: `Agent not found: ${agentId}` });
+      return;
+    }
+    logger.info('Agent config updated', { id, enabled: updated.enabled, model: updated.model });
+    res.json({ agent: updated });
+  } catch (e) {
+    const err = e instanceof Error ? e.message : String(e);
+    res.status(400).json({ error: err });
   }
 });
 
