@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Loader2, UserPlus } from 'lucide-react';
 import { registerAccount, setToken } from '../lib/api';
+import SocialAuthButtons from './social-auth-buttons';
 
 export default function SignupForm() {
   const router = useRouter();
@@ -106,6 +107,10 @@ export default function SignupForm() {
           {loading ? 'Creating account…' : 'Sign up'}
         </button>
       </form>
+
+      <div className="mt-5">
+        <SocialAuthButtons />
+      </div>
 
       <p className="mt-5 text-center text-xs text-slate-500">
         Already have an account?{' '}

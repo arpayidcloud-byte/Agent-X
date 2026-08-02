@@ -16,6 +16,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import SocialAuthButtons from './social-auth-buttons';
 
 // Web Pro user settings: profile (id/email/roles) + change password.
 // Requires a Bearer token; shows an inline login form when not authed.
@@ -120,6 +121,9 @@ export default function SettingsView() {
             Sign in
           </Button>
         </form>
+        <div className="mt-4">
+          <SocialAuthButtons />
+        </div>
         <p className="mt-4 text-center text-xs text-slate-500">
           New here?{' '}
           <Link href="/signup" className="font-medium text-accent-300 hover:text-accent-200">

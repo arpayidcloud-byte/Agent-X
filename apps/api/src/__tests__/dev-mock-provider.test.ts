@@ -20,8 +20,10 @@ describe('Dev mock providers (ENABLE_MOCK_PROVIDER)', () => {
     );
 
     expect(response.message).toContain('[MOCK]');
-    expect(response.provider).toBe('openai');
-    expect(response.model).toBe('gpt-4o-mini');
+    // Price-aware routing (PR #42): simple complexity picks the cheapest
+    // adequate model — deepseek-v3 ($0.10/$0.10) beats gpt-4o-mini.
+    expect(response.provider).toBe('deepseek');
+    expect(response.model).toBe('deepseek-v3');
     expect(response.usage.totalTokens).toBeGreaterThan(0);
     expect(response.latencyMs).toBeGreaterThanOrEqual(0);
   });
