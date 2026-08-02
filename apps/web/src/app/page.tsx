@@ -1,7 +1,5 @@
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import SubmitForm from '@/components/submit-form';
 import TaskStreamView from '@/components/task-stream-view';
-import { API_URL, fetchHealth, fetchStats, fetchTasks } from '@/lib/api';
+import { fetchHealth, fetchStats, fetchTasks } from '@/lib/api';
 
 // Always render on the server per request — the dashboard is a live view of the
 // API server, it must never be statically prerendered (avoids build-time fetches).
@@ -24,125 +22,62 @@ export default async function AgentXDashboard() {
   const providerCount = health?.providers.length ?? 0;
   const completed = tasks?.tasks.filter((t) => t.status === 'success').length ?? 0;
   const requests = stats?.stats.llm_requests_total ?? 0;
-  const errors = stats?.stats.llm_errors_total ?? 0;
-  const fallbacks = stats?.stats.llm_fallbacks_total ?? 0;
   const cacheHits = stats?.stats.llm_cache_hits_total ?? 0;
 
   return (
     <main className="text-white">
       <div className="mx-auto max-w-6xl">
-        <header className="mb-10">
-          <h1 className="bg-gradient-to-r from-cyan-400 via-blue-400 to-violet-400 bg-clip-text text-4xl font-extrabold tracking-tight text-transparent">
-            AgentX Dashboard
-          </h1>
-          <p className="mt-3 text-sm text-slate-400">
-            Enterprise AI Agent Platform — live data from{' '}
-            <code className="rounded bg-slate-800 px-1.5 py-0.5 text-xs text-cyan-300">
-              {API_URL}
+        <TaskStreamView />
+
+        {/* Compact stat strip */}
+        <section className="mt-10 grid grid-cols-2 gap-3 lg:grid-cols-4">
+          {[
+            {
+              label: 'Providers Healthy',
+              value: health ? `${healthyProviders}/${providerCount}` : '—',
+              sub: health ? `status: ${health.status}` : 'no data',
+              color: 'text-cyan-400',
+            },
+            {
+              label: 'Tasks Completed',
+              value: tasks ? completed : '—',
+              sub: tasks ? `of ${tasks.total} recorded` : 'no data',
+              color: 'text-blue-400',
+            },
+            {
+              label: 'LLM Requests',
+              value: stats ? requests : '—',
+              sub: 'router total',
+              color: 'text-violet-400',
+            },
+            {
+              label: 'Cache Hits',
+              value: stats ? cacheHits : '—',
+              sub: 'llm_cache_hits_total',
+              color: 'text-emerald-400',
+            },
+          ].map((s) => (
+            <div key={s.label} className="rounded-xl border border-slate-800 bg-slate-900/40 p-4">
+              <div className={`text-sm font-medium ${s.color}`}>{s.label}</div>
+              <div className="mt-1 text-2xl font-bold text-slate-100">{s.value}</div>
+              <div className="mt-0.5 text-xs text-slate-600">{s.sub}</div>
+            </div>
+          ))}
+        </section>
+
+        {apiError && (
+          <p className="mt-6 rounded-lg border border-amber-500/20 bg-amber-950/30 p-3 text-sm text-amber-300">
+            ⚠ API unreachable: {apiError} — start the server with{' '}
+            <code className="rounded bg-slate-800 px-1.5 py-0.5">
+              ENABLE_MOCK_PROVIDER=true node apps/api/dist/agentx-server.js
             </code>
           </p>
-          {apiError && (
-            <p className="mt-3 rounded-lg border border-amber-500/20 bg-amber-950/30 p-3 text-sm text-amber-300">
-              ⚠ API unreachable: {apiError} — start the server with{' '}
-              <code className="rounded bg-slate-800 px-1.5 py-0.5">
-                ENABLE_MOCK_PROVIDER=true node apps/api/dist/agentx-server.js
-              </code>
-            </p>
-          )}
-        </header>
+        )}
 
-        <section className="mb-12 grid grid-cols-4 gap-4">
-          <Card className="bg-slate-900/40 border-cyan-500/20">
-            <CardHeader>
-              <CardTitle className="text-sm text-cyan-400">Providers Healthy</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold">
-                {health ? `${healthyProviders}/${providerCount}` : '—'}
-              </div>
-              <div className="text-xs text-slate-500">
-                {health ? `status: ${health.status}` : 'no data'}
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-slate-900/40 border-blue-500/20">
-            <CardHeader>
-              <CardTitle className="text-sm text-blue-400">Tasks Completed</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold">{tasks ? completed : '—'}</div>
-              <div className="text-xs text-slate-500">
-                {tasks ? `of ${tasks.total} recorded` : 'no data'}
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-slate-900/40 border-violet-500/20">
-            <CardHeader>
-              <CardTitle className="text-sm text-violet-400">LLM Requests</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold">{stats ? requests : '—'}</div>
-              <div className="text-xs text-slate-500">
-                {stats ? `${errors} errors · ${fallbacks} fallbacks` : 'no data'}
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-slate-900/40 border-emerald-500/20">
-            <CardHeader>
-              <CardTitle className="text-sm text-emerald-400">Cache Hits</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold">{stats ? cacheHits : '—'}</div>
-              <div className="text-xs text-slate-500">from llm_cache_hits_total</div>
-            </CardContent>
-          </Card>
-        </section>
-
-        <div className="mb-12 grid grid-cols-1 gap-6 lg:grid-cols-2">
-          <SubmitForm />
-          <div className="rounded-xl border border-slate-700/50 bg-slate-900/40 p-6">
-            <h2 className="mb-3 text-lg font-semibold text-slate-300">Provider health</h2>
-            {health?.providers.length ? (
-              <ul className="space-y-2">
-                {health.providers.map((p) => (
-                  <li
-                    key={p.name}
-                    className="flex items-center justify-between rounded-lg bg-slate-950/60 px-4 py-2 text-sm"
-                  >
-                    <span className="font-mono text-slate-300">{p.name}</span>
-                    <span
-                      className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${
-                        p.status === 'healthy'
-                          ? 'bg-emerald-500/15 text-emerald-400'
-                          : p.status === 'degraded'
-                            ? 'bg-amber-500/15 text-amber-400'
-                            : 'bg-red-500/15 text-red-400'
-                      }`}
-                    >
-                      {p.status}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p className="text-sm text-slate-500">
-                {apiError ? 'API unreachable' : 'No providers registered'}
-              </p>
-            )}
-          </div>
-        </div>
-
-        <section className="mb-12">
-          <TaskStreamView />
-        </section>
-
-        <section>
-          <h2 className="mb-4 text-2xl font-bold text-slate-200">Recent tasks</h2>
+        <section className="mt-10">
+          <h2 className="mb-4 text-xl font-bold text-slate-200">Recent tasks</h2>
           {tasks?.tasks.length ? (
-            <div className="overflow-x-auto rounded-xl border border-slate-700/50">
+            <div className="overflow-x-auto rounded-xl border border-slate-800">
               <table className="w-full text-left text-sm">
                 <thead className="bg-slate-900/80 text-xs uppercase tracking-wider text-slate-500">
                   <tr>
@@ -185,7 +120,7 @@ export default async function AgentXDashboard() {
               </table>
             </div>
           ) : (
-            <p className="rounded-xl border border-slate-700/50 bg-slate-900/40 p-6 text-sm text-slate-500">
+            <p className="rounded-xl border border-slate-800 bg-slate-900/40 p-6 text-sm text-slate-500">
               {apiError
                 ? 'API unreachable — no task data.'
                 : 'No tasks yet. Submit your first task above.'}
