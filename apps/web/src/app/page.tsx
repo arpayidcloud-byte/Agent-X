@@ -61,6 +61,18 @@ export default async function AgentXDashboard() {
               🤖 Agents
             </a>
             <a
+              href="/team"
+              className="rounded-lg border border-emerald-500/40 bg-emerald-950/40 px-4 py-2 font-medium text-emerald-300 transition hover:bg-emerald-900/40"
+            >
+              👥 Team
+            </a>
+            <a
+              href="/settings"
+              className="rounded-lg border border-slate-500/40 bg-slate-800/40 px-4 py-2 font-medium text-slate-300 transition hover:bg-slate-700/40"
+            >
+              ⚙️ Settings
+            </a>
+            <a
               href="/beta"
               className="rounded-lg border border-emerald-500/40 bg-emerald-950/40 px-4 py-2 font-medium text-emerald-300 transition hover:bg-emerald-900/40"
             >

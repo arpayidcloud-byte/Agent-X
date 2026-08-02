@@ -417,6 +417,29 @@ export async function fetchMe(): Promise<{ user: AuthUser }> {
   return authJson<{ user: AuthUser }>('/v1/auth/me', {}, true);
 }
 
+export async function changePassword(
+  currentPassword: string,
+  newPassword: string,
+): Promise<{ ok: boolean }> {
+  return authJson<{ ok: boolean }>(
+    '/v1/auth/change-password',
+    { method: 'POST', body: JSON.stringify({ currentPassword, newPassword }) },
+    true,
+  );
+}
+
+export interface TeamMember {
+  id: string;
+  email: string;
+  roles: string[];
+  createdAt: string;
+}
+
+/** Admin-only: list registered users (no password hashes). */
+export async function fetchTeam(): Promise<{ users: TeamMember[] }> {
+  return authJson<{ users: TeamMember[] }>('/v1/team', {}, true);
+}
+
 /** Admin-only (AUTH_ENABLED): list waitlist entries. */
 export async function fetchWaitlistAdmin(limit = 100): Promise<WaitlistListResponse> {
   return authJson<WaitlistListResponse>(`/v1/beta/waitlist?limit=${limit}`, {}, true);

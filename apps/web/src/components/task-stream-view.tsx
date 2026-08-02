@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { API_URL, startStreamTask, type TaskStreamEvent } from '@/lib/api';
+import { notifyTaskComplete, requestNotifyPermission } from '@/lib/notify';
 
 const STAGE_LABEL: Record<TaskStreamEvent['type'], string> = {
   accepted: '📥 Accepted',
@@ -19,6 +20,9 @@ export default function TaskStreamView() {
   const sourceRef = useRef<EventSource | null>(null);
 
   useEffect(() => {
+    // Ask for notification permission once, on first interaction with the
+    // demo (browser shows the prompt; denied is handled gracefully).
+    requestNotifyPermission();
     return () => {
       sourceRef.current?.close();
     };
@@ -40,6 +44,7 @@ export default function TaskStreamView() {
         if (ev.type === 'complete') {
           setStatus(ev.status === 'success' ? 'done' : 'error');
           if (ev.status === 'error') setError(ev.error ?? 'unknown error');
+          notifyTaskComplete(ev.status === 'success', ev.taskId ?? '');
           source.close();
           sourceRef.current = null;
         }

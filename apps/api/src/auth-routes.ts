@@ -1,5 +1,5 @@
 import type { Express, Request, Response } from 'express';
-import { register, login, refresh, requireAuth } from './auth.js';
+import { register, login, refresh, requireAuth, changePassword, AuthError } from './auth.js';
 import type { AuthenticatedRequest } from './auth.js';
 
 export function registerAuthRoutes(app: Express): void {
@@ -47,4 +47,20 @@ export function registerAuthRoutes(app: Express): void {
   app.get('/v1/auth/me', requireAuth, (req: AuthenticatedRequest, res: Response) => {
     res.json({ user: { id: req.auth?.sub, email: req.auth?.email, roles: req.auth?.roles } });
   });
+
+  // ─── Change password ────
+  app.post(
+    '/v1/auth/change-password',
+    requireAuth,
+    async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+      try {
+        const { currentPassword, newPassword } = req.body ?? {};
+        await changePassword(req.auth?.sub ?? '', currentPassword, newPassword);
+        res.json({ ok: true });
+      } catch (e) {
+        const err = e instanceof AuthError ? e : new AuthError(String(e), 500);
+        res.status(err.status).json({ error: err.message });
+      }
+    },
+  );
 }
