@@ -179,6 +179,40 @@ export async function startChatStream(messages: ChatMessage[]): Promise<ChatStre
   return body;
 }
 
+// ─── Web Pro: analytics ────
+
+export interface AnalyticsSummary {
+  generatedAt: string;
+  overview: {
+    totalRequests: number;
+    totalErrors: number;
+    successRate: number;
+    totalCacheHits: number;
+    cacheHitRate: number;
+    totalFallbacks: number;
+    activeProviders: number;
+    avgLatencyMs: number;
+    p50LatencyMs: number;
+    p95LatencyMs: number;
+    inputTokens: number;
+    outputTokens: number;
+    totalTokens: number;
+  };
+  byProvider: Array<{
+    provider: string;
+    requests: number;
+    errors: number;
+    avgLatencyMs: number;
+    tokens: number;
+  }>;
+  byModel: Array<{ model: string; requests: number }>;
+}
+
+/** Fetch the analytics summary (aggregated LLM metrics). */
+export async function fetchAnalytics(): Promise<AnalyticsSummary> {
+  return getJson<AnalyticsSummary>('/v1/analytics/summary');
+}
+
 // ─── Beta recruitment API (Phase 3 Week 19-20) ────
 
 export interface WaitlistEntry {

@@ -2,6 +2,7 @@ import express from 'express';
 import { llmMetrics, alertManager, healthChecker, Logger } from '@agent-xai/observability';
 import { LLMRouter, OpenAIMock, DeepSeekMock, AnthropicMock } from '@agent-xai/llm-router';
 import { createRequestLogger } from './request-logger.js';
+import { computeAnalyticsSummary } from './analytics.js';
 import { notifySlack } from './slack.js';
 import { getBetaBackend } from './beta-store.js';
 import type { WaitlistEntry, FeedbackEntry } from './beta-store.js';
@@ -408,6 +409,17 @@ app.get('/v1/agentx/chat/:id/events', (req, res) => {
     clearInterval(heartbeat);
     unsubscribe();
   });
+});
+
+// ─── Analytics summary (Web Pro) ────
+// Aggregates the LLM metrics registry into a dashboard-friendly summary.
+app.get('/v1/analytics/summary', async (_req, res) => {
+  try {
+    const snapshot = await llmMetrics.getSnapshot();
+    res.json(computeAnalyticsSummary(snapshot));
+  } catch (e) {
+    res.status(500).json({ error: String(e) });
+  }
 });
 
 // ─── Task list endpoint (dashboard) ────
