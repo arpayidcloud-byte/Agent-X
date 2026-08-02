@@ -29,62 +29,18 @@ export default async function AgentXDashboard() {
   const cacheHits = stats?.stats.llm_cache_hits_total ?? 0;
 
   return (
-    <main className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 px-8 py-12 text-white">
+    <main className="text-white">
       <div className="mx-auto max-w-6xl">
         <header className="mb-10">
-          <h1 className="bg-gradient-to-r from-cyan-400 via-blue-400 to-violet-400 bg-clip-text text-5xl font-extrabold tracking-tight text-transparent">
+          <h1 className="bg-gradient-to-r from-cyan-400 via-blue-400 to-violet-400 bg-clip-text text-4xl font-extrabold tracking-tight text-transparent">
             AgentX Dashboard
           </h1>
-          <p className="mt-3 text-lg text-slate-400">
+          <p className="mt-3 text-sm text-slate-400">
             Enterprise AI Agent Platform — live data from{' '}
-            <code className="rounded bg-slate-800 px-1.5 py-0.5 text-sm text-cyan-300">
+            <code className="rounded bg-slate-800 px-1.5 py-0.5 text-xs text-cyan-300">
               {API_URL}
             </code>
           </p>
-          <nav className="mt-4 flex gap-4 text-sm">
-            <a
-              href="/chat"
-              className="rounded-lg border border-cyan-500/40 bg-cyan-950/40 px-4 py-2 font-medium text-cyan-300 transition hover:bg-cyan-900/40"
-            >
-              💬 Chat
-            </a>
-            <a
-              href="/analytics"
-              className="rounded-lg border border-blue-500/40 bg-blue-950/40 px-4 py-2 font-medium text-blue-300 transition hover:bg-blue-900/40"
-            >
-              📊 Analytics
-            </a>
-            <a
-              href="/multi-agent"
-              className="rounded-lg border border-fuchsia-500/40 bg-fuchsia-950/40 px-4 py-2 font-medium text-fuchsia-300 transition hover:bg-fuchsia-900/40"
-            >
-              🤝 Multi-Agent
-            </a>
-            <a
-              href="/agents"
-              className="rounded-lg border border-violet-500/40 bg-violet-950/40 px-4 py-2 font-medium text-violet-300 transition hover:bg-violet-900/40"
-            >
-              🤖 Agents
-            </a>
-            <a
-              href="/team"
-              className="rounded-lg border border-emerald-500/40 bg-emerald-950/40 px-4 py-2 font-medium text-emerald-300 transition hover:bg-emerald-900/40"
-            >
-              👥 Team
-            </a>
-            <a
-              href="/settings"
-              className="rounded-lg border border-slate-500/40 bg-slate-800/40 px-4 py-2 font-medium text-slate-300 transition hover:bg-slate-700/40"
-            >
-              ⚙️ Settings
-            </a>
-            <a
-              href="/beta"
-              className="rounded-lg border border-emerald-500/40 bg-emerald-950/40 px-4 py-2 font-medium text-emerald-300 transition hover:bg-emerald-900/40"
-            >
-              🚀 Beta Recruitment — waitlist &amp; feedback
-            </a>
-          </nav>
           {apiError && (
             <p className="mt-3 rounded-lg border border-amber-500/20 bg-amber-950/30 p-3 text-sm text-amber-300">
               ⚠ API unreachable: {apiError} — start the server with{' '}
