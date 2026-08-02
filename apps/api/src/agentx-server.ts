@@ -6,6 +6,8 @@ import { computeAnalyticsSummary } from './analytics.js';
 import { agentConfigStore, AGENT_MODEL_OPTIONS } from './agent-config.js';
 import { notifySlack } from './slack.js';
 import { getBetaBackend } from './beta-store.js';
+import { getQualityBackend } from './quality-store.js';
+import { QualityScorer } from '@agent-xai/quality-scoring';
 import { maybeRequireAdmin, listUsers } from './auth.js';
 import { createHttpServer } from './ws-bridge.js';
 import { startParallelRun, getMultiAgentRun } from './multi-agent-runner.js';
@@ -36,6 +38,7 @@ import {
 } from './chat-stream.js';
 
 export { waitlistStore, feedbackStore, resetBetaStores } from './beta-store.js';
+export { qualityStore, resetQualityStore } from './quality-store.js';
 
 const logger = new Logger('agentx-api');
 
@@ -225,6 +228,41 @@ app.post('/v1/agentx/run/stream', async (req, res): Promise<void> => {
           task.model = response.model;
           task.response = response.message;
         }
+        // Auto-score successful task outputs (quality scoring — Phase 2).
+        void (async () => {
+          try {
+            const scored = await new QualityScorer().score({
+              prompt,
+              response: response.message,
+              provider: response.provider,
+              model: response.model,
+              taskId: request.taskId,
+            });
+            const backend = await getQualityBackend();
+            await backend.create({
+              id: scored.id,
+              prompt: scored.prompt,
+              response: scored.response,
+              provider: scored.provider,
+              model: scored.model,
+              taskId: scored.taskId,
+              dimensions: { dimensions: scored.dimensions, overall: scored.overall },
+              overall: scored.overall,
+              grade: scored.grade,
+              evaluator: scored.evaluator,
+              createdAt: scored.createdAt,
+            });
+            logger.info('Quality score recorded', {
+              taskId: request.taskId,
+              overall: scored.overall,
+            });
+          } catch (scoreErr) {
+            logger.warn('Quality auto-score failed', {
+              taskId: request.taskId,
+              error: scoreErr instanceof Error ? scoreErr.message : String(scoreErr),
+            });
+          }
+        })();
         publishEvent({
           type: 'complete',
           taskId: request.taskId,
@@ -505,6 +543,74 @@ app.get('/v1/agentx/multi-agent/:runId', (req, res) => {
     return;
   }
   res.json({ run });
+});
+
+// ─── Quality scoring (Web Pro) ────
+// Scores a prompt+response pair with the deterministic heuristic engine and
+// persists the result. GET lists recent scores; GET stats aggregates them.
+// Task completions are also auto-scored server-side (see /v1/agentx/run).
+app.post('/v1/quality/score', async (req, res): Promise<void> => {
+  try {
+    const { prompt, response, provider, model, taskId } = req.body ?? {};
+    if (typeof prompt !== 'string' || typeof response !== 'string') {
+      res.status(400).json({ error: 'Missing or invalid field: prompt, response (strings)' });
+      return;
+    }
+    const scorer = new QualityScorer();
+    const scored = await scorer.score({
+      prompt,
+      response,
+      provider: typeof provider === 'string' ? provider : undefined,
+      model: typeof model === 'string' ? model : undefined,
+      taskId: typeof taskId === 'string' ? taskId : undefined,
+    });
+    const backend = await getQualityBackend();
+    const result = await backend.create({
+      id: scored.id,
+      prompt: scored.prompt,
+      response: scored.response,
+      provider: scored.provider,
+      model: scored.model,
+      taskId: scored.taskId,
+      dimensions: {
+        dimensions: scored.dimensions,
+        overall: scored.overall,
+      },
+      overall: scored.overall,
+      grade: scored.grade,
+      evaluator: scored.evaluator,
+      createdAt: scored.createdAt,
+    });
+    res.status(201).json({ score: result });
+  } catch (e) {
+    const err = e instanceof Error ? e.message : String(e);
+    res.status(500).json({ error: err });
+  }
+});
+
+app.get('/v1/quality/scores', async (_req, res): Promise<void> => {
+  try {
+    const backend = await getQualityBackend();
+    const limitRaw = Number(_req.query.limit ?? 50);
+    const limit =
+      Number.isFinite(limitRaw) && limitRaw > 0 ? Math.min(Math.floor(limitRaw), 200) : 50;
+    const scores = await backend.findAll(limit);
+    res.json({ scores, total: scores.length });
+  } catch (e) {
+    const err = e instanceof Error ? e.message : String(e);
+    res.status(500).json({ error: err });
+  }
+});
+
+app.get('/v1/quality/stats', async (_req, res): Promise<void> => {
+  try {
+    const backend = await getQualityBackend();
+    const stats = await backend.stats();
+    res.json({ stats, generatedAt: new Date().toISOString() });
+  } catch (e) {
+    const err = e instanceof Error ? e.message : String(e);
+    res.status(500).json({ error: err });
+  }
 });
 
 // ─── Analytics summary (Web Pro) ────

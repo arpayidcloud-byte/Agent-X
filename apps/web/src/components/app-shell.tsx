@@ -17,6 +17,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: '/chat', label: 'Chat', icon: '💬' },
   { href: '/multi-agent', label: 'Multi-Agent', icon: '🤝' },
   { href: '/agents', label: 'Agents', icon: '🤖' },
+  { href: '/quality', label: 'Quality', icon: '🏅' },
   { href: '/analytics', label: 'Analytics', icon: '📊' },
   { href: '/team', label: 'Team', icon: '👥' },
   { href: '/settings', label: 'Settings', icon: '⚙️' },

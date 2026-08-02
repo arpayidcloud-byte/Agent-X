@@ -110,3 +110,21 @@ model FeedbackEntry {
 
   @@index([category, createdAt])
 }
+
+model QualityScore {
+  id         String   @id
+  taskId     String?
+  prompt     String
+  response   String
+  provider   String?
+  model      String?
+  dimensions Json
+  overall    Int
+  grade      String
+  evaluator  String   @default("heuristic")
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([createdAt])
+  @@index([provider, createdAt])
+}
