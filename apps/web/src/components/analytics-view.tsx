@@ -1,7 +1,11 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { Activity, CheckCircle2, Gauge, Braces, DollarSign, Wallet } from 'lucide-react';
 import { fetchAnalytics, type AnalyticsSummary } from '@/lib/api';
+import { StatCard } from '@/components/ui/stat-card';
+import { SkeletonCard } from '@/components/ui/skeleton';
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 
 function fmt(n: number): string {
   if (n >= 1000) return `${(n / 1000).toFixed(1)}k`;
@@ -18,7 +22,7 @@ function fmtUsd(n: number): string {
 function BarChart({
   rows,
   format,
-  color = 'bg-cyan-500',
+  color = 'bg-accent-500',
 }: {
   rows: Array<{ label: string; value: number; sub?: string }>;
   format: (n: number) => string;
@@ -26,7 +30,7 @@ function BarChart({
 }) {
   const max = Math.max(1, ...rows.map((r) => r.value));
   return (
-    <div className="space-y-2">
+    <div className="space-y-2.5">
       {rows.length === 0 && (
         <p className="py-6 text-center text-sm text-slate-500">
           No data yet — run a task to see it here.
@@ -37,12 +41,12 @@ function BarChart({
           <span className="w-28 shrink-0 truncate text-right font-medium text-slate-300">
             {r.label}
           </span>
-          <div className="h-5 flex-1 overflow-hidden rounded bg-slate-800/60">
+          <div className="h-5 flex-1 overflow-hidden rounded bg-surface-2">
             <div
               className={`flex h-full items-center rounded px-2 ${color}`}
               style={{ width: `${Math.max(2, (r.value / max) * 100)}%` }}
             >
-              <span className="truncate text-[10px] font-semibold text-white/90">
+              <span className="truncate text-[10px] font-semibold text-slate-950">
                 {format(r.value)}
                 {r.sub ? ` · ${r.sub}` : ''}
               </span>
@@ -50,16 +54,6 @@ function BarChart({
           </div>
         </div>
       ))}
-    </div>
-  );
-}
-
-function StatCard({ label, value, sub }: { label: string; value: string; sub?: string }) {
-  return (
-    <div className="rounded-xl border border-slate-700/50 bg-slate-900/50 p-4">
-      <p className="text-xs uppercase tracking-wide text-slate-500">{label}</p>
-      <p className="mt-1 text-2xl font-bold text-slate-100">{value}</p>
-      {sub && <p className="mt-1 text-xs text-slate-500">{sub}</p>}
     </div>
   );
 }
@@ -87,7 +81,16 @@ export default function AnalyticsView() {
   }, []);
 
   if (loading) {
-    return <p className="py-10 text-center text-sm text-slate-500">Loading analytics…</p>;
+    return (
+      <div className="space-y-4">
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <SkeletonCard key={i} rows={1} />
+          ))}
+        </div>
+        <SkeletonCard rows={4} />
+      </div>
+    );
   }
   if (error || !data) {
     return (
@@ -112,59 +115,92 @@ export default function AnalyticsView() {
   return (
     <div className="space-y-6">
       <p className="text-xs text-slate-500">
-        Aggregated from live LLM metrics · generated {new Date(data.generatedAt).toLocaleString()}
+        Live metrics · generated {new Date(data.generatedAt).toLocaleString()}
       </p>
 
-      <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-        <StatCard label="Requests" value={fmt(o.totalRequests)} sub={`${o.totalErrors} errors`} />
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+        <StatCard
+          label="Requests"
+          value={fmt(o.totalRequests)}
+          sub={`${o.totalErrors} errors`}
+          icon={Activity}
+        />
         <StatCard
           label="Success rate"
           value={`${o.successRate}%`}
           sub={`${o.activeProviders} active providers`}
+          icon={CheckCircle2}
+          tone="text-emerald-300"
         />
         <StatCard
           label="Latency"
           value={`${o.avgLatencyMs}ms`}
           sub={`p50 ${o.p50LatencyMs}ms · p95 ${o.p95LatencyMs}ms`}
+          icon={Gauge}
+          tone="text-secondary-300"
         />
         <StatCard
           label="Tokens"
           value={fmt(o.totalTokens)}
           sub={`${fmt(o.inputTokens)} in · ${fmt(o.outputTokens)} out`}
+          icon={Braces}
+          tone="text-sky-300"
         />
       </div>
 
-      <div className="rounded-xl border border-emerald-500/30 bg-emerald-950/20 p-5">
-        <h3 className="mb-2 text-sm font-semibold text-emerald-300">Total cost</h3>
-        <p className="text-3xl font-bold text-emerald-200">{fmtUsd(o.totalCostUsd)}</p>
-        <p className="mt-1 text-xs text-slate-500">
-          accrued across {fmt(o.totalRequests)} requests · avg{' '}
-          {o.totalRequests > 0 ? `$${(o.totalCostUsd / o.totalRequests).toFixed(6)}` : '$0'} /
-          request
-        </p>
+      <Card className="border-emerald-500/25 bg-emerald-500/5">
+        <CardHeader className="pb-2">
+          <CardTitle className="flex items-center gap-2 text-emerald-300">
+            <Wallet className="h-4 w-4" aria-hidden /> Total cost
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-3xl font-semibold tracking-tight text-emerald-200">
+            {fmtUsd(o.totalCostUsd)}
+          </p>
+          <p className="mt-1 text-xs text-slate-500">
+            across {fmt(o.totalRequests)} requests · avg{' '}
+            {o.totalRequests > 0 ? `$${(o.totalCostUsd / o.totalRequests).toFixed(6)}` : '$0'} /
+            request
+          </p>
+        </CardContent>
+      </Card>
+
+      <div className="grid gap-4 md:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle>Requests by provider</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <BarChart rows={providerBars} format={fmt} />
+            <div className="mt-4 flex gap-4 text-xs text-slate-500">
+              <span>
+                Cache hits: {fmt(o.totalCacheHits)} ({o.cacheHitRate}%)
+              </span>
+              <span>Fallbacks: {fmt(o.totalFallbacks)}</span>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader>
+            <CardTitle>Requests by model</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <BarChart rows={modelBars} format={fmt} color="bg-secondary-500" />
+          </CardContent>
+        </Card>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-2">
-        <div className="rounded-xl border border-slate-700/50 bg-slate-900/50 p-5">
-          <h3 className="mb-4 text-sm font-semibold text-slate-200">Requests by provider</h3>
-          <BarChart rows={providerBars} format={fmt} />
-          <div className="mt-4 flex gap-4 text-xs text-slate-500">
-            <span>
-              Cache hits: {fmt(o.totalCacheHits)} ({o.cacheHitRate}%)
-            </span>
-            <span>Fallbacks: {fmt(o.totalFallbacks)}</span>
-          </div>
-        </div>
-        <div className="rounded-xl border border-slate-700/50 bg-slate-900/50 p-5">
-          <h3 className="mb-4 text-sm font-semibold text-slate-200">Requests by model</h3>
-          <BarChart rows={modelBars} format={fmt} color="bg-violet-500" />
-        </div>
-      </div>
-
-      <div className="rounded-xl border border-slate-700/50 bg-slate-900/50 p-5">
-        <h3 className="mb-4 text-sm font-semibold text-slate-200">Cost by provider</h3>
-        <BarChart rows={costBars} format={fmtUsd} color="bg-emerald-500" />
-      </div>
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <DollarSign className="h-4 w-4 text-emerald-400" aria-hidden /> Cost by provider
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <BarChart rows={costBars} format={fmtUsd} color="bg-emerald-500" />
+        </CardContent>
+      </Card>
     </div>
   );
 }

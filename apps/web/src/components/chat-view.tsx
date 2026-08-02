@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
+import { Send, Loader2 } from 'lucide-react';
 import { startChatStream, type ChatMessage, type ChatStreamEvent } from '@/lib/api';
 import { openEventStream, type StreamHandle } from '@/lib/stream';
 
@@ -106,36 +107,44 @@ export default function ChatView() {
   }
 
   return (
-    <div className="mx-auto flex h-[calc(100dvh-9rem)] max-w-3xl flex-col rounded-xl border border-slate-700/50 bg-slate-900/40">
-      <div className="border-b border-slate-800 px-4 py-3 sm:px-6 sm:py-4">
-        <h2 className="text-base font-semibold text-cyan-400 sm:text-lg">
-          Chat{' '}
-          <span className="text-xs font-normal text-slate-500">(Web Pro · SSE + WS fallback)</span>
-        </h2>
+    <div className="mx-auto flex h-[calc(100dvh-9rem)] max-w-3xl flex-col overflow-hidden rounded-2xl border border-surface-3 bg-surface-1 shadow-soft">
+      <div className="flex items-center gap-2 border-b border-surface-3 px-4 py-3.5 sm:px-6">
+        <span className="h-2 w-2 rounded-full bg-accent-400" />
+        <h2 className="text-sm font-semibold text-slate-200">Chat</h2>
+        <span className="ml-auto text-xs text-slate-500">Streaming responses</span>
       </div>
 
-      <div className="flex-1 space-y-4 overflow-y-auto p-3 sm:p-6">
+      <div className="flex-1 space-y-4 overflow-y-auto p-4 sm:p-6">
         {bubbles.length === 0 && (
-          <p className="text-center text-sm text-slate-500">
-            Ask anything — responses stream token-by-token over Server-Sent Events.
+          <p className="pt-16 text-center text-sm text-slate-500">
+            Ask anything — responses stream in as they are generated.
           </p>
         )}
         {bubbles.map((b, i) => (
           <div key={i} className={`flex ${b.role === 'user' ? 'justify-end' : 'justify-start'}`}>
             <div
-              className={`max-w-[85%] rounded-2xl px-3.5 py-2.5 text-sm sm:max-w-[80%] sm:px-4 sm:py-3 ${
+              className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed sm:max-w-[80%] ${
                 b.role === 'user'
-                  ? 'bg-cyan-600 text-white'
+                  ? 'rounded-br-md bg-accent-500 text-slate-950'
                   : b.error
-                    ? 'border border-rose-500/40 bg-rose-950/40 text-rose-200'
-                    : 'border border-slate-700 bg-slate-950 text-slate-100'
+                    ? 'rounded-bl-md border border-rose-500/30 bg-rose-950/30 text-rose-200'
+                    : 'rounded-bl-md border border-surface-3 bg-surface-0 text-slate-100'
               }`}
             >
               {b.role === 'user' ? (
                 b.content
               ) : (
                 <>
-                  <p className="whitespace-pre-wrap">{b.content || (streaming ? '…' : '')}</p>
+                  <p className="whitespace-pre-wrap">
+                    {b.content}
+                    {streaming && !b.content && (
+                      <span className="inline-flex items-center gap-1">
+                        <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-slate-500 [animation-delay:0ms]" />
+                        <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-slate-500 [animation-delay:120ms]" />
+                        <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-slate-500 [animation-delay:240ms]" />
+                      </span>
+                    )}
+                  </p>
                   {b.meta && b.meta !== '…' && (
                     <p className="mt-2 text-[10px] text-slate-500">{b.meta}</p>
                   )}
@@ -155,21 +164,26 @@ export default function ChatView() {
 
       <form
         onSubmit={(e) => void handleSend(e)}
-        className="flex gap-2 border-t border-slate-800 p-2.5 sm:gap-3 sm:p-4"
+        className="flex gap-2 border-t border-surface-3 p-3 sm:gap-3 sm:p-4"
       >
         <input
           value={input}
           onChange={(e) => setInput(e.target.value)}
           placeholder="Type a message…"
           disabled={streaming}
-          className="flex-1 rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500 focus:border-cyan-500 focus:outline-none disabled:opacity-50 sm:px-4"
+          className="h-10 flex-1 rounded-lg border border-surface-3 bg-surface-0 px-3.5 text-sm text-slate-100 placeholder:text-slate-500 transition-colors focus:border-accent-500/60 focus:outline-none focus:ring-2 focus:ring-accent-500/20 disabled:opacity-50"
         />
         <button
           type="submit"
           disabled={streaming || !input.trim()}
-          className="rounded-lg bg-cyan-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-cyan-500 disabled:cursor-not-allowed disabled:opacity-50 sm:px-5"
+          className="inline-flex h-10 items-center gap-1.5 rounded-lg bg-accent-500 px-4 text-sm font-semibold text-slate-950 transition-colors hover:bg-accent-400 disabled:cursor-not-allowed disabled:opacity-50"
         >
-          {streaming ? '…' : 'Send'}
+          {streaming ? (
+            <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+          ) : (
+            <Send className="h-4 w-4" strokeWidth={2} aria-hidden />
+          )}
+          <span className="hidden sm:inline">{streaming ? 'Streaming' : 'Send'}</span>
         </button>
       </form>
     </div>

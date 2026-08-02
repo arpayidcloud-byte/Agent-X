@@ -128,7 +128,7 @@ export default function TaskStreamView() {
               key={q}
               type="button"
               onClick={() => setPrompt(q)}
-              className="rounded-full border border-slate-700 bg-slate-900/40 px-3 py-1.5 text-xs text-slate-400 transition hover:border-cyan-500/40 hover:text-cyan-300"
+              className="rounded-full border border-surface-3 bg-surface-1 px-3 py-1.5 text-xs text-slate-400 transition hover:border-accent-500/40 hover:text-accent-300"
             >
               {q}
             </button>

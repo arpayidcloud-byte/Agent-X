@@ -1,3 +1,4 @@
+import { AlertTriangle } from 'lucide-react';
 import { fetchWaitlistStats, fetchFeedback, API_URL } from '../../lib/api';
 import BetaSignupForm from '../../components/beta-signup-form';
 import BetaFeedbackForm from '../../components/beta-feedback-form';
@@ -36,9 +37,12 @@ export default async function BetaPage() {
         <p className="text-slate-400 mb-6">Phase 3 Week 19-20 — waitlist &amp; feedback system</p>
 
         {!apiOk && (
-          <div className="rounded-lg border border-red-500/40 bg-red-950/40 p-4 mb-6 text-sm">
-            ⚠️ API tidak dapat dijangkau (<code className="text-red-300">{API_URL}</code>). Data di
-            bawah tidak tersedia.
+          <div className="mb-6 flex items-start gap-2 rounded-xl border border-rose-500/30 bg-rose-950/20 p-4 text-sm text-rose-200">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
+            <span>
+              API tidak dapat dijangkau (<code className="text-rose-300">{API_URL}</code>). Data di
+              bawah tidak tersedia.
+            </span>
           </div>
         )}
 

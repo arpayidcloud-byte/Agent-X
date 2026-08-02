@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
+import { CheckCircle2, XCircle, Play } from 'lucide-react';
 import {
   startMultiAgentRun,
   fetchMultiAgentRun,
@@ -8,6 +9,9 @@ import {
   type MultiAgentRunDetail,
 } from '@/lib/api';
 import { openEventStream, type StreamHandle } from '@/lib/stream';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Textarea } from '@/components/ui/input';
 
 interface GoalCard {
   goalId: string;
@@ -144,23 +148,19 @@ export default function MultiAgentView() {
 
   return (
     <div className="space-y-6">
-      <div className="rounded-xl border border-violet-500/20 bg-slate-900/40 p-6">
-        <h2 className="mb-1 text-lg font-semibold text-violet-400">
-          Parallel Multi-Agent Run{' '}
-          <span className="text-xs font-normal text-slate-500">(SSE + WS fallback)</span>
-        </h2>
+      <div className="rounded-xl border border-secondary-500/20 bg-surface-1 p-6">
+        <h2 className="mb-1 text-base font-semibold text-slate-200">Parallel Multi-Agent Run</h2>
         <p className="mb-4 text-xs text-slate-500">
           One goal per line. Goals run through the specialist team (architect → coder → reviewer →
-          tester) concurrently with a bounded pool. Live progress streams over SSE; WebSocket takes
-          over automatically if SSE fails.
+          tester) concurrently with a bounded pool, streaming live progress.
         </p>
         <form onSubmit={(e) => void handleRun(e)} className="space-y-3">
-          <textarea
+          <Textarea
             value={goalsText}
             onChange={(e) => setGoalsText(e.target.value)}
             rows={4}
             placeholder="One goal per line…"
-            className="w-full rounded-lg border border-slate-700 bg-slate-950 p-3 font-mono text-sm text-slate-100 placeholder:text-slate-500 focus:border-violet-500 focus:outline-none"
+            className="font-mono text-sm"
           />
           <div className="flex flex-wrap items-center gap-4">
             <label className="flex items-center gap-2 text-sm text-slate-400">
@@ -169,7 +169,7 @@ export default function MultiAgentView() {
                 value={concurrency}
                 onChange={(e) => setConcurrency(Number(e.target.value))}
                 disabled={running}
-                className="rounded-lg border border-slate-700 bg-slate-950 px-2 py-1 text-xs text-slate-200 focus:border-violet-500 focus:outline-none disabled:opacity-50"
+                className="rounded-lg border border-surface-3 bg-surface-0 px-2 py-1 text-xs text-slate-200 focus:border-secondary-500/60 focus:outline-none focus:ring-2 focus:ring-secondary-500/20 disabled:opacity-50"
               >
                 <option value={1}>1</option>
                 <option value={2}>2</option>
@@ -177,13 +177,15 @@ export default function MultiAgentView() {
                 <option value={4}>4</option>
               </select>
             </label>
-            <button
-              type="submit"
-              disabled={running || !goalsText.trim()}
-              className="rounded-lg bg-violet-600 px-5 py-2 text-sm font-semibold text-white transition hover:bg-violet-500 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {running ? 'Running…' : 'Run in parallel →'}
-            </button>
+            <Button type="submit" disabled={running || !goalsText.trim()}>
+              {running ? (
+                'Running…'
+              ) : (
+                <>
+                  <Play className="h-4 w-4" strokeWidth={2} aria-hidden /> Run in parallel
+                </>
+              )}
+            </Button>
             {runId && <span className="font-mono text-xs text-slate-500">run: {runId}</span>}
           </div>
         </form>
@@ -195,13 +197,16 @@ export default function MultiAgentView() {
       </div>
 
       {summary && (
-        <div className="rounded-xl border border-emerald-500/30 bg-emerald-950/20 p-5">
-          <p className="text-sm font-semibold text-emerald-300">
-            ✅ {summary.approvedCount}/{summary.totalGoals} goals approved
-          </p>
-          <p className="mt-1 text-xs text-slate-500">
-            finished in {(summary.wallTimeMs / 1000).toFixed(1)}s wall time
-          </p>
+        <div className="flex items-center gap-3 rounded-xl border border-emerald-500/25 bg-emerald-500/5 p-5">
+          <CheckCircle2 className="h-5 w-5 shrink-0 text-emerald-400" aria-hidden />
+          <div>
+            <p className="text-sm font-semibold text-emerald-300">
+              {summary.approvedCount}/{summary.totalGoals} goals approved
+            </p>
+            <p className="mt-0.5 text-xs text-slate-500">
+              finished in {(summary.wallTimeMs / 1000).toFixed(1)}s wall time
+            </p>
+          </div>
         </div>
       )}
 
@@ -212,26 +217,26 @@ export default function MultiAgentView() {
               key={`${card.goalId}-${i}`}
               className={`rounded-xl border p-4 ${
                 card.status === 'done'
-                  ? 'border-emerald-500/30 bg-emerald-950/10'
+                  ? 'border-emerald-500/25 bg-emerald-500/5'
                   : card.status === 'error'
-                    ? 'border-rose-500/30 bg-rose-950/10'
+                    ? 'border-rose-500/25 bg-rose-500/5'
                     : card.status === 'running'
-                      ? 'border-violet-500/40 bg-violet-950/20'
-                      : 'border-slate-800 bg-slate-950/40'
+                      ? 'border-secondary-500/30 bg-secondary-500/5'
+                      : 'border-surface-3 bg-surface-1'
               }`}
             >
               <div className="flex items-start justify-between gap-3">
                 <p className="text-sm text-slate-200">{card.description}</p>
-                <span
-                  className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-semibold ${
+                <Badge
+                  tone={
                     card.status === 'done'
-                      ? 'bg-emerald-500/15 text-emerald-400'
+                      ? 'success'
                       : card.status === 'error'
-                        ? 'bg-rose-500/15 text-rose-400'
+                        ? 'danger'
                         : card.status === 'running'
-                          ? 'bg-violet-500/15 text-violet-400'
-                          : 'bg-slate-500/15 text-slate-400'
-                  }`}
+                          ? 'accent'
+                          : 'neutral'
+                  }
                 >
                   {card.status === 'done'
                     ? `approved (${card.iterations ?? 1} iter)`
@@ -240,9 +245,13 @@ export default function MultiAgentView() {
                         ? 'rejected'
                         : 'failed'
                       : card.status}
-                </span>
+                </Badge>
               </div>
-              {card.error && <p className="mt-2 text-xs text-rose-400">{card.error}</p>}
+              {card.status === 'error' && (
+                <p className="mt-2 flex items-center gap-1.5 text-xs text-rose-400">
+                  <XCircle className="h-3.5 w-3.5" aria-hidden /> {card.error}
+                </p>
+              )}
             </div>
           ))}
         </div>
