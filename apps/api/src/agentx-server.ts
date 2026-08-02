@@ -7,7 +7,13 @@ import { agentConfigStore, AGENT_MODEL_OPTIONS } from './agent-config.js';
 import { notifySlack } from './slack.js';
 import { getBetaBackend } from './beta-store.js';
 import { getQualityBackend } from './quality-store.js';
-import { QualityScorer } from '@agent-xai/quality-scoring';
+import { getFeedbackBackend } from './feedback-store.js';
+import {
+  QualityScorer,
+  type QualityDimension,
+  type QualityGrade,
+} from '@agent-xai/quality-scoring';
+import { generateFeedback, buildRevisionPrompt } from '@agent-xai/agent-feedback';
 import { maybeRequireAdmin, listUsers } from './auth.js';
 import { createHttpServer } from './ws-bridge.js';
 import { startParallelRun, getMultiAgentRun } from './multi-agent-runner.js';
@@ -39,6 +45,7 @@ import {
 
 export { waitlistStore, feedbackStore, resetBetaStores } from './beta-store.js';
 export { qualityStore, resetQualityStore } from './quality-store.js';
+export { agentFeedbackStore, resetAgentFeedbackStore } from './feedback-store.js';
 
 const logger = new Logger('agentx-api');
 
@@ -256,6 +263,30 @@ app.post('/v1/agentx/run/stream', async (req, res): Promise<void> => {
               taskId: request.taskId,
               overall: scored.overall,
             });
+            // Agent feedback loop: low-scoring outputs get actionable feedback
+            // (weak dimensions + revision prompt) so the next run can improve.
+            if (scored.overall < 70) {
+              const feedback = generateFeedback(scored);
+              const fbBackend = await getFeedbackBackend();
+              await fbBackend.create({
+                id: feedback.id,
+                scoreId: feedback.scoreId,
+                taskId: feedback.taskId,
+                prompt: feedback.prompt,
+                response: feedback.response,
+                overall: feedback.overall,
+                grade: feedback.grade,
+                weakDimensions: feedback.weakDimensions,
+                priorityAdvice: feedback.priorityAdvice,
+                improvementPrompt: feedback.improvementPrompt,
+                createdAt: feedback.createdAt,
+              });
+              logger.info('Agent feedback generated', {
+                taskId: request.taskId,
+                feedbackId: feedback.id,
+                overall: feedback.overall,
+              });
+            }
           } catch (scoreErr) {
             logger.warn('Quality auto-score failed', {
               taskId: request.taskId,
@@ -607,6 +638,114 @@ app.get('/v1/quality/stats', async (_req, res): Promise<void> => {
     const backend = await getQualityBackend();
     const stats = await backend.stats();
     res.json({ stats, generatedAt: new Date().toISOString() });
+  } catch (e) {
+    const err = e instanceof Error ? e.message : String(e);
+    res.status(500).json({ error: err });
+  }
+});
+
+// ─── Agent feedback loop (Web Pro) ────
+// Generates actionable feedback from a quality score (weak dimensions +
+// revision prompt), lists feedback history, and builds revision prompts for
+// follow-up runs. Low-scoring task outputs are auto-feedbacked server-side.
+app.post('/v1/feedback/generate', async (req, res): Promise<void> => {
+  try {
+    const { scoreId } = req.body ?? {};
+    if (typeof scoreId !== 'string' || scoreId.length === 0) {
+      res.status(400).json({ error: 'Missing or invalid field: scoreId (string)' });
+      return;
+    }
+    const qBackend = await getQualityBackend();
+    const scores = await qBackend.findAll(200);
+    const score = scores.find((s) => s.id === scoreId);
+    if (!score) {
+      res.status(404).json({ error: `Score not found: ${scoreId}` });
+      return;
+    }
+    const fbBackend = await getFeedbackBackend();
+    const existing = await fbBackend.findByScoreId(scoreId);
+    if (existing) {
+      res.json({ feedback: existing, reused: true });
+      return;
+    }
+    const feedback = generateFeedback({
+      id: score.id,
+      taskId: score.taskId,
+      prompt: score.prompt,
+      response: score.response,
+      provider: score.provider,
+      model: score.model,
+      dimensions: (score.dimensions as { dimensions: QualityDimension[] }).dimensions,
+      overall: score.overall,
+      grade: score.grade as QualityGrade,
+      evaluator: score.evaluator as 'heuristic' | 'llm',
+      createdAt: score.createdAt,
+    });
+    const created = await fbBackend.create({
+      id: feedback.id,
+      scoreId: feedback.scoreId,
+      taskId: feedback.taskId,
+      prompt: feedback.prompt,
+      response: feedback.response,
+      overall: feedback.overall,
+      grade: feedback.grade,
+      weakDimensions: feedback.weakDimensions,
+      priorityAdvice: feedback.priorityAdvice,
+      improvementPrompt: feedback.improvementPrompt,
+      createdAt: feedback.createdAt,
+    });
+    res.status(201).json({ feedback: created });
+  } catch (e) {
+    const err = e instanceof Error ? e.message : String(e);
+    res.status(500).json({ error: err });
+  }
+});
+
+app.get('/v1/feedback', async (req, res): Promise<void> => {
+  try {
+    const backend = await getFeedbackBackend();
+    const limitRaw = Number(req.query.limit ?? 20);
+    const limit =
+      Number.isFinite(limitRaw) && limitRaw > 0 ? Math.min(Math.floor(limitRaw), 200) : 20;
+    const feedback = await backend.findAll(limit);
+    res.json({ feedback, total: feedback.length });
+  } catch (e) {
+    const err = e instanceof Error ? e.message : String(e);
+    res.status(500).json({ error: err });
+  }
+});
+
+app.get('/v1/feedback/stats', async (_req, res): Promise<void> => {
+  try {
+    const backend = await getFeedbackBackend();
+    const stats = await backend.stats();
+    res.json({ stats, generatedAt: new Date().toISOString() });
+  } catch (e) {
+    const err = e instanceof Error ? e.message : String(e);
+    res.status(500).json({ error: err });
+  }
+});
+
+app.post('/v1/feedback/:id/revision', async (req, res): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const { prompt } = req.body ?? {};
+    if (typeof prompt !== 'string' || prompt.length === 0) {
+      res.status(400).json({ error: 'Missing or invalid field: prompt (string)' });
+      return;
+    }
+    const backend = await getFeedbackBackend();
+    const all = await backend.findAll(200);
+    const feedback = all.find((f) => f.id === id);
+    if (!feedback) {
+      res.status(404).json({ error: `Feedback not found: ${id}` });
+      return;
+    }
+    const revisionPrompt = buildRevisionPrompt(prompt, {
+      priorityAdvice: feedback.priorityAdvice,
+      weakDimensions: feedback.weakDimensions,
+    });
+    res.json({ revisionPrompt });
   } catch (e) {
     const err = e instanceof Error ? e.message : String(e);
     res.status(500).json({ error: err });

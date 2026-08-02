@@ -128,3 +128,20 @@ model QualityScore {
   @@index([createdAt])
   @@index([provider, createdAt])
 }
+
+model AgentFeedback {
+  id                String   @id
+  scoreId           String   @unique
+  taskId            String?
+  prompt            String
+  response          String
+  overall           Int
+  grade             String
+  weakDimensions    Json
+  priorityAdvice    Json
+  improvementPrompt String
+  createdAt         DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([grade, createdAt])
+}
