@@ -440,6 +440,78 @@ export async function fetchTeam(): Promise<{ users: TeamMember[] }> {
   return authJson<{ users: TeamMember[] }>('/v1/team', {}, true);
 }
 
+// ─── Web Pro: parallel multi-agent runs ────
+
+export interface MultiAgentRunStart {
+  runId: string;
+  status: string;
+  concurrency: number;
+}
+
+export interface MultiAgentGoalResult {
+  goalId: string;
+  approved: boolean;
+  iterations: number;
+  error?: string;
+  phases: Array<{ role: string; status: string; output: string }>;
+}
+
+export interface MultiAgentRunDetail {
+  run: {
+    runId: string;
+    status: 'running' | 'completed' | 'error';
+    concurrency: number;
+    goals: Array<{ goalId: string; description: string }>;
+    startedAt: string;
+    completedAt?: string;
+    result?: {
+      approvedCount: number;
+      totalGoals: number;
+      wallTimeMs: number;
+      goals: MultiAgentGoalResult[];
+    };
+    error?: string;
+  };
+}
+
+export type MultiAgentStreamEvent =
+  | { type: 'run-accepted'; runId: string; goalIds: string[]; concurrency: number; at: string }
+  | { type: 'goal-start'; runId: string; goalId: string; index: number; at: string }
+  | {
+      type: 'goal-complete';
+      runId: string;
+      goalId: string;
+      approved: boolean;
+      iterations: number;
+      error?: string;
+      at: string;
+    }
+  | {
+      type: 'run-complete';
+      runId: string;
+      approvedCount: number;
+      totalGoals: number;
+      wallTimeMs: number;
+      at: string;
+    };
+
+/** Start a parallel multi-agent run (202 + runId). */
+export async function startMultiAgentRun(
+  goals: string[],
+  concurrency: number,
+): Promise<MultiAgentRunStart> {
+  return authJson<MultiAgentRunStart>(
+    '/v1/agentx/multi-agent/run',
+    { method: 'POST', body: JSON.stringify({ goals, concurrency }) },
+    false,
+  );
+}
+
+/** Fetch a run's status + result (JSON polling). */
+export async function fetchMultiAgentRun(runId: string): Promise<MultiAgentRunDetail> {
+  return getJson<MultiAgentRunDetail>(`/v1/agentx/multi-agent/${encodeURIComponent(runId)}`);
+}
+
 /** Admin-only (AUTH_ENABLED): list waitlist entries. */
 export async function fetchWaitlistAdmin(limit = 100): Promise<WaitlistListResponse> {
   return authJson<WaitlistListResponse>(`/v1/beta/waitlist?limit=${limit}`, {}, true);
