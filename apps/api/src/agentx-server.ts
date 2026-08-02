@@ -15,6 +15,16 @@ import {
   delay,
   type TaskStreamEvent,
 } from './task-stream.js';
+import {
+  publishChatEvent,
+  subscribeChat,
+  getChatEventHistory,
+  chunkText,
+  buildChatPrompt,
+  parseChatMessages,
+  CHAT_CHUNK_DELAY_MS,
+  type ChatStreamEvent,
+} from './chat-stream.js';
 
 export { waitlistStore, feedbackStore, resetBetaStores } from './beta-store.js';
 
@@ -262,6 +272,136 @@ app.get('/v1/agentx/tasks/:id/events', (req, res) => {
     res.write(`data: ${JSON.stringify(ev)}\n\n`);
   };
   const unsubscribe = subscribeTask(taskId, onEvent);
+  const heartbeat = setInterval(() => res.write(': ping\n\n'), 15_000);
+
+  req.on('close', () => {
+    clearInterval(heartbeat);
+    unsubscribe();
+  });
+});
+
+// ─── Chat (Web Pro): single-turn with transcript context ────
+// Builds a bounded transcript prompt from the conversation, then routes it
+// through the LLM router like any other task.
+app.post('/v1/agentx/chat', async (req, res): Promise<void> => {
+  try {
+    const { messages, taskId, complexity, type, budget } = req.body ?? {};
+    const parsed = parseChatMessages(messages);
+    if (!parsed) {
+      res.status(400).json({
+        error:
+          'Missing or invalid field: messages (non-empty array of {role: user|assistant, content: string})',
+      });
+      return;
+    }
+    const last = parsed[parsed.length - 1]!;
+    const request = {
+      taskId: taskId ?? `chat-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      description: last.content.slice(0, 120),
+      complexity: complexity ?? 'medium',
+      type: type ?? 'reasoning',
+      budget: budget ?? 'medium',
+    };
+    const response = await router.execute(request, buildChatPrompt(parsed));
+    res.json({ ...response, taskId: request.taskId });
+  } catch (e) {
+    const err = e instanceof Error ? e.message : String(e);
+    res.status(500).json({ error: err });
+  }
+});
+
+// ─── Chat streaming (Web Pro): SSE token stream ────
+// POST returns 202 + chatId; events (start -> chunk* -> complete/error) are
+// consumed via GET /v1/agentx/chat/:id/events.
+app.post('/v1/agentx/chat/stream', async (req, res): Promise<void> => {
+  try {
+    const { messages, taskId, complexity, type, budget } = req.body ?? {};
+    const parsed = parseChatMessages(messages);
+    if (!parsed) {
+      res.status(400).json({
+        error:
+          'Missing or invalid field: messages (non-empty array of {role: user|assistant, content: string})',
+      });
+      return;
+    }
+    const last = parsed[parsed.length - 1]!;
+    const chatId = `chat-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const request = {
+      taskId: taskId ?? chatId,
+      description: last.content.slice(0, 120),
+      complexity: complexity ?? 'medium',
+      type: type ?? 'reasoning',
+      budget: budget ?? 'medium',
+    };
+
+    res.status(202).json({ chatId, status: 'accepted' });
+
+    void (async () => {
+      try {
+        const response = await router.execute(request, buildChatPrompt(parsed));
+        const startedAt = new Date().toISOString();
+        publishChatEvent({
+          type: 'start',
+          chatId,
+          provider: response.provider,
+          model: response.model,
+          at: startedAt,
+        });
+        for (const chunk of chunkText(response.message)) {
+          await delay(CHAT_CHUNK_DELAY_MS);
+          publishChatEvent({
+            type: 'chunk',
+            chatId,
+            text: chunk,
+            at: new Date().toISOString(),
+          });
+        }
+        publishChatEvent({
+          type: 'complete',
+          chatId,
+          usage: response.usage,
+          cost: response.cost,
+          latencyMs: response.latencyMs,
+          at: new Date().toISOString(),
+        });
+      } catch (runErr) {
+        const err = runErr instanceof Error ? runErr.message : String(runErr);
+        publishChatEvent({
+          type: 'error',
+          chatId,
+          error: err,
+          at: new Date().toISOString(),
+        });
+      }
+    })();
+  } catch (e) {
+    const err = e instanceof Error ? e.message : String(e);
+    res.status(500).json({ error: err });
+  }
+});
+
+// ─── Chat SSE event stream (Web Pro) ────
+app.get('/v1/agentx/chat/:id/events', (req, res) => {
+  const { id } = req.params;
+  const chatId = typeof id === 'string' ? id : '';
+
+  res.set({
+    'Content-Type': 'text/event-stream',
+    'Cache-Control': 'no-cache, no-transform',
+    Connection: 'keep-alive',
+    'X-Accel-Buffering': 'no',
+  });
+  res.flushHeaders();
+  res.write('retry: 3000\n\n');
+
+  for (const ev of getChatEventHistory(chatId)) {
+    res.write(`data: ${JSON.stringify(ev)}\n\n`);
+  }
+
+  const onEvent = (ev: ChatStreamEvent): void => {
+    res.write(`data: ${JSON.stringify(ev)}\n\n`);
+  };
+  const unsubscribe = subscribeChat(chatId, onEvent);
   const heartbeat = setInterval(() => res.write(': ping\n\n'), 15_000);
 
   req.on('close', () => {
