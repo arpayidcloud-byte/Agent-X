@@ -106,15 +106,15 @@ export default function ChatView() {
   }
 
   return (
-    <div className="mx-auto flex h-[calc(100vh-8rem)] max-w-3xl flex-col rounded-xl border border-slate-700/50 bg-slate-900/40">
-      <div className="border-b border-slate-800 px-6 py-4">
-        <h2 className="text-lg font-semibold text-cyan-400">
+    <div className="mx-auto flex h-[calc(100dvh-9rem)] max-w-3xl flex-col rounded-xl border border-slate-700/50 bg-slate-900/40">
+      <div className="border-b border-slate-800 px-4 py-3 sm:px-6 sm:py-4">
+        <h2 className="text-base font-semibold text-cyan-400 sm:text-lg">
           Chat{' '}
           <span className="text-xs font-normal text-slate-500">(Web Pro · SSE + WS fallback)</span>
         </h2>
       </div>
 
-      <div className="flex-1 space-y-4 overflow-y-auto p-6">
+      <div className="flex-1 space-y-4 overflow-y-auto p-3 sm:p-6">
         {bubbles.length === 0 && (
           <p className="text-center text-sm text-slate-500">
             Ask anything — responses stream token-by-token over Server-Sent Events.
@@ -123,7 +123,7 @@ export default function ChatView() {
         {bubbles.map((b, i) => (
           <div key={i} className={`flex ${b.role === 'user' ? 'justify-end' : 'justify-start'}`}>
             <div
-              className={`max-w-[80%] rounded-2xl px-4 py-3 text-sm ${
+              className={`max-w-[85%] rounded-2xl px-3.5 py-2.5 text-sm sm:max-w-[80%] sm:px-4 sm:py-3 ${
                 b.role === 'user'
                   ? 'bg-cyan-600 text-white'
                   : b.error
@@ -155,21 +155,21 @@ export default function ChatView() {
 
       <form
         onSubmit={(e) => void handleSend(e)}
-        className="flex gap-3 border-t border-slate-800 p-4"
+        className="flex gap-2 border-t border-slate-800 p-2.5 sm:gap-3 sm:p-4"
       >
         <input
           value={input}
           onChange={(e) => setInput(e.target.value)}
           placeholder="Type a message…"
           disabled={streaming}
-          className="flex-1 rounded-lg border border-slate-700 bg-slate-950 px-4 py-2 text-sm text-slate-100 placeholder:text-slate-500 focus:border-cyan-500 focus:outline-none disabled:opacity-50"
+          className="flex-1 rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500 focus:border-cyan-500 focus:outline-none disabled:opacity-50 sm:px-4"
         />
         <button
           type="submit"
           disabled={streaming || !input.trim()}
-          className="rounded-lg bg-cyan-600 px-5 py-2 text-sm font-semibold text-white transition hover:bg-cyan-500 disabled:cursor-not-allowed disabled:opacity-50"
+          className="rounded-lg bg-cyan-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-cyan-500 disabled:cursor-not-allowed disabled:opacity-50 sm:px-5"
         >
-          {streaming ? 'Streaming…' : 'Send'}
+          {streaming ? '…' : 'Send'}
         </button>
       </form>
     </div>
