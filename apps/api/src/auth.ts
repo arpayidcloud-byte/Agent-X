@@ -103,7 +103,7 @@ function prismaUserBackend(prisma: NonNullable<ReturnType<typeof getPrisma>>): U
 
 let userBackendPromise: Promise<UserBackend> | null = null;
 
-function getUserBackend(): Promise<UserBackend> {
+export function getUserBackend(): Promise<UserBackend> {
   if (userBackendPromise === null) {
     userBackendPromise = (async () => {
       if (await dbReady()) {
@@ -131,7 +131,7 @@ function toAuthUser(user: UserRecord): AuthUser {
   return rest;
 }
 
-function rolesFor(email: string): string[] {
+export function rolesFor(email: string): string[] {
   return ADMIN_EMAILS.includes(email.toLowerCase()) ? ['admin', 'user'] : ['user'];
 }
 
@@ -237,7 +237,7 @@ export function verifyToken(token: string): JWTPayload {
   }
 }
 
-function issueTokens(user: UserRecord): AuthTokens {
+export function issueTokens(user: UserRecord): AuthTokens {
   const accessToken = jwt.sign({ sub: user.id, email: user.email, roles: user.roles }, JWT_SECRET, {
     expiresIn: ACCESS_TOKEN_TTL,
   });

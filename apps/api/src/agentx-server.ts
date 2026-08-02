@@ -24,6 +24,7 @@ import {
 } from './multi-agent-stream.js';
 import type { WaitlistEntry, FeedbackEntry } from './beta-store.js';
 import { registerAuthRoutes } from './auth-routes.js';
+import { registerOAuthRoutes } from './oauth-routes.js';
 import {
   publishEvent,
   subscribeTask,
@@ -67,6 +68,7 @@ app.use((req, res, next) => {
 });
 
 registerAuthRoutes(app);
+registerOAuthRoutes(app);
 
 const PORT = process.env.PORT || 4000;
 
