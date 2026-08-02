@@ -127,6 +127,79 @@ export async function postQualityScore(input: {
   return (await res.json()) as { score: QualityScoreRecord };
 }
 
+// ─── Agent feedback loop ────
+export interface AgentFeedbackWeakDimension {
+  name: string;
+  score: number;
+  weight: number;
+  suggestions: string[];
+  notes: string[];
+}
+
+export interface AgentFeedbackRecord {
+  id: string;
+  scoreId: string;
+  taskId?: string;
+  prompt: string;
+  response: string;
+  overall: number;
+  grade: string;
+  weakDimensions: AgentFeedbackWeakDimension[];
+  priorityAdvice: string[];
+  improvementPrompt: string;
+  createdAt: string;
+}
+
+export interface AgentFeedbackStats {
+  total: number;
+  byGrade: Record<string, number>;
+}
+
+export async function fetchAgentFeedback(
+  limit = 20,
+): Promise<{ feedback: AgentFeedbackRecord[]; total: number }> {
+  return getJson<{ feedback: AgentFeedbackRecord[]; total: number }>(`/v1/feedback?limit=${limit}`);
+}
+
+export async function fetchAgentFeedbackStats(): Promise<{
+  stats: AgentFeedbackStats;
+  generatedAt: string;
+}> {
+  return getJson<{ stats: AgentFeedbackStats; generatedAt: string }>('/v1/feedback/stats');
+}
+
+export async function postAgentFeedbackGenerate(scoreId: string): Promise<{
+  feedback: AgentFeedbackRecord;
+  reused?: boolean;
+}> {
+  const res = await fetch(`${API_URL}/v1/feedback/generate`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ scoreId }),
+  });
+  if (!res.ok) {
+    throw new Error(`POST /v1/feedback/generate failed: ${res.status} ${res.statusText}`);
+  }
+  return (await res.json()) as { feedback: AgentFeedbackRecord; reused?: boolean };
+}
+
+export async function postAgentFeedbackRevision(
+  feedbackId: string,
+  prompt: string,
+): Promise<{ revisionPrompt: string }> {
+  const res = await fetch(`${API_URL}/v1/feedback/${feedbackId}/revision`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ prompt }),
+  });
+  if (!res.ok) {
+    throw new Error(
+      `POST /v1/feedback/${feedbackId}/revision failed: ${res.status} ${res.statusText}`,
+    );
+  }
+  return (await res.json()) as { revisionPrompt: string };
+}
+
 export async function runTask(prompt: string): Promise<RunResponse> {
   const res = await fetch(`${API_URL}/v1/agentx/run`, {
     method: 'POST',

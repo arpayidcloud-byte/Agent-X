@@ -34,7 +34,8 @@
   },
   "dependencies": {
     "@prisma/client": "^5.14.0",
-    "@agent-xai/core-runtime": "workspace:*"
+    "@agent-xai/core-runtime": "workspace:*",
+    "@agent-xai/agent-feedback": "workspace:^"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",

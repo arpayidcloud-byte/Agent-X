@@ -1,0 +1,33 @@
+{
+  "name": "@agent-xai/agent-feedback",
+  "version": "1.0.0",
+  "description": "Closed-loop feedback for agent outputs: turns quality scores into actionable revision prompts",
+  "license": "MIT",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src test",
+    "test": "vitest run",
+    "build": "tsc --build"
+  },
+  "dependencies": {
+    "@agent-xai/quality-scoring": "workspace:^"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "eslint": "^8.57.0",
+    "typescript": "^5.4.5",
+    "vitest": "^3.2.6"
+  }
+}
