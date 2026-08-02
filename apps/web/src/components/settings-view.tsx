@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { LogOut, KeyRound } from 'lucide-react';
 import {
   fetchMe,
   loginAccount,
@@ -10,6 +11,10 @@ import {
   isAuthed,
   type AuthUser,
 } from '@/lib/api';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 
 // Web Pro user settings: profile (id/email/roles) + change password.
 // Requires a Bearer token; shows an inline login form when not authed.
@@ -88,129 +93,120 @@ export default function SettingsView() {
 
   if (!authed) {
     return (
-      <div className="mx-auto max-w-md rounded-xl border border-slate-700/50 bg-slate-900/50 p-6">
-        <h2 className="mb-4 text-lg font-semibold text-slate-100">Sign in to manage settings</h2>
+      <div className="mx-auto max-w-md rounded-xl border border-surface-3 bg-surface-1 p-6">
+        <h2 className="mb-4 text-base font-semibold text-slate-100">Sign in to manage settings</h2>
         {error && (
           <p className="mb-3 rounded-lg border border-rose-500/30 bg-rose-950/30 px-3 py-2 text-xs text-rose-300">
             ⚠ {error}
           </p>
         )}
         <form onSubmit={(e) => void handleLogin(e)} className="space-y-3">
-          <input
+          <Input
             type="email"
             required
             placeholder="Email"
             value={loginEmail}
             onChange={(e) => setLoginEmail(e.target.value)}
-            className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-200 placeholder-slate-500 focus:border-cyan-500 focus:outline-none"
           />
-          <input
+          <Input
             type="password"
             required
             placeholder="Password"
             value={loginPassword}
             onChange={(e) => setLoginPassword(e.target.value)}
-            className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-200 placeholder-slate-500 focus:border-cyan-500 focus:outline-none"
           />
-          <button
-            type="submit"
-            className="w-full rounded-lg bg-cyan-600 py-2 text-sm font-semibold text-white transition hover:bg-cyan-500"
-          >
+          <Button type="submit" className="w-full">
             Sign in
-          </button>
+          </Button>
         </form>
       </div>
     );
   }
 
   return (
-    <div className="grid gap-6 md:grid-cols-2">
-      <div className="rounded-xl border border-slate-700/50 bg-slate-900/50 p-5">
-        <h3 className="mb-4 text-sm font-semibold text-slate-200">Profile</h3>
-        {loading ? (
-          <p className="text-sm text-slate-500">Loading…</p>
-        ) : user ? (
-          <dl className="space-y-3 text-sm">
-            <div>
-              <dt className="text-xs uppercase tracking-wide text-slate-500">Email</dt>
-              <dd className="mt-0.5 text-slate-200">{user.email}</dd>
-            </div>
-            <div>
-              <dt className="text-xs uppercase tracking-wide text-slate-500">Roles</dt>
-              <dd className="mt-0.5">
-                {user.roles.map((r) => (
-                  <span
-                    key={r}
-                    className={`mr-1 rounded px-2 py-0.5 text-xs font-medium ${
-                      r === 'admin' ? 'bg-amber-950 text-amber-300' : 'bg-slate-800 text-slate-300'
-                    }`}
-                  >
-                    {r}
-                  </span>
-                ))}
-              </dd>
-            </div>
-            <div>
-              <dt className="text-xs uppercase tracking-wide text-slate-500">User ID</dt>
-              <dd className="mt-0.5 font-mono text-xs text-slate-400">{user.id}</dd>
-            </div>
-          </dl>
-        ) : (
-          <p className="text-sm text-rose-300">⚠ {error ?? 'Failed to load profile'}</p>
-        )}
-        <button
-          onClick={handleLogout}
-          className="mt-5 rounded-lg border border-slate-700 px-4 py-1.5 text-sm text-slate-300 transition hover:bg-slate-800"
-        >
-          Sign out
-        </button>
-      </div>
+    <div className="grid gap-4 md:grid-cols-2">
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle>Profile</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {loading ? (
+            <p className="text-sm text-slate-500">Loading…</p>
+          ) : user ? (
+            <dl className="space-y-3 text-sm">
+              <div>
+                <dt className="text-xs uppercase tracking-wide text-slate-500">Email</dt>
+                <dd className="mt-0.5 text-slate-200">{user.email}</dd>
+              </div>
+              <div>
+                <dt className="text-xs uppercase tracking-wide text-slate-500">Roles</dt>
+                <dd className="mt-0.5">
+                  {user.roles.map((r) => (
+                    <Badge key={r} tone={r === 'admin' ? 'warning' : 'neutral'} className="mr-1">
+                      {r}
+                    </Badge>
+                  ))}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-xs uppercase tracking-wide text-slate-500">User ID</dt>
+                <dd className="mt-0.5 font-mono text-xs text-slate-400">{user.id}</dd>
+              </div>
+            </dl>
+          ) : (
+            <p className="text-sm text-rose-300">⚠ {error ?? 'Failed to load profile'}</p>
+          )}
+          <Button variant="ghost" size="sm" className="mt-4" onClick={handleLogout}>
+            <LogOut className="h-3.5 w-3.5" strokeWidth={2} aria-hidden /> Sign out
+          </Button>
+        </CardContent>
+      </Card>
 
-      <div className="rounded-xl border border-slate-700/50 bg-slate-900/50 p-5">
-        <h3 className="mb-4 text-sm font-semibold text-slate-200">Change password</h3>
-        {pwMsg && (
-          <p className="mb-3 rounded-lg border border-emerald-500/30 bg-emerald-950/30 px-3 py-2 text-xs text-emerald-300">
-            ✓ {pwMsg}
-          </p>
-        )}
-        {pwErr && (
-          <p className="mb-3 rounded-lg border border-rose-500/30 bg-rose-950/30 px-3 py-2 text-xs text-rose-300">
-            ⚠ {pwErr}
-          </p>
-        )}
-        <form onSubmit={(e) => void handleChangePassword(e)} className="space-y-3">
-          <input
-            type="password"
-            required
-            placeholder="Current password"
-            value={current}
-            onChange={(e) => setCurrent(e.target.value)}
-            className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-200 placeholder-slate-500 focus:border-cyan-500 focus:outline-none"
-          />
-          <input
-            type="password"
-            required
-            placeholder="New password (min 8 chars)"
-            value={next}
-            onChange={(e) => setNext(e.target.value)}
-            className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-200 placeholder-slate-500 focus:border-cyan-500 focus:outline-none"
-          />
-          <input
-            type="password"
-            required
-            placeholder="Confirm new password"
-            value={confirm}
-            onChange={(e) => setConfirm(e.target.value)}
-            className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-200 placeholder-slate-500 focus:border-cyan-500 focus:outline-none"
-          />
-          <button
-            type="submit"
-            className="w-full rounded-lg bg-cyan-600 py-2 text-sm font-semibold text-white transition hover:bg-cyan-500"
-          >
-            Update password
-          </button>
-        </form>
-      </div>
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="flex items-center gap-2">
+            <KeyRound className="h-4 w-4 text-accent-400" aria-hidden /> Change password
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {pwMsg && (
+            <p className="mb-3 rounded-lg border border-emerald-500/30 bg-emerald-950/30 px-3 py-2 text-xs text-emerald-300">
+              ✓ {pwMsg}
+            </p>
+          )}
+          {pwErr && (
+            <p className="mb-3 rounded-lg border border-rose-500/30 bg-rose-950/30 px-3 py-2 text-xs text-rose-300">
+              ⚠ {pwErr}
+            </p>
+          )}
+          <form onSubmit={(e) => void handleChangePassword(e)} className="space-y-3">
+            <Input
+              type="password"
+              required
+              placeholder="Current password"
+              value={current}
+              onChange={(e) => setCurrent(e.target.value)}
+            />
+            <Input
+              type="password"
+              required
+              placeholder="New password (min 8 chars)"
+              value={next}
+              onChange={(e) => setNext(e.target.value)}
+            />
+            <Input
+              type="password"
+              required
+              placeholder="Confirm new password"
+              value={confirm}
+              onChange={(e) => setConfirm(e.target.value)}
+            />
+            <Button type="submit" className="w-full">
+              Update password
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
     </div>
   );
 }

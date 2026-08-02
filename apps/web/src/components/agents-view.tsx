@@ -1,13 +1,16 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { Landmark, Code2, Search, FlaskConical } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import { fetchAgents, updateAgent, isAuthed, getToken, type AgentConfig } from '@/lib/api';
+import { Button } from '@/components/ui/button';
 
-const ROLE_EMOJI: Record<string, string> = {
-  architect: '🏛️',
-  coder: '💻',
-  reviewer: '🔍',
-  tester: '🧪',
+const ROLE_ICON: Record<string, LucideIcon> = {
+  architect: Landmark,
+  coder: Code2,
+  reviewer: Search,
+  tester: FlaskConical,
 };
 
 const COMPLEXITY_OPTIONS = ['simple', 'medium', 'complex'] as const;
@@ -81,80 +84,83 @@ export default function AgentsView() {
         </p>
       )}
 
-      {agents.map((agent) => (
-        <div
-          key={agent.id}
-          className={`rounded-xl border p-5 transition ${
-            agent.enabled
-              ? 'border-slate-700/50 bg-slate-900/50'
-              : 'border-slate-800 bg-slate-950/40 opacity-70'
-          }`}
-        >
-          <div className="flex flex-wrap items-start justify-between gap-4">
-            <div>
-              <h3 className="text-base font-semibold text-slate-100">
-                {ROLE_EMOJI[agent.role]} {agent.name}
-                <span className="ml-2 rounded bg-slate-800 px-2 py-0.5 text-xs font-mono text-slate-400">
-                  {agent.id}
-                </span>
-              </h3>
-              <p className="mt-1 max-w-2xl text-sm text-slate-400">{agent.description}</p>
-              <p className="mt-1 text-xs text-slate-500">{agent.capabilities.join(' · ')}</p>
-            </div>
-            {authed && (
-              <button
-                onClick={() => void patch(agent.id, { enabled: !agent.enabled })}
-                disabled={saving === agent.id}
-                className={`rounded-lg px-4 py-1.5 text-sm font-semibold transition disabled:opacity-50 ${
-                  agent.enabled
-                    ? 'bg-emerald-600 text-white hover:bg-emerald-500'
-                    : 'bg-slate-700 text-slate-200 hover:bg-slate-600'
-                }`}
-              >
-                {agent.enabled ? 'Enabled' : 'Disabled'}
-              </button>
-            )}
-          </div>
-
-          {authed && (
-            <div className="mt-4 flex flex-wrap gap-4 border-t border-slate-800 pt-4 text-sm">
-              <label className="flex items-center gap-2 text-slate-400">
-                Model
-                <select
-                  value={agent.model}
-                  onChange={(e) => void patch(agent.id, { model: e.target.value })}
+      {agents.map((agent) => {
+        const RoleIcon = ROLE_ICON[agent.role] ?? Code2;
+        return (
+          <div
+            key={agent.id}
+            className={`rounded-xl border p-5 transition ${
+              agent.enabled
+                ? 'border-surface-3 bg-surface-1'
+                : 'border-surface-3 bg-surface-0 opacity-70'
+            }`}
+          >
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div>
+                <h3 className="flex items-center gap-2 text-base font-semibold text-slate-100">
+                  <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-surface-2 text-accent-400">
+                    <RoleIcon className="h-4 w-4" strokeWidth={1.8} aria-hidden />
+                  </span>
+                  {agent.name}
+                  <span className="rounded bg-surface-2 px-2 py-0.5 font-mono text-xs text-slate-400">
+                    {agent.id}
+                  </span>
+                </h3>
+                <p className="mt-1 max-w-2xl text-sm text-slate-400">{agent.description}</p>
+                <p className="mt-1 text-xs text-slate-500">{agent.capabilities.join(' · ')}</p>
+              </div>
+              {authed && (
+                <Button
+                  onClick={() => void patch(agent.id, { enabled: !agent.enabled })}
                   disabled={saving === agent.id}
-                  className="rounded-lg border border-slate-700 bg-slate-950 px-2 py-1 text-xs text-slate-200 focus:border-cyan-500 focus:outline-none disabled:opacity-50"
+                  size="sm"
+                  variant={agent.enabled ? 'primary' : 'secondary'}
                 >
-                  {modelOptions.map((m) => (
-                    <option key={m} value={m}>
-                      {m}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="flex items-center gap-2 text-slate-400">
-                Complexity
-                <select
-                  value={agent.complexity}
-                  onChange={(e) => void patch(agent.id, { complexity: e.target.value })}
-                  disabled={saving === agent.id}
-                  className="rounded-lg border border-slate-700 bg-slate-950 px-2 py-1 text-xs text-slate-200 focus:border-cyan-500 focus:outline-none disabled:opacity-50"
-                >
-                  {COMPLEXITY_OPTIONS.map((c) => (
-                    <option key={c} value={c}>
-                      {c}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              {saving === agent.id && (
-                <span className="self-center text-xs text-slate-500">saving…</span>
+                  {agent.enabled ? 'Enabled' : 'Disabled'}
+                </Button>
               )}
             </div>
-          )}
-        </div>
-      ))}
+
+            {authed && (
+              <div className="mt-4 flex flex-wrap gap-4 border-t border-surface-3 pt-4 text-sm">
+                <label className="flex items-center gap-2 text-slate-400">
+                  Model
+                  <select
+                    value={agent.model}
+                    onChange={(e) => void patch(agent.id, { model: e.target.value })}
+                    disabled={saving === agent.id}
+                    className="rounded-lg border border-surface-3 bg-surface-0 px-2 py-1 text-xs text-slate-200 focus:border-accent-500/60 focus:outline-none focus:ring-2 focus:ring-accent-500/20 disabled:opacity-50"
+                  >
+                    {modelOptions.map((m) => (
+                      <option key={m} value={m}>
+                        {m}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="flex items-center gap-2 text-slate-400">
+                  Complexity
+                  <select
+                    value={agent.complexity}
+                    onChange={(e) => void patch(agent.id, { complexity: e.target.value })}
+                    disabled={saving === agent.id}
+                    className="rounded-lg border border-surface-3 bg-surface-0 px-2 py-1 text-xs text-slate-200 focus:border-accent-500/60 focus:outline-none focus:ring-2 focus:ring-accent-500/20 disabled:opacity-50"
+                  >
+                    {COMPLEXITY_OPTIONS.map((c) => (
+                      <option key={c} value={c}>
+                        {c}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                {saving === agent.id && (
+                  <span className="self-center text-xs text-slate-500">saving…</span>
+                )}
+              </div>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }

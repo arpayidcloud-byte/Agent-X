@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { LogOut } from 'lucide-react';
 import {
   fetchTeam,
   loginAccount,
@@ -9,6 +10,9 @@ import {
   isAuthed,
   type TeamMember,
 } from '@/lib/api';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 
 // Web Pro team management (basic): admin-only user table. Shows an inline
 // login form when not authed; non-admin users get a 403 message.
@@ -60,8 +64,8 @@ export default function TeamView() {
 
   if (!authed) {
     return (
-      <div className="mx-auto max-w-md rounded-xl border border-slate-700/50 bg-slate-900/50 p-6">
-        <h2 className="mb-4 text-lg font-semibold text-slate-100">Admin sign in</h2>
+      <div className="mx-auto max-w-md rounded-xl border border-surface-3 bg-surface-1 p-6">
+        <h2 className="mb-4 text-base font-semibold text-slate-100">Admin sign in</h2>
         <p className="mb-4 text-xs text-slate-500">
           Team management lists registered users. Only accounts with the{' '}
           <code className="text-amber-300">admin</code> role can view it.
@@ -72,28 +76,23 @@ export default function TeamView() {
           </p>
         )}
         <form onSubmit={(e) => void handleLogin(e)} className="space-y-3">
-          <input
+          <Input
             type="email"
             required
             placeholder="Email"
             value={loginEmail}
             onChange={(e) => setLoginEmail(e.target.value)}
-            className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-200 placeholder-slate-500 focus:border-cyan-500 focus:outline-none"
           />
-          <input
+          <Input
             type="password"
             required
             placeholder="Password"
             value={loginPassword}
             onChange={(e) => setLoginPassword(e.target.value)}
-            className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-200 placeholder-slate-500 focus:border-cyan-500 focus:outline-none"
           />
-          <button
-            type="submit"
-            className="w-full rounded-lg bg-cyan-600 py-2 text-sm font-semibold text-white transition hover:bg-cyan-500"
-          >
+          <Button type="submit" className="w-full">
             Sign in
-          </button>
+          </Button>
         </form>
       </div>
     );
@@ -101,19 +100,16 @@ export default function TeamView() {
 
   if (error && !users) {
     return (
-      <div className="rounded-xl border border-rose-500/30 bg-rose-950/30 p-5">
+      <div className="rounded-xl border border-rose-500/30 bg-rose-950/20 p-5">
         <p className="text-sm text-rose-300">⚠ {error}</p>
         {error.includes('403') && (
           <p className="mt-2 text-xs text-slate-400">
             Your account does not have the admin role. Sign in with an admin account.
           </p>
         )}
-        <button
-          onClick={handleLogout}
-          className="mt-4 rounded-lg border border-slate-700 px-4 py-1.5 text-sm text-slate-300 hover:bg-slate-800"
-        >
+        <Button variant="secondary" size="sm" className="mt-4" onClick={handleLogout}>
           Sign out
-        </button>
+        </Button>
       </div>
     );
   }
@@ -124,42 +120,32 @@ export default function TeamView() {
         <p className="text-sm text-slate-400">
           {users ? `${users.length} registered user${users.length === 1 ? '' : 's'}` : '…'}
         </p>
-        <button
-          onClick={handleLogout}
-          className="rounded-lg border border-slate-700 px-3 py-1 text-xs text-slate-300 hover:bg-slate-800"
-        >
-          Sign out
-        </button>
+        <Button variant="ghost" size="sm" onClick={handleLogout}>
+          <LogOut className="h-3.5 w-3.5" strokeWidth={2} aria-hidden /> Sign out
+        </Button>
       </div>
 
       {loading && !users ? (
         <p className="text-sm text-slate-500">Loading…</p>
       ) : users ? (
-        <div className="overflow-x-auto rounded-xl border border-slate-700/50 bg-slate-900/50">
+        <div className="overflow-hidden rounded-xl border border-surface-3 bg-surface-1">
           <table className="w-full text-left text-sm">
             <thead>
-              <tr className="border-b border-slate-800 text-xs uppercase tracking-wide text-slate-500">
-                <th className="px-4 py-3">Email</th>
-                <th className="px-4 py-3">Roles</th>
-                <th className="px-4 py-3">Joined</th>
+              <tr className="border-b border-surface-3 text-xs uppercase tracking-wide text-slate-500">
+                <th className="px-4 py-3 font-medium">Email</th>
+                <th className="px-4 py-3 font-medium">Roles</th>
+                <th className="px-4 py-3 font-medium">Joined</th>
               </tr>
             </thead>
             <tbody>
               {users.map((u) => (
-                <tr key={u.id} className="border-b border-slate-800/50 last:border-0">
+                <tr key={u.id} className="border-b border-surface-3/60 last:border-0">
                   <td className="px-4 py-3 text-slate-200">{u.email}</td>
                   <td className="px-4 py-3">
                     {u.roles.map((r) => (
-                      <span
-                        key={r}
-                        className={`mr-1 rounded px-2 py-0.5 text-xs font-medium ${
-                          r === 'admin'
-                            ? 'bg-amber-950 text-amber-300'
-                            : 'bg-slate-800 text-slate-300'
-                        }`}
-                      >
+                      <Badge key={r} tone={r === 'admin' ? 'warning' : 'neutral'} className="mr-1">
                         {r}
-                      </span>
+                      </Badge>
                     ))}
                   </td>
                   <td className="px-4 py-3 text-xs text-slate-500">

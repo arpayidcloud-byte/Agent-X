@@ -35,16 +35,16 @@ export default function BetaFeedbackForm() {
 
   return (
     <form onSubmit={(e) => void handleSubmit(e)} className="space-y-3">
-      <div className="flex gap-2">
+      <div className="flex flex-wrap gap-2">
         {CATEGORIES.map((c) => (
           <button
             key={c}
             type="button"
             onClick={() => setCategory(c)}
-            className={`rounded px-3 py-1 text-xs font-medium ${
+            className={`rounded-lg px-3 py-1 text-xs font-medium transition ${
               category === c
-                ? 'bg-emerald-600 text-white'
-                : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                ? 'bg-accent-500 text-slate-950'
+                : 'bg-surface-2 text-slate-400 hover:bg-surface-3 hover:text-slate-200'
             }`}
           >
             {c}
@@ -57,7 +57,7 @@ export default function BetaFeedbackForm() {
         placeholder="Ceritakan masalah / ide fitur..."
         value={message}
         onChange={(e) => setMessage(e.target.value)}
-        className="w-full rounded border border-slate-600 bg-slate-950 px-3 py-2 text-sm"
+        className="w-full rounded-lg border border-surface-3 bg-surface-0 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500 focus:border-accent-500/60 focus:outline-none focus:ring-2 focus:ring-accent-500/20"
         rows={3}
       />
       <div className="flex items-center gap-3">
@@ -66,14 +66,14 @@ export default function BetaFeedbackForm() {
           placeholder="email (opsional)"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          className="flex-1 rounded border border-slate-600 bg-slate-950 px-3 py-2 text-sm"
+          className="flex-1 rounded-lg border border-surface-3 bg-surface-0 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500 focus:border-accent-500/60 focus:outline-none focus:ring-2 focus:ring-accent-500/20"
         />
         <label className="text-sm text-slate-300">
           Rating:
           <select
             value={rating}
             onChange={(e) => setRating(Number(e.target.value))}
-            className="ml-2 rounded border border-slate-600 bg-slate-950 px-2 py-1 text-sm"
+            className="ml-2 rounded-lg border border-surface-3 bg-surface-0 px-2 py-1 text-sm text-slate-100 focus:border-accent-500/60 focus:outline-none"
           >
             {[5, 4, 3, 2, 1].map((r) => (
               <option key={r} value={r}>
@@ -85,7 +85,7 @@ export default function BetaFeedbackForm() {
         <button
           type="submit"
           disabled={status === 'loading'}
-          className="rounded bg-emerald-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+          className="rounded-lg bg-accent-500 px-4 py-2 text-sm font-semibold text-slate-950 transition hover:bg-accent-400 disabled:opacity-50"
         >
           {status === 'loading' ? 'Mengirim...' : 'Kirim'}
         </button>
