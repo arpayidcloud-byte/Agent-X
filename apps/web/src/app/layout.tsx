@@ -1,5 +1,6 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import { Geist, Geist_Mono } from 'next/font/google';
+import AppShell from '@/components/app-shell';
 import './globals.css';
 
 const geistSans = Geist({
@@ -13,8 +14,15 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: 'AgentX Dashboard',
-  description: 'Enterprise AI Agent Platform — monitor tasks, agents, and infrastructure.',
+  title: 'AgentX',
+  description: 'Enterprise AI Agent Platform — tasks, multi-agent teams, and analytics.',
+  applicationName: 'AgentX',
+};
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  themeColor: '#020617',
 };
 
 export default function RootLayout({
@@ -24,7 +32,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}>
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full bg-slate-950">
+        <AppShell>{children}</AppShell>
+      </body>
     </html>
   );
 }

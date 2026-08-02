@@ -30,7 +30,7 @@ export default async function BetaPage() {
   const bySource = stats?.bySource ?? {};
 
   return (
-    <main className="flex min-h-screen flex-col items-center p-8 bg-slate-950 text-slate-100">
+    <main className="flex min-h-screen flex-col text-slate-100">
       <div className="w-full max-w-3xl">
         <h1 className="text-3xl font-bold mb-2">Beta Recruitment</h1>
         <p className="text-slate-400 mb-6">Phase 3 Week 19-20 — waitlist &amp; feedback system</p>
