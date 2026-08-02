@@ -89,9 +89,21 @@ function NavLinks({
               Signed in · Settings
             </Link>
           ) : (
-            <Link href="/settings" className="hover:text-slate-300">
-              Guest · Sign in
-            </Link>
+            <div className="flex items-center gap-1">
+              <Link
+                href="/settings"
+                className="rounded-md px-1.5 py-0.5 hover:bg-surface-2 hover:text-slate-300"
+              >
+                Sign in
+              </Link>
+              <span className="text-slate-700">·</span>
+              <Link
+                href="/signup"
+                className="rounded-md bg-accent-500/15 px-1.5 py-0.5 font-medium text-accent-300 hover:bg-accent-500/25"
+              >
+                Sign up
+              </Link>
+            </div>
           )}
         </div>
       </div>
