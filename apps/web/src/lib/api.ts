@@ -67,6 +67,66 @@ export async function fetchTasks(limit = 50): Promise<TasksResponse> {
   return getJson<TasksResponse>(`/v1/agentx/tasks?limit=${limit}`);
 }
 
+// ─── Quality scoring ────
+export interface QualityDimensionRecord {
+  name: string;
+  score: number;
+  weight: number;
+  notes: string[];
+}
+
+export interface QualityScoreRecord {
+  id: string;
+  taskId?: string;
+  prompt: string;
+  response: string;
+  provider?: string;
+  model?: string;
+  dimensions: { dimensions: QualityDimensionRecord[]; overall: number };
+  overall: number;
+  grade: string;
+  evaluator: string;
+  createdAt: string;
+}
+
+export interface QualityScoresResponse {
+  scores: QualityScoreRecord[];
+  total: number;
+}
+
+export interface QualityStats {
+  total: number;
+  avgOverall: number;
+  byGrade: Record<string, number>;
+  byProvider: Record<string, number>;
+  byEvaluator: Record<string, number>;
+}
+
+export async function fetchQualityScores(limit = 50): Promise<QualityScoresResponse> {
+  return getJson<QualityScoresResponse>(`/v1/quality/scores?limit=${limit}`);
+}
+
+export async function fetchQualityStats(): Promise<{ stats: QualityStats; generatedAt: string }> {
+  return getJson<{ stats: QualityStats; generatedAt: string }>('/v1/quality/stats');
+}
+
+export async function postQualityScore(input: {
+  prompt: string;
+  response: string;
+  provider?: string;
+  model?: string;
+}): Promise<{ score: QualityScoreRecord }> {
+  const res = await fetch(`${API_URL}/v1/quality/score`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(input),
+  });
+  if (!res.ok) {
+    throw new Error(`POST /v1/quality/score failed: ${res.status} ${res.statusText}`);
+  }
+  return (await res.json()) as { score: QualityScoreRecord };
+}
+
 export async function runTask(prompt: string): Promise<RunResponse> {
   const res = await fetch(`${API_URL}/v1/agentx/run`, {
     method: 'POST',
