@@ -3,14 +3,18 @@
 // SSE (EventSource) is tried first: it is the primary transport with native
 // auto-reconnect. If it errors out (proxies that buffer SSE, blocked
 // EventSource, etc.) the client transparently reconnects over WebSocket to
-// the same logical channel (`ws(s)://<api-host>/ws?channel=<channel>`).
-// Both transports deliver the same JSON event objects.
-
 import { API_URL } from '@/lib/api';
 
 export interface StreamHandle {
   close: () => void;
 }
+
+// Channel prefix → SSE route segment (the server routes differ per channel).
+const SSE_ROUTES: Record<string, string> = {
+  'task:': 'tasks',
+  'chat:': 'chat',
+  'ma:': 'multi-agent',
+};
 
 function wsUrlFor(channel: string): string {
   const base = API_URL.replace(/^http/, 'ws');
@@ -18,8 +22,9 @@ function wsUrlFor(channel: string): string {
 }
 
 /**
- * Open a stream for `channel` (e.g. `task:<id>` or `chat:<id>`), delivering
- * parsed JSON events to `onEvent`. Returns a handle; call close() to stop.
+ * Open a stream for `channel` (e.g. `task:<id>`, `chat:<id>` or `ma:<id>`),
+ * delivering parsed JSON events to `onEvent`. Returns a handle; call close()
+ * to stop.
  */
 export function openEventStream(channel: string, onEvent: (ev: unknown) => void): StreamHandle {
   let closed = false;
@@ -58,13 +63,22 @@ export function openEventStream(channel: string, onEvent: (ev: unknown) => void)
     }
   }
 
+  const prefix = Object.keys(SSE_ROUTES).find((p) => channel.startsWith(p));
+  const route = prefix ? SSE_ROUTES[prefix] : undefined;
+  const id = prefix ? channel.slice(prefix.length) : '';
+
   try {
-    source = new EventSource(`${API_URL}/v1/agentx/${channel.replace(':', '/')}/events`);
-    source.onmessage = (msg) => onData(msg.data);
-    source.onerror = () => {
-      source?.close();
-      onClose();
-    };
+    if (route) {
+      source = new EventSource(`${API_URL}/v1/agentx/${route}/${id}/events`);
+      source.onmessage = (msg) => onData(msg.data);
+      source.onerror = () => {
+        source?.close();
+        onClose();
+      };
+    } else {
+      // Unknown channel — no SSE route; go straight to WS.
+      connectWs();
+    }
   } catch {
     // EventSource unavailable (very old browsers) — straight to WS.
     connectWs();
