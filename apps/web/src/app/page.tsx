@@ -49,6 +49,12 @@ export default async function AgentXDashboard() {
               💬 Chat
             </a>
             <a
+              href="/analytics"
+              className="rounded-lg border border-blue-500/40 bg-blue-950/40 px-4 py-2 font-medium text-blue-300 transition hover:bg-blue-900/40"
+            >
+              📊 Analytics
+            </a>
+            <a
               href="/beta"
               className="rounded-lg border border-emerald-500/40 bg-emerald-950/40 px-4 py-2 font-medium text-emerald-300 transition hover:bg-emerald-900/40"
             >

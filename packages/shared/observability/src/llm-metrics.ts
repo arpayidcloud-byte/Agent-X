@@ -128,6 +128,15 @@ export class LLMMetrics {
   getRegistry(): Registry {
     return this.registry;
   }
+
+  /**
+   * Raw JSON snapshot of the LLM metrics (llm_* series only) for analytics
+   * aggregation. Filtering keeps the payload small and scoped.
+   */
+  async getSnapshot(): Promise<unknown[]> {
+    const all = await this.registry.getMetricsAsJSON();
+    return all.filter((m) => m.name.startsWith('llm_'));
+  }
 }
 
 // Singleton instance
