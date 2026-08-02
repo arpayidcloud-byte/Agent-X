@@ -7,6 +7,14 @@ import { getBetaBackend } from './beta-store.js';
 import type { WaitlistEntry, FeedbackEntry } from './beta-store.js';
 import { maybeRequireAdmin } from './auth.js';
 import { registerAuthRoutes } from './auth-routes.js';
+import {
+  publishEvent,
+  subscribeTask,
+  getTaskEventHistory,
+  STAGE_DELAY_MS,
+  delay,
+  type TaskStreamEvent,
+} from './task-stream.js';
 
 export { waitlistStore, feedbackStore, resetBetaStores } from './beta-store.js';
 
@@ -15,6 +23,19 @@ const logger = new Logger('agentx-api');
 const app: express.Express = express();
 app.use(express.json());
 app.use(createRequestLogger());
+
+// ─── Minimal CORS (demo environment: web UI on :30500 talks to API on :30400).
+// Allow-all is fine for the public demo; restrict origins in production.
+app.use((req, res, next) => {
+  res.set('Access-Control-Allow-Origin', '*');
+  res.set('Access-Control-Allow-Methods', 'GET,POST,PATCH,OPTIONS');
+  res.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  if (req.method === 'OPTIONS') {
+    res.sendStatus(204);
+    return;
+  }
+  next();
+});
 
 registerAuthRoutes(app);
 
@@ -133,6 +154,120 @@ app.post('/v1/agentx/run', async (req, res): Promise<void> => {
     const err = e instanceof Error ? e.message : String(e);
     res.status(500).json({ error: err });
   }
+});
+
+// ─── Async stream run (Web Pro: SSE real-time task execution) ────
+// POST returns 202 + taskId immediately; the task runs in the background and
+// emits lifecycle events consumed via GET /v1/agentx/tasks/:id/events.
+app.post('/v1/agentx/run/stream', async (req, res): Promise<void> => {
+  try {
+    const { prompt, taskId, description, complexity, type, budget } = req.body ?? {};
+
+    if (!prompt || typeof prompt !== 'string') {
+      res.status(400).json({ error: 'Missing required field: prompt (string)' });
+      return;
+    }
+
+    const request = {
+      taskId: taskId ?? `stream-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      description: description ?? prompt.slice(0, 120),
+      complexity: complexity ?? 'medium',
+      type: type ?? 'reasoning',
+      budget: budget ?? 'medium',
+    };
+
+    const startedAt = new Date().toISOString();
+    recordTask({
+      id: request.taskId,
+      prompt,
+      description: request.description,
+      status: 'pending',
+      createdAt: startedAt,
+    });
+
+    publishEvent({ type: 'accepted', taskId: request.taskId, at: startedAt });
+    res.status(202).json({ taskId: request.taskId, status: 'accepted' });
+
+    // Background worker: stage transitions -> execute -> complete/error.
+    void (async () => {
+      try {
+        await delay(STAGE_DELAY_MS);
+        publishEvent({
+          type: 'generating',
+          taskId: request.taskId,
+          at: new Date().toISOString(),
+        });
+        const response = await router.execute(request, prompt);
+        const task = taskStore.get(request.taskId);
+        if (task) {
+          task.status = 'success';
+          task.completedAt = new Date().toISOString();
+          task.provider = response.provider;
+          task.model = response.model;
+          task.response = response.message;
+        }
+        publishEvent({
+          type: 'complete',
+          taskId: request.taskId,
+          status: 'success',
+          provider: response.provider,
+          model: response.model,
+          response: response.message,
+          at: new Date().toISOString(),
+        });
+      } catch (runErr) {
+        const err = runErr instanceof Error ? runErr.message : String(runErr);
+        const task = taskStore.get(request.taskId);
+        if (task) {
+          task.status = 'error';
+          task.completedAt = new Date().toISOString();
+          task.error = err;
+        }
+        publishEvent({
+          type: 'complete',
+          taskId: request.taskId,
+          status: 'error',
+          error: err,
+          at: new Date().toISOString(),
+        });
+      }
+    })();
+  } catch (e) {
+    const err = e instanceof Error ? e.message : String(e);
+    res.status(500).json({ error: err });
+  }
+});
+
+// ─── SSE event stream for a task (Web Pro) ────
+// Replays buffered history first, then streams live events until the client
+// disconnects. Heartbeat comments keep proxies from killing idle connections.
+app.get('/v1/agentx/tasks/:id/events', (req, res) => {
+  const { id } = req.params;
+  const taskId = typeof id === 'string' ? id : '';
+
+  res.set({
+    'Content-Type': 'text/event-stream',
+    'Cache-Control': 'no-cache, no-transform',
+    Connection: 'keep-alive',
+    'X-Accel-Buffering': 'no',
+  });
+  res.flushHeaders();
+  res.write('retry: 3000\n\n');
+
+  for (const ev of getTaskEventHistory(taskId)) {
+    res.write(`data: ${JSON.stringify(ev)}\n\n`);
+  }
+
+  const onEvent = (ev: TaskStreamEvent): void => {
+    res.write(`data: ${JSON.stringify(ev)}\n\n`);
+  };
+  const unsubscribe = subscribeTask(taskId, onEvent);
+  const heartbeat = setInterval(() => res.write(': ping\n\n'), 15_000);
+
+  req.on('close', () => {
+    clearInterval(heartbeat);
+    unsubscribe();
+  });
 });
 
 // ─── Task list endpoint (dashboard) ────
