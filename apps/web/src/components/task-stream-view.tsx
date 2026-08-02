@@ -1,9 +1,11 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
+import { Inbox, Check, Cog, Send } from 'lucide-react';
 import { startStreamTask, type TaskStreamEvent } from '@/lib/api';
 import { notifyTaskComplete, requestNotifyPermission } from '@/lib/notify';
 import { openEventStream, type StreamHandle } from '@/lib/stream';
+import { Button } from '@/components/ui/button';
 
 const QUICK_PROMPTS = [
   'Design an API gateway rate limiter',
@@ -13,6 +15,12 @@ const QUICK_PROMPTS = [
 ];
 
 const STAGE_ORDER: TaskStreamEvent['type'][] = ['accepted', 'generating', 'complete'];
+
+const STAGE_META: Record<TaskStreamEvent['type'], { label: string; Icon: typeof Inbox }> = {
+  accepted: { label: 'Accepted', Icon: Inbox },
+  generating: { label: 'Generating', Icon: Cog },
+  complete: { label: 'Complete', Icon: Check },
+};
 
 // Devin-style task composer + live session. Idle state shows a large hero
 // composer with quick prompts; once a task is submitted the view becomes a
@@ -79,7 +87,7 @@ export default function TaskStreamView() {
   if (status === 'idle') {
     return (
       <div className="mx-auto flex min-h-[60vh] max-w-2xl flex-col items-center justify-center text-center">
-        <h1 className="bg-gradient-to-r from-cyan-400 via-blue-400 to-violet-400 bg-clip-text text-3xl font-bold tracking-tight text-transparent lg:text-4xl">
+        <h1 className="bg-gradient-to-r from-accent-300 via-sky-300 to-secondary-300 bg-clip-text text-3xl font-semibold tracking-tight text-transparent lg:text-4xl">
           What can I help you build?
         </h1>
         <p className="mt-3 text-sm text-slate-500">
@@ -99,17 +107,15 @@ export default function TaskStreamView() {
               placeholder="e.g. Explain how SSE works with WebSocket fallback…"
               rows={3}
               autoFocus
-              className="w-full resize-none rounded-2xl border border-slate-700 bg-slate-900/60 p-4 pr-16 text-base text-slate-100 shadow-lg shadow-black/20 placeholder:text-slate-600 focus:border-cyan-500/60 focus:outline-none focus:ring-2 focus:ring-cyan-500/20"
+              className="w-full resize-none rounded-2xl border border-surface-3 bg-surface-1 p-4 pr-16 text-base text-slate-100 shadow-soft placeholder:text-slate-600 focus:border-accent-500/60 focus:outline-none focus:ring-2 focus:ring-accent-500/20"
             />
             <button
               type="submit"
               disabled={!prompt.trim()}
               aria-label="Run task"
-              className="absolute bottom-3 right-3 flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-cyan-500 to-violet-500 text-slate-950 transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-30"
+              className="absolute bottom-3 right-3 flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-accent-500 to-secondary-500 text-slate-950 transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-30"
             >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M3.4 20.4 20.85 12 3.4 3.6 3.39 10.5 15 12 3.39 13.5z" />
-              </svg>
+              <Send className="h-4 w-4" strokeWidth={2.2} aria-hidden />
             </button>
           </div>
           <p className="mt-2 text-right text-[11px] text-slate-600">
@@ -135,16 +141,16 @@ export default function TaskStreamView() {
   // ── Session card (running / done / error) ──
   return (
     <div className="mx-auto max-w-3xl">
-      <div className="rounded-2xl border border-slate-800 bg-slate-900/40 p-5 shadow-lg shadow-black/20">
+      <div className="rounded-2xl border border-surface-3 bg-surface-1 p-5 shadow-soft">
         <div className="mb-4 flex items-start justify-between gap-3">
           <div className="flex items-start gap-3">
             <span
-              className={`mt-1 h-2.5 w-2.5 shrink-0 rounded-full ${
+              className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${
                 status === 'done'
                   ? 'bg-emerald-400'
                   : status === 'error'
                     ? 'bg-rose-400'
-                    : 'animate-pulse bg-cyan-400'
+                    : 'animate-pulse bg-accent-400'
               }`}
             />
             <div>
@@ -154,13 +160,9 @@ export default function TaskStreamView() {
               )}
             </div>
           </div>
-          <button
-            type="button"
-            onClick={reset}
-            className="shrink-0 rounded-lg border border-slate-700 px-3 py-1.5 text-xs text-slate-400 transition hover:bg-slate-800 hover:text-slate-200"
-          >
+          <Button type="button" variant="secondary" size="sm" onClick={reset}>
             New task
-          </button>
+          </Button>
         </div>
 
         {/* Stage timeline */}
@@ -172,10 +174,11 @@ export default function TaskStreamView() {
                 : stage === 'generating'
                   ? generating
                   : status === 'done' || status === 'error';
+            const { label, Icon } = STAGE_META[stage];
             return (
               <div key={stage} className="flex flex-1 items-center gap-1">
                 <span
-                  className={`rounded-full px-3 py-1 text-[11px] font-medium transition ${
+                  className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-medium transition ${
                     active
                       ? stage === 'complete'
                         ? status === 'error'
@@ -184,12 +187,13 @@ export default function TaskStreamView() {
                         : stage === 'generating'
                           ? 'bg-amber-500/15 text-amber-300'
                           : 'bg-sky-500/15 text-sky-300'
-                      : 'bg-slate-800/60 text-slate-600'
+                      : 'bg-surface-2 text-slate-600'
                   }`}
                 >
-                  {STAGE_LABEL[stage]}
+                  <Icon className="h-3 w-3" strokeWidth={2} aria-hidden />
+                  {label}
                 </span>
-                {i < STAGE_ORDER.length - 1 && <span className="h-px flex-1 bg-slate-800" />}
+                {i < STAGE_ORDER.length - 1 && <span className="h-px flex-1 bg-surface-3" />}
               </div>
             );
           })}
@@ -202,7 +206,7 @@ export default function TaskStreamView() {
         )}
 
         {lastComplete?.status === 'success' && lastComplete.response && (
-          <pre className="max-h-72 overflow-auto whitespace-pre-wrap rounded-xl border border-slate-800 bg-slate-950 p-4 text-xs leading-relaxed text-slate-300">
+          <pre className="max-h-72 overflow-auto whitespace-pre-wrap rounded-xl border border-surface-3 bg-surface-0 p-4 text-xs leading-relaxed text-slate-300">
             {lastComplete.response}
           </pre>
         )}
@@ -212,8 +216,8 @@ export default function TaskStreamView() {
           </pre>
         )}
         {status === 'running' && (
-          <div className="flex items-center gap-2 rounded-xl border border-slate-800 bg-slate-950 p-4 text-xs text-slate-500">
-            <span className="h-3 w-3 animate-spin rounded-full border-2 border-slate-600 border-t-cyan-400" />
+          <div className="flex items-center gap-2 rounded-xl border border-surface-3 bg-surface-0 p-4 text-xs text-slate-500">
+            <span className="h-3 w-3 animate-spin rounded-full border-2 border-surface-4 border-t-accent-400" />
             {generating ? 'Generating response…' : 'Waiting for task to start…'}
           </div>
         )}
@@ -221,9 +225,3 @@ export default function TaskStreamView() {
     </div>
   );
 }
-
-const STAGE_LABEL: Record<TaskStreamEvent['type'], string> = {
-  accepted: '📥 Accepted',
-  generating: '⚙️ Generating…',
-  complete: '✅ Complete',
-};
