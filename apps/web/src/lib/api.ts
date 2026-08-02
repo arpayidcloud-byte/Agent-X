@@ -215,6 +215,41 @@ export async function fetchAnalytics(): Promise<AnalyticsSummary> {
   return getJson<AnalyticsSummary>('/v1/analytics/summary');
 }
 
+// ─── Web Pro: agent configuration ────
+
+export interface AgentConfig {
+  id: string;
+  role: 'architect' | 'coder' | 'reviewer' | 'tester';
+  name: string;
+  description: string;
+  capabilities: string[];
+  enabled: boolean;
+  model: string;
+  complexity: 'simple' | 'medium' | 'complex';
+}
+
+export interface AgentsResponse {
+  agents: AgentConfig[];
+  modelOptions: string[];
+}
+
+/** Fetch the specialist agent configs (public). */
+export async function fetchAgents(): Promise<AgentsResponse> {
+  return getJson<AgentsResponse>('/v1/agents');
+}
+
+/** Update an agent config (admin only). */
+export async function updateAgent(
+  id: string,
+  patch: { enabled?: boolean; model?: string; complexity?: string },
+): Promise<{ agent: AgentConfig }> {
+  return authJson<{ agent: AgentConfig }>(
+    `/v1/agents/${encodeURIComponent(id)}`,
+    { method: 'PATCH', body: JSON.stringify(patch) },
+    true,
+  );
+}
+
 // ─── Beta recruitment API (Phase 3 Week 19-20) ────
 
 export interface WaitlistEntry {
