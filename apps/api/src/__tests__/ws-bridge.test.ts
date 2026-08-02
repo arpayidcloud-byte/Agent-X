@@ -4,7 +4,6 @@ import WebSocket from 'ws';
 import { attachWsServer } from '../ws-bridge.js';
 import { publishEvent, getTaskEventHistory } from '../task-stream.js';
 import { publishChatEvent } from '../chat-stream.js';
-import { publishMultiAgentEvent } from '../multi-agent-stream.js';
 import { createServer } from 'node:http';
 
 describe('WebSocket fallback bridge (Web Pro)', () => {
@@ -88,38 +87,6 @@ describe('WebSocket fallback bridge (Web Pro)', () => {
     expect(getTaskEventHistory(taskId)).toHaveLength(3);
   });
 
-  it('forwards multi-agent run events over the ma channel', async () => {
-    const runId = `ws-ma-${Date.now()}`;
-    const received: unknown[] = [];
-    await new Promise<void>((resolve, reject) => {
-      const ws = new WebSocket(`${baseWs}?channel=ma:${runId}`);
-      const timer = setTimeout(() => reject(new Error('timeout')), 5000);
-      ws.on('message', (data) => {
-        received.push(JSON.parse(data.toString()));
-        if (received.length === 1) {
-          clearTimeout(timer);
-          ws.close();
-          resolve();
-        }
-      });
-      ws.on('error', (e) => {
-        clearTimeout(timer);
-        reject(e);
-      });
-      setTimeout(() => {
-        publishMultiAgentEvent({
-          type: 'goal-start',
-          runId,
-          goalId: 'goal-1',
-          index: 0,
-          at: new Date().toISOString(),
-        });
-      }, 150);
-    });
-    expect(received).toHaveLength(1);
-    expect((received[0] as { type: string }).type).toBe('goal-start');
-  });
-
   it('forwards chat events over the chat channel', async () => {
     const chatId = `ws-chat-${Date.now()}`;
     const received: unknown[] = [];
@@ -138,6 +105,7 @@ describe('WebSocket fallback bridge (Web Pro)', () => {
         clearTimeout(timer);
         reject(e);
       });
+      // Publish after the client subscribed (small delay for handshake)
       setTimeout(() => {
         publishChatEvent({
           type: 'start',

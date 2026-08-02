@@ -14,16 +14,11 @@ import { createServer, type Server, type IncomingMessage } from 'node:http';
 import { WebSocketServer, WebSocket } from 'ws';
 import { subscribeTask, getTaskEventHistory, type TaskStreamEvent } from './task-stream.js';
 import { subscribeChat, getChatEventHistory, type ChatStreamEvent } from './chat-stream.js';
-import {
-  subscribeMultiAgent,
-  getMultiAgentEventHistory,
-  type MultiAgentStreamEvent,
-} from './multi-agent-stream.js';
 
 export const WS_PATH = '/ws';
 const HEARTBEAT_MS = 30_000;
 
-type StreamEvent = TaskStreamEvent | ChatStreamEvent | MultiAgentStreamEvent;
+type StreamEvent = TaskStreamEvent | ChatStreamEvent;
 
 export function attachWsServer(server: Server): WebSocketServer {
   const wss = new WebSocketServer({ noServer: true });
@@ -35,10 +30,7 @@ export function attachWsServer(server: Server): WebSocketServer {
       return;
     }
     const channel = searchParams.get('channel');
-    if (
-      !channel ||
-      (!channel.startsWith('task:') && !channel.startsWith('chat:') && !channel.startsWith('ma:'))
-    ) {
+    if (!channel || (!channel.startsWith('task:') && !channel.startsWith('chat:'))) {
       socket.write('HTTP/1.1 400 Bad Request\r\n\r\n');
       socket.destroy();
       return;
@@ -59,10 +51,6 @@ export function attachWsServer(server: Server): WebSocketServer {
       const taskId = channel.slice(5);
       for (const ev of getTaskEventHistory(taskId)) send(ev);
       unsubscribe = subscribeTask(taskId, send);
-    } else if (channel.startsWith('ma:')) {
-      const runId = channel.slice(3);
-      for (const ev of getMultiAgentEventHistory(runId)) send(ev);
-      unsubscribe = subscribeMultiAgent(runId, send);
     } else {
       const chatId = channel.slice(5);
       for (const ev of getChatEventHistory(chatId)) send(ev);

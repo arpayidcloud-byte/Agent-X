@@ -55,12 +55,6 @@ export default async function AgentXDashboard() {
               📊 Analytics
             </a>
             <a
-              href="/multi-agent"
-              className="rounded-lg border border-fuchsia-500/40 bg-fuchsia-950/40 px-4 py-2 font-medium text-fuchsia-300 transition hover:bg-fuchsia-900/40"
-            >
-              🤝 Multi-Agent
-            </a>
-            <a
               href="/agents"
               className="rounded-lg border border-violet-500/40 bg-violet-950/40 px-4 py-2 font-medium text-violet-300 transition hover:bg-violet-900/40"
             >

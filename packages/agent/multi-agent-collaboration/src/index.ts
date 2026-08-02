@@ -25,4 +25,3 @@ export * from './collaboration-hook-manager.js';
 export * from './collaboration-event-bus.js';
 export * from './specialist-agents.js';
 export * from './specialist-workflow.js';
-export * from './parallel-workflow.js';

@@ -8,12 +8,6 @@ import { notifySlack } from './slack.js';
 import { getBetaBackend } from './beta-store.js';
 import { maybeRequireAdmin, listUsers } from './auth.js';
 import { createHttpServer } from './ws-bridge.js';
-import { startParallelRun, getMultiAgentRun } from './multi-agent-runner.js';
-import {
-  subscribeMultiAgent,
-  getMultiAgentEventHistory,
-  type MultiAgentStreamEvent,
-} from './multi-agent-stream.js';
 import type { WaitlistEntry, FeedbackEntry } from './beta-store.js';
 import { registerAuthRoutes } from './auth-routes.js';
 import {
@@ -430,81 +424,6 @@ app.get('/v1/team', maybeRequireAdmin, async (_req, res) => {
     const err = e instanceof Error ? e.message : String(e);
     res.status(500).json({ error: err });
   }
-});
-
-// ─── Parallel multi-agent runs (Web Pro) ────
-// POST accepts multiple goals (one per element) and runs them through the
-// specialist team concurrently (bounded pool). Returns 202 + runId; progress
-// streams over GET /v1/agentx/multi-agent/:runId/events (SSE/WS).
-app.post('/v1/agentx/multi-agent/run', async (req, res): Promise<void> => {
-  try {
-    const { goals, concurrency } = req.body ?? {};
-    if (!Array.isArray(goals) || goals.length === 0 || goals.length > 10) {
-      res.status(400).json({
-        error: 'Missing or invalid field: goals (non-empty array of 1-10 strings)',
-      });
-      return;
-    }
-    for (const g of goals) {
-      if (typeof g !== 'string' || g.trim().length === 0) {
-        res.status(400).json({ error: 'Invalid field: goals must be non-empty strings' });
-        return;
-      }
-    }
-    const parsedConcurrency = Number.isFinite(concurrency)
-      ? Math.min(4, Math.max(1, Math.round(concurrency)))
-      : 2;
-    const run = startParallelRun({
-      goals: goals.map((g: string) => g.trim()),
-      concurrency: parsedConcurrency,
-    });
-    res.status(202).json({ runId: run.runId, status: run.status, concurrency: run.concurrency });
-  } catch (e) {
-    const err = e instanceof Error ? e.message : String(e);
-    res.status(500).json({ error: err });
-  }
-});
-
-// SSE stream for a parallel run: replay history, then live events.
-app.get('/v1/agentx/multi-agent/:runId/events', (req, res) => {
-  const { runId } = req.params;
-  const id = typeof runId === 'string' ? runId : '';
-
-  res.set({
-    'Content-Type': 'text/event-stream',
-    'Cache-Control': 'no-cache, no-transform',
-    Connection: 'keep-alive',
-    'X-Accel-Buffering': 'no',
-  });
-  res.flushHeaders();
-  res.write('retry: 3000\n\n');
-
-  for (const ev of getMultiAgentEventHistory(id)) {
-    res.write(`data: ${JSON.stringify(ev)}\n\n`);
-  }
-
-  const onEvent = (ev: MultiAgentStreamEvent): void => {
-    res.write(`data: ${JSON.stringify(ev)}\n\n`);
-  };
-  const unsubscribe = subscribeMultiAgent(id, onEvent);
-  const heartbeat = setInterval(() => res.write(': ping\n\n'), 15_000);
-
-  req.on('close', () => {
-    clearInterval(heartbeat);
-    unsubscribe();
-  });
-});
-
-// Run status + result (JSON, for polling clients).
-app.get('/v1/agentx/multi-agent/:runId', (req, res) => {
-  const { runId } = req.params;
-  const id = typeof runId === 'string' ? runId : '';
-  const run = getMultiAgentRun(id);
-  if (!run) {
-    res.status(404).json({ error: `Run not found: ${id}` });
-    return;
-  }
-  res.json({ run });
 });
 
 // ─── Analytics summary (Web Pro) ────
