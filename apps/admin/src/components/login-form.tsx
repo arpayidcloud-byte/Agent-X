@@ -29,10 +29,13 @@ export default function LoginForm() {
       router.replace('/providers');
     } catch (err) {
       const status = (err as Error & { status?: number }).status;
-      if (status === 403) {
+      const message = err instanceof Error ? err.message : '';
+      if (status === 403 && message.toLowerCase().includes('human verification')) {
+        setError('Verifikasi manusia gagal — coba lagi.');
+      } else if (status === 403) {
         setError('Akun ini tidak memiliki akses admin.');
       } else {
-        setError(err instanceof Error ? err.message : 'Login gagal. Coba lagi.');
+        setError(message || 'Login gagal. Coba lagi.');
       }
     } finally {
       setLoading(false);
