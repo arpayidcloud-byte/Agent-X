@@ -6,12 +6,14 @@ import { useRouter } from 'next/navigation';
 import { Loader2, UserPlus } from 'lucide-react';
 import { registerAccount, setToken } from '../lib/api';
 import SocialAuthButtons from './social-auth-buttons';
+import TurnstileWidget from './turnstile-widget';
 
 export default function SignupForm() {
   const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -30,7 +32,7 @@ export default function SignupForm() {
 
     setLoading(true);
     try {
-      const { tokens } = await registerAccount(email, password);
+      const { tokens } = await registerAccount(email, password, turnstileToken ?? undefined);
       setToken(tokens.accessToken);
       router.push('/');
       router.refresh();
@@ -98,6 +100,7 @@ export default function SignupForm() {
             placeholder="repeat password"
           />
         </div>
+        <TurnstileWidget onVerify={setTurnstileToken} />
         <button
           type="submit"
           disabled={loading}

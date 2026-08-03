@@ -532,17 +532,25 @@ export interface AuthResponse {
   tokens: AuthTokens;
 }
 
-export async function registerAccount(email: string, password: string): Promise<AuthResponse> {
+export async function registerAccount(
+  email: string,
+  password: string,
+  turnstileToken?: string,
+): Promise<AuthResponse> {
   return authJson<AuthResponse>('/v1/auth/register', {
     method: 'POST',
-    body: JSON.stringify({ email, password }),
+    body: JSON.stringify({ email, password, turnstileToken }),
   });
 }
 
-export async function loginAccount(email: string, password: string): Promise<AuthResponse> {
+export async function loginAccount(
+  email: string,
+  password: string,
+  turnstileToken?: string,
+): Promise<AuthResponse> {
   return authJson<AuthResponse>('/v1/auth/login', {
     method: 'POST',
-    body: JSON.stringify({ email, password }),
+    body: JSON.stringify({ email, password, turnstileToken }),
   });
 }
 

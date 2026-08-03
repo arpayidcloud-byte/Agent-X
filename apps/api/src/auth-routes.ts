@@ -1,12 +1,17 @@
 import type { Express, Request, Response } from 'express';
 import { register, login, refresh, requireAuth, changePassword, AuthError } from './auth.js';
 import type { AuthenticatedRequest } from './auth.js';
+import { verifyTurnstile } from './turnstile.js';
 
 export function registerAuthRoutes(app: Express): void {
   // ─── Register ────
   app.post('/v1/auth/register', async (req: Request, res: Response): Promise<void> => {
     try {
-      const { email, password } = req.body ?? {};
+      const { email, password, turnstileToken } = req.body ?? {};
+      if (!(await verifyTurnstile(turnstileToken))) {
+        res.status(403).json({ error: 'Human verification failed — please try again.' });
+        return;
+      }
       const result = await register(email, password);
       res.status(201).json(result);
     } catch (e) {
@@ -18,7 +23,11 @@ export function registerAuthRoutes(app: Express): void {
   // ─── Login ────
   app.post('/v1/auth/login', async (req: Request, res: Response): Promise<void> => {
     try {
-      const { email, password } = req.body ?? {};
+      const { email, password, turnstileToken } = req.body ?? {};
+      if (!(await verifyTurnstile(turnstileToken))) {
+        res.status(403).json({ error: 'Human verification failed — please try again.' });
+        return;
+      }
       const result = await login(email, password);
       res.json(result);
     } catch (e) {
