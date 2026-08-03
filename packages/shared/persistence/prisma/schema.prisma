@@ -87,6 +87,21 @@ model User {
   updatedAt    DateTime @updatedAt
 }
 
+// LLM provider connections managed by admins via the web UI
+// (OpenAI-compatible / Anthropic-compatible endpoints). The API key is
+// stored encrypted (AES-256-GCM, see apps/api/src/crypto.ts) — never plain.
+model LlmProvider {
+  id              String   @id @default(cuid())
+  name            String   @unique
+  type            String // 'openai-compatible' | 'anthropic-compatible'
+  baseUrl         String
+  apiKeyEncrypted String
+  models          Json // [{ id, name, inputCostPerMillion, outputCostPerMillion, capabilities[], complexityRating }]
+  enabled         Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
 model WaitlistEntry {
   id        String   @id
   email     String   @unique

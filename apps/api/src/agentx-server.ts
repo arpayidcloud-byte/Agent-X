@@ -25,6 +25,8 @@ import {
 import type { WaitlistEntry, FeedbackEntry } from './beta-store.js';
 import { registerAuthRoutes } from './auth-routes.js';
 import { registerOAuthRoutes } from './oauth-routes.js';
+import { registerAdminLlmRoutes } from './admin-llm-routes.js';
+import { syncProvidersFromDb } from './llm-providers.js';
 import {
   publishEvent,
   subscribeTask,
@@ -58,7 +60,7 @@ app.use(createRequestLogger());
 // Allow-all is fine for the public demo; restrict origins in production.
 app.use((req, res, next) => {
   res.set('Access-Control-Allow-Origin', '*');
-  res.set('Access-Control-Allow-Methods', 'GET,POST,PATCH,OPTIONS');
+  res.set('Access-Control-Allow-Methods', 'GET,POST,PATCH,DELETE,OPTIONS');
   res.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   if (req.method === 'OPTIONS') {
     res.sendStatus(204);
@@ -99,6 +101,12 @@ function recordTask(task: TaskRecord): void {
 
 // ─── Router instance (singleton) ────
 export const router = new LLMRouter();
+
+// ─── Admin LLM provider management + boot-time sync from DB ────
+registerAdminLlmRoutes(app, router);
+void syncProvidersFromDb(router).then((n) => {
+  if (n > 0) logger.info(`Registered ${n} admin-managed LLM provider(s) from DB`);
+});
 
 // ─── Dev/demo providers (no API keys required) ────
 // Set ENABLE_MOCK_PROVIDER=true to register mock providers so the API is
