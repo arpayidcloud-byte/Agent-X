@@ -1,0 +1,82 @@
+@import "tailwindcss";
+
+/* ─── Design tokens (Tailwind v4 CSS-first) — same system as apps/web ────
+ * AgentX panel: single accent, neutral surfaces, consistent radius.
+ * Consumed via utilities: bg-surface-1, text-accent-400, rounded-lg, etc.
+ */
+@theme {
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  /* Neutral surfaces (dark, slightly cool, layered depth) */
+  --color-surface-0: #0a0a0f;
+  --color-surface-1: #121218;
+  --color-surface-2: #1a1a22;
+  --color-surface-3: #24242e;
+  --color-surface-4: #2e2e3a;
+
+  /* Primary accent — cyan (brand), single hue with a violet gradient
+   * partner used ONLY for logo/hero moments. */
+  --color-accent-200: #a5f3fc;
+  --color-accent-300: #67e8f9;
+  --color-accent-400: #22d3ee;
+  --color-accent-500: #06b6d4;
+  --color-accent-600: #0891b2;
+
+  --color-secondary-300: #c4b5fd;
+  --color-secondary-400: #a78bfa;
+  --color-secondary-500: #8b5cf6;
+
+  /* Radius — softer, modern */
+  --radius-xs: 6px;
+  --radius-sm: 8px;
+  --radius-md: 10px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-2xl: 20px;
+  --radius-3xl: 24px;
+
+  /* Shadows — soft + subtle */
+  --shadow-soft: 0 1px 2px rgb(0 0 0 / 0.3), 0 4px 16px -4px rgb(0 0 0 / 0.4);
+  --shadow-glow: 0 0 0 1px rgb(34 211 238 / 0.12), 0 4px 24px -4px rgb(34 211 238 / 0.15);
+}
+
+@layer base {
+  html {
+    color-scheme: dark;
+  }
+
+  body {
+    background-color: var(--color-surface-0);
+    color: var(--color-slate-200);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  ::selection {
+    background-color: rgb(34 211 238 / 0.25);
+    color: var(--color-slate-50);
+  }
+
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--color-surface-3);
+    border-radius: 999px;
+    border: 2px solid var(--color-surface-0);
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--color-surface-4);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-accent-400);
+    outline-offset: 2px;
+  }
+}

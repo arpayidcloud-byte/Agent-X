@@ -1,23 +1,33 @@
 // Admin-only LLM provider management API (protected by maybeRequireAdmin).
-// Lets admins connect the app to any OpenAI-compatible / Anthropic-compatible
-// LLM endpoint (OpenRouter, DeepSeek, Qwen, Azure, Together, Groq, etc.)
-// entirely from the web UI — no redeploy needed.
+// Powers the dedicated admin panel (panel.id-tech.cloud): connect the app to
+// any OpenAI-compatible / Anthropic-compatible LLM endpoint (OpenRouter,
+// DeepSeek, Qwen, Grok, Gemini, Azure, Groq, etc.) entirely from the UI —
+// no redeploy needed. Every mutation is written to the audit log.
 
 import type { Express, Request, Response } from 'express';
 import type { AuthenticatedRequest } from './auth.js';
 import { maybeRequireAdmin } from './auth.js';
-import type { LlmProviderRow, ProviderModel } from './llm-provider-store.js';
+import type { LlmProviderRow, ProviderModel, AuthMethod } from './llm-provider-store.js';
 import {
   listProviders,
   getProvider,
   upsertProvider,
+  updateProvider,
   deleteProvider,
+  recordTestResult,
   maskApiKey,
+  appendAuditLog,
+  listAuditLogs,
+  PROVIDER_PRESETS,
+  getPreset,
 } from './llm-provider-store.js';
 import { buildProvider, syncProvidersFromDb, registerProviderNow } from './llm-providers.js';
 import type { LLMRouter } from '@agent-xai/llm-router';
 
 const TYPES = new Set(['openai-compatible', 'anthropic-compatible']);
+const AUTH_METHODS = new Set<AuthMethod>(['api-key', 'oauth', 'account']);
+const NAME_RE = /^[a-z0-9][a-z0-9-_]{1,63}$/;
+const URL_RE = /^https?:\/\/.+/;
 
 function toView(row: LlmProviderRow) {
   return {
@@ -27,8 +37,17 @@ function toView(row: LlmProviderRow) {
     apiKeyMasked: maskApiKey(row.apiKey),
     models: row.models.map((m) => m.id),
     enabled: row.enabled,
+    provider: row.provider ?? 'custom',
+    authMethod: row.authMethod ?? 'api-key',
+    accountRef: row.accountRef ?? null,
+    lastTestAt: row.lastTestAt ?? null,
+    lastTestOk: row.lastTestOk ?? null,
     updatedAt: row.updatedAt ?? null,
   };
+}
+
+function adminEmail(req: AuthenticatedRequest): string {
+  return req.auth?.email ?? 'unknown';
 }
 
 function parseModels(raw: unknown): ProviderModel[] {
@@ -72,57 +91,161 @@ export function registerAdminLlmRoutes(app: Express, router: LLMRouter): void {
     }
   });
 
-  // ─── Create / update provider ────
-  app.post('/v1/admin/llm-providers', maybeRequireAdmin, async (req: Request, res: Response) => {
-    try {
-      const { name, type, baseUrl, apiKey, models, enabled } = req.body ?? {};
-      if (typeof name !== 'string' || !/^[a-z0-9][a-z0-9-_]{1,63}$/.test(name)) {
-        res.status(400).json({ error: 'name: lowercase slug 2-64 chars (a-z0-9-_ )' });
-        return;
-      }
-      if (typeof type !== 'string' || !TYPES.has(type)) {
-        res.status(400).json({ error: 'type: openai-compatible | anthropic-compatible' });
-        return;
-      }
-      if (typeof baseUrl !== 'string' || !/^https?:\/\/.+/.test(baseUrl)) {
-        res.status(400).json({ error: 'baseUrl: must be http(s)://...' });
-        return;
-      }
-      if (typeof apiKey !== 'string' || apiKey.trim().length < 8) {
-        res.status(400).json({ error: 'apiKey: required (min 8 chars)' });
-        return;
-      }
-      let parsedModels: ProviderModel[];
-      try {
-        parsedModels = parseModels(models);
-      } catch (e) {
-        res.status(400).json({ error: e instanceof Error ? e.message : String(e) });
-        return;
-      }
+  // ─── Native provider preset gallery ────
+  // NOTE: registered BEFORE /:name routes so "presets" is not captured as a name.
+  app.get(
+    '/v1/admin/llm-providers/presets',
+    maybeRequireAdmin,
+    async (_req: Request, res: Response) => {
+      res.json({ presets: PROVIDER_PRESETS });
+    },
+  );
 
-      const row: LlmProviderRow = {
-        name,
-        type: type as LlmProviderRow['type'],
-        baseUrl: baseUrl.replace(/\/+$/, ''),
-        apiKey: apiKey.trim(),
-        models: parsedModels,
-        enabled: enabled !== false,
-      };
-      await upsertProvider(row);
-      registerProviderNow(router, row);
-      res.status(201).json({ provider: toView(row) });
-    } catch (e) {
-      res.status(500).json({ error: e instanceof Error ? e.message : String(e) });
-    }
-  });
+  // ─── Create provider ────
+  app.post(
+    '/v1/admin/llm-providers',
+    maybeRequireAdmin,
+    async (req: AuthenticatedRequest, res: Response) => {
+      try {
+        const { name, type, baseUrl, apiKey, models, enabled, provider, authMethod } =
+          req.body ?? {};
+        if (typeof name !== 'string' || !NAME_RE.test(name)) {
+          res.status(400).json({ error: 'name: lowercase slug 2-64 chars (a-z0-9-_ )' });
+          return;
+        }
+        if (typeof type !== 'string' || !TYPES.has(type)) {
+          res.status(400).json({ error: 'type: openai-compatible | anthropic-compatible' });
+          return;
+        }
+        if (typeof baseUrl !== 'string' || !URL_RE.test(baseUrl)) {
+          res.status(400).json({ error: 'baseUrl: must be http(s)://...' });
+          return;
+        }
+        if (typeof apiKey !== 'string' || apiKey.trim().length < 8) {
+          res.status(400).json({ error: 'apiKey: must be at least 8 characters' });
+          return;
+        }
+        if (
+          authMethod !== undefined &&
+          (typeof authMethod !== 'string' || !AUTH_METHODS.has(authMethod as AuthMethod))
+        ) {
+          res.status(400).json({ error: 'authMethod: api-key | oauth | account' });
+          return;
+        }
+        if (provider !== undefined && typeof provider !== 'string') {
+          res.status(400).json({ error: 'provider: must be a string slug' });
+          return;
+        }
+        let parsedModels: ProviderModel[];
+        try {
+          parsedModels = parseModels(models);
+        } catch (e) {
+          res.status(400).json({ error: e instanceof Error ? e.message : String(e) });
+          return;
+        }
+
+        const row: LlmProviderRow = {
+          name,
+          type: type as LlmProviderRow['type'],
+          baseUrl: baseUrl.replace(/\/+$/, ''),
+          apiKey: apiKey.trim(),
+          models: parsedModels,
+          enabled: enabled !== false,
+          provider: provider ?? 'custom',
+          authMethod: (authMethod as AuthMethod) ?? 'api-key',
+        };
+        await upsertProvider(row);
+        registerProviderNow(router, row);
+        await appendAuditLog(adminEmail(req), 'create', row.name, {
+          type: row.type,
+          provider: row.provider,
+        });
+        res.status(201).json({ provider: toView(row) });
+      } catch (e) {
+        res.status(500).json({ error: e instanceof Error ? e.message : String(e) });
+      }
+    },
+  );
+
+  // ─── Update provider (partial) ────
+  app.patch(
+    '/v1/admin/llm-providers/:name',
+    maybeRequireAdmin,
+    async (req: AuthenticatedRequest, res: Response) => {
+      try {
+        const name = String(req.params.name);
+        const existing = await getProvider(name);
+        if (!existing) {
+          res.status(404).json({ error: 'Provider not found' });
+          return;
+        }
+        const { type, baseUrl, apiKey, models, enabled, provider, authMethod, accountRef } =
+          req.body ?? {};
+
+        if (type !== undefined && (typeof type !== 'string' || !TYPES.has(type))) {
+          res.status(400).json({ error: 'type: openai-compatible | anthropic-compatible' });
+          return;
+        }
+        if (baseUrl !== undefined && (typeof baseUrl !== 'string' || !URL_RE.test(baseUrl))) {
+          res.status(400).json({ error: 'baseUrl: must be http(s)://...' });
+          return;
+        }
+        if (apiKey !== undefined && (typeof apiKey !== 'string' || apiKey.trim().length < 8)) {
+          res.status(400).json({ error: 'apiKey: must be at least 8 characters' });
+          return;
+        }
+        if (
+          authMethod !== undefined &&
+          (typeof authMethod !== 'string' || !AUTH_METHODS.has(authMethod as AuthMethod))
+        ) {
+          res.status(400).json({ error: 'authMethod: api-key | oauth | account' });
+          return;
+        }
+
+        let parsedModels: ProviderModel[] | undefined;
+        if (models !== undefined) {
+          try {
+            parsedModels = parseModels(models);
+          } catch (e) {
+            res.status(400).json({ error: e instanceof Error ? e.message : String(e) });
+            return;
+          }
+        }
+
+        const patch: Partial<LlmProviderRow> = {};
+        if (type !== undefined) patch.type = type;
+        if (baseUrl !== undefined) patch.baseUrl = baseUrl.replace(/\/+$/, '');
+        if (apiKey !== undefined) patch.apiKey = apiKey.trim();
+        if (parsedModels !== undefined) patch.models = parsedModels;
+        if (enabled !== undefined) patch.enabled = enabled === true;
+        if (provider !== undefined) patch.provider = provider;
+        if (authMethod !== undefined) patch.authMethod = authMethod;
+        if (accountRef !== undefined) patch.accountRef = accountRef;
+
+        const updated = await updateProvider(name, patch);
+        if (!updated) {
+          res.status(404).json({ error: 'Provider not found' });
+          return;
+        }
+        registerProviderNow(router, updated);
+        await appendAuditLog(adminEmail(req), 'update', name, {
+          fields: Object.keys(patch).filter((k) => k !== 'apiKey'),
+        });
+        res.json({ provider: toView(updated) });
+      } catch (e) {
+        res.status(500).json({ error: e instanceof Error ? e.message : String(e) });
+      }
+    },
+  );
 
   // ─── Test provider connection ────
   app.post(
     '/v1/admin/llm-providers/:name/test',
     maybeRequireAdmin,
-    async (req: Request, res: Response) => {
+    async (req: AuthenticatedRequest, res: Response) => {
       try {
-        const row = await getProvider(String(req.params.name));
+        const name = String(req.params.name);
+        const row = await getProvider(name);
         if (!row) {
           res.status(404).json({ error: 'Provider not found' });
           return;
@@ -135,6 +258,8 @@ export function registerAdminLlmRoutes(app: Express, router: LLMRouter): void {
         }
         const started = Date.now();
         const resp = await provider.generate(firstModel, 'ping');
+        await recordTestResult(name, true);
+        await appendAuditLog(adminEmail(req), 'test', name, { ok: true, model: firstModel });
         res.json({
           ok: true,
           provider: row.name,
@@ -143,6 +268,11 @@ export function registerAdminLlmRoutes(app: Express, router: LLMRouter): void {
           cost: resp.cost,
         });
       } catch (e) {
+        await recordTestResult(String(req.params.name), false).catch(() => undefined);
+        await appendAuditLog(adminEmail(req), 'test', String(req.params.name), {
+          ok: false,
+          error: e instanceof Error ? e.message : String(e),
+        }).catch(() => undefined);
         res.status(502).json({
           ok: false,
           error: e instanceof Error ? e.message : String(e),
@@ -155,7 +285,7 @@ export function registerAdminLlmRoutes(app: Express, router: LLMRouter): void {
   app.delete(
     '/v1/admin/llm-providers/:name',
     maybeRequireAdmin,
-    async (req: Request, res: Response) => {
+    async (req: AuthenticatedRequest, res: Response) => {
       try {
         const name = String(req.params.name);
         const removed = await deleteProvider(name);
@@ -164,10 +294,36 @@ export function registerAdminLlmRoutes(app: Express, router: LLMRouter): void {
           return;
         }
         await syncProvidersFromDb(router);
+        await appendAuditLog(adminEmail(req), 'delete', name);
         res.json({ ok: true, name });
       } catch (e) {
         res.status(500).json({ error: e instanceof Error ? e.message : String(e) });
       }
+    },
+  );
+
+  // ─── Audit log ────
+  app.get('/v1/admin/audit-logs', maybeRequireAdmin, async (req: Request, res: Response) => {
+    try {
+      const limit = Number(req.query.limit) || 100;
+      const logs = await listAuditLogs(limit);
+      res.json({ logs });
+    } catch (e) {
+      res.status(500).json({ error: e instanceof Error ? e.message : String(e) });
+    }
+  });
+
+  // ─── Resolve a preset slug (used by the panel wizard) ────
+  app.get(
+    '/v1/admin/llm-providers/presets/:slug',
+    maybeRequireAdmin,
+    async (req: Request, res: Response) => {
+      const preset = getPreset(String(req.params.slug));
+      if (!preset) {
+        res.status(404).json({ error: 'Preset not found' });
+        return;
+      }
+      res.json({ preset });
     },
   );
 }

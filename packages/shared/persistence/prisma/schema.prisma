@@ -91,15 +91,34 @@ model User {
 // (OpenAI-compatible / Anthropic-compatible endpoints). The API key is
 // stored encrypted (AES-256-GCM, see apps/api/src/crypto.ts) — never plain.
 model LlmProvider {
-  id              String   @id @default(cuid())
-  name            String   @unique
+  id              String    @id @default(cuid())
+  name            String    @unique
   type            String // 'openai-compatible' | 'anthropic-compatible'
   baseUrl         String
   apiKeyEncrypted String
   models          Json // [{ id, name, inputCostPerMillion, outputCostPerMillion, capabilities[], complexityRating }]
-  enabled         Boolean  @default(true)
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  enabled         Boolean   @default(true)
+  // Admin panel (panel.id-tech.cloud): native preset slug + auth method.
+  provider        String?   @default("custom") // 'openai' | 'grok' | 'deepseek' | 'qwen' | 'claude' | 'gemini' | 'mistral' | 'openrouter' | 'groq' | 'perplexity' | 'custom'
+  authMethod      String    @default("api-key") // 'api-key' | 'oauth' | 'account'
+  accountRef      String? // e.g. 'google:<email>' for OAuth/account connections
+  lastTestAt      DateTime?
+  lastTestOk      Boolean?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+}
+
+// Admin action audit trail (who did what, when).
+model AdminAuditLog {
+  id        String   @id @default(cuid())
+  email     String
+  action    String // 'create' | 'update' | 'delete' | 'test' | 'import' | 'export'
+  target    String // provider name / resource identifier
+  detail    Json?
+  createdAt DateTime @default(now())
+
+  @@index([email, createdAt])
+  @@index([target, createdAt])
 }
 
 model WaitlistEntry {

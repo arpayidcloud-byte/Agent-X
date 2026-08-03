@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: "{{ include "agentx.fullname" . }}-admin"
+  labels:
+    app.kubernetes.io/name: "{{ include "agentx.fullname" . }}"
+    app.kubernetes.io/component: admin
+spec:
+  type: {{ .Values.admin.service.type }}
+  selector:
+    app.kubernetes.io/name: "{{ include "agentx.fullname" . }}"
+    app.kubernetes.io/component: admin
+  ports:
+    - name: http
+      port: {{ .Values.admin.service.port }}
+      targetPort: http
+      {{- if and (eq .Values.admin.service.type "NodePort") .Values.admin.service.nodePort }}
+      nodePort: {{ .Values.admin.service.nodePort }}
+      {{- end }}

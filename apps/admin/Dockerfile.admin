@@ -1,0 +1,35 @@
+# syntax=docker/dockerfile:1
+# Agent-X admin panel image (Next.js standalone, pnpm monorepo).
+# Build with:
+#   docker build -f apps/admin/Dockerfile.admin \
+#     --build-arg NEXT_PUBLIC_API_URL=https://api.id-tech.cloud \
+#     --build-arg NEXT_PUBLIC_TURNSTILE_SITE_KEY=<site-key> \
+#     -t agentx-admin:dev .
+#
+# NOTE: base image is node:22-slim (Debian/glibc), NOT alpine. musl's
+# getaddrinfo fails to resolve CNAME chains (e.g. api.id-tech.cloud ->
+# <tunnel>.cfargotunnel.com -> multiple A records), which broke all
+# server-side fetches from the pod (see PR #47). glibc handles CNAMEs.
+
+FROM node:22-slim AS build
+WORKDIR /app
+# Match the pnpm version that produced pnpm-lock.yaml (host: 9.15.0).
+RUN npm install -g pnpm@9.15.0
+COPY . .
+ARG NEXT_PUBLIC_API_URL=https://api.id-tech.cloud
+ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+ARG NEXT_PUBLIC_TURNSTILE_SITE_KEY=
+ENV NEXT_PUBLIC_TURNSTILE_SITE_KEY=$NEXT_PUBLIC_TURNSTILE_SITE_KEY
+RUN pnpm install --frozen-lockfile
+RUN pnpm --filter @agent-xai/admin build
+
+FROM node:22-slim
+WORKDIR /app
+ENV NODE_ENV=production
+ENV PORT=3000
+# Next.js standalone server (keeps the monorepo path structure).
+COPY --from=build /app/apps/admin/.next/standalone ./
+COPY --from=build /app/apps/admin/.next/static ./apps/admin/.next/static
+COPY --from=build /app/apps/admin/public ./apps/admin/public
+EXPOSE 3000
+CMD ["node", "apps/admin/server.js"]

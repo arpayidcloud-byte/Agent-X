@@ -76,3 +76,24 @@ web:
     limits:
       cpu: 500m
       memory: 512Mi
+
+# Admin panel (Next.js standalone, panel.id-tech.cloud).
+admin:
+  replicaCount: 1
+  image:
+    repository: agentx-admin
+    tag: dev
+    # IfNotPresent is REQUIRED for locally-imported images (k3s containerd).
+    pullPolicy: IfNotPresent
+  service:
+    type: NodePort
+    port: 3000
+    # NodePort for the admin panel on the cluster node.
+    nodePort: 30510
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi

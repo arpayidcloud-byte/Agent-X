@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
@@ -15,10 +15,9 @@ import {
   Settings,
   Menu,
   X,
-  ServerCog,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
-import { isAuthed, fetchMe } from '@/lib/api';
+import { isAuthed } from '@/lib/api';
 
 interface NavItem {
   href: string;
@@ -39,8 +38,6 @@ const NAV_ITEMS: NavItem[] = [
   { href: '/settings', label: 'Settings', icon: Settings },
 ];
 
-const ADMIN_ITEM: NavItem = { href: '/admin/llm', label: 'Admin', icon: ServerCog };
-
 function isActive(item: NavItem, pathname: string): boolean {
   return item.exact ? pathname === item.href : pathname.startsWith(item.href);
 }
@@ -48,19 +45,16 @@ function isActive(item: NavItem, pathname: string): boolean {
 function NavLinks({
   pathname,
   authed,
-  isAdmin,
   onNavigate,
 }: {
   pathname: string;
   authed: boolean;
-  isAdmin: boolean;
   onNavigate?: () => void;
 }) {
-  const items = isAdmin ? [...NAV_ITEMS, ADMIN_ITEM] : NAV_ITEMS;
   return (
     <div className="flex h-full flex-col">
       <nav className="flex flex-col gap-0.5 px-2">
-        {items.map((item) => {
+        {NAV_ITEMS.map((item) => {
           const active = isActive(item, pathname);
           const Icon = item.icon;
           return (
@@ -137,32 +131,13 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const authed = isAuthed();
-  const [isAdmin, setIsAdmin] = useState(false);
-
-  useEffect(() => {
-    if (!authed) return;
-    let cancelled = false;
-    void fetchMe()
-      .then((d) => {
-        if (!cancelled) setIsAdmin(d.user.roles.includes('admin'));
-      })
-      .catch(() => {
-        if (!cancelled) setIsAdmin(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [authed]);
-
-  // Never show the admin link when signed out, even if isAdmin is stale.
-  const showAdmin = authed && isAdmin;
 
   return (
     <div className="min-h-screen bg-surface-0 text-slate-100">
       {/* Desktop sidebar (fixed, hidden on mobile) */}
       <aside className="fixed inset-y-0 left-0 z-40 hidden w-60 border-r border-surface-3 bg-surface-1/70 backdrop-blur lg:block">
         <Brand />
-        <NavLinks pathname={pathname} authed={authed} isAdmin={showAdmin} />
+        <NavLinks pathname={pathname} authed={authed} />
       </aside>
 
       {/* Mobile top bar */}
@@ -205,12 +180,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                 <X className="h-4 w-4" strokeWidth={1.8} aria-hidden />
               </button>
             </div>
-            <NavLinks
-              pathname={pathname}
-              authed={authed}
-              isAdmin={showAdmin}
-              onNavigate={() => setDrawerOpen(false)}
-            />
+            <NavLinks pathname={pathname} authed={authed} onNavigate={() => setDrawerOpen(false)} />
           </aside>
         </div>
       )}
