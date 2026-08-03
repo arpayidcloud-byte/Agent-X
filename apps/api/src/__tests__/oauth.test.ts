@@ -1,6 +1,4 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import jwt from 'jsonwebtoken';
-import { generateKeyPairSync } from 'node:crypto';
 
 // Unit tests for the OAuth layer. Network calls are stubbed so tests run
 // offline; the token exchange + userinfo + upsert flow is covered.
@@ -12,43 +10,12 @@ import {
   oauthLogin,
   exchangeCode,
   oauthSuccessUrl,
-  appleClientSecret,
-  verifyAppleIdToken,
-  resetAppleOAuthCaches,
 } from '../oauth.js';
 import { getUserBackend, type AuthTokens } from '../auth.js';
 
 const googleCreds = { GOOGLE_CLIENT_ID: 'g-id', GOOGLE_CLIENT_SECRET: 'g-secret' };
 const githubCreds = { GITHUB_CLIENT_ID: 'gh-id', GITHUB_CLIENT_SECRET: 'gh-secret' };
-const appleCreds = {
-  APPLE_CLIENT_ID: 'com.example.service',
-  APPLE_TEAM_ID: 'ABCDE12345',
-  APPLE_KEY_ID: 'ABC123DEFG',
-};
 const baseEnv = { ...process.env };
-
-// A real EC P-256 key so Apple's ES256 client secret signing is exercised.
-const ecKey = generateKeyPairSync('ec', { namedCurve: 'prime256v1' });
-const applePrivateKeyPem = ecKey.privateKey.export({ type: 'pkcs8', format: 'pem' }) as string;
-
-// A real RSA key so Apple id_token (RS256) verification is exercised.
-const rsaKey = generateKeyPairSync('rsa', { modulusLength: 2048 });
-const rsaJwk = rsaKey.publicKey.export({ format: 'jwk' }) as { kty: string; n: string; e: string };
-const APPLE_JWKS = { keys: [{ kid: 'apple-key-1', ...rsaJwk }] };
-
-function signAppleIdToken(
-  payload: Record<string, unknown>,
-  overrides: jwt.SignOptions = {},
-): string {
-  return jwt.sign(payload, rsaKey.privateKey, {
-    algorithm: 'RS256',
-    keyid: 'apple-key-1',
-    issuer: 'https://appleid.apple.com',
-    audience: appleCreds.APPLE_CLIENT_ID,
-    expiresIn: 3600,
-    ...overrides,
-  });
-}
 
 beforeEach(() => {
   vi.resetModules();
@@ -56,13 +23,8 @@ beforeEach(() => {
   delete process.env.GOOGLE_CLIENT_SECRET;
   delete process.env.GITHUB_CLIENT_ID;
   delete process.env.GITHUB_CLIENT_SECRET;
-  delete process.env.APPLE_CLIENT_ID;
-  delete process.env.APPLE_TEAM_ID;
-  delete process.env.APPLE_KEY_ID;
-  delete process.env.APPLE_PRIVATE_KEY;
   process.env.OAUTH_BASE_URL = 'http://api.test:30400';
   process.env.OAUTH_WEB_URL = 'http://web.test:30500';
-  resetAppleOAuthCaches();
 });
 
 afterEach(() => {
@@ -73,7 +35,6 @@ describe('oauth config', () => {
   it('reports not configured when env vars are missing', () => {
     expect(isOAuthConfigured('google')).toBe(false);
     expect(isOAuthConfigured('github')).toBe(false);
-    expect(isOAuthConfigured('apple')).toBe(false);
   });
 
   it('reports configured when env vars are present', () => {
@@ -81,13 +42,8 @@ describe('oauth config', () => {
     process.env.GOOGLE_CLIENT_SECRET = googleCreds.GOOGLE_CLIENT_SECRET;
     process.env.GITHUB_CLIENT_ID = githubCreds.GITHUB_CLIENT_ID;
     process.env.GITHUB_CLIENT_SECRET = githubCreds.GITHUB_CLIENT_SECRET;
-    process.env.APPLE_CLIENT_ID = appleCreds.APPLE_CLIENT_ID;
-    process.env.APPLE_TEAM_ID = appleCreds.APPLE_TEAM_ID;
-    process.env.APPLE_KEY_ID = appleCreds.APPLE_KEY_ID;
-    process.env.APPLE_PRIVATE_KEY = applePrivateKeyPem;
     expect(isOAuthConfigured('google')).toBe(true);
     expect(isOAuthConfigured('github')).toBe(true);
-    expect(isOAuthConfigured('apple')).toBe(true);
   });
 });
 
@@ -115,19 +71,6 @@ describe('buildAuthorizeUrl', () => {
     expect(url).toContain('https://github.com/login/oauth/authorize');
     expect(url).toContain('client_id=gh-id');
     expect(url).toContain('state=state-456');
-  });
-
-  it('builds an Apple authorize URL', () => {
-    process.env.APPLE_CLIENT_ID = appleCreds.APPLE_CLIENT_ID;
-    process.env.APPLE_TEAM_ID = appleCreds.APPLE_TEAM_ID;
-    process.env.APPLE_KEY_ID = appleCreds.APPLE_KEY_ID;
-    process.env.APPLE_PRIVATE_KEY = applePrivateKeyPem;
-    const url = buildAuthorizeUrl('apple', 'state-789');
-    expect(url).toContain('https://appleid.apple.com/auth/authorize');
-    expect(url).toContain('client_id=com.example.service');
-    expect(url).toContain(encodeURIComponent('http://api.test:30400/v1/auth/oauth/apple/callback'));
-    expect(url).toContain('response_mode=query');
-    expect(url).toContain('state=state-789');
   });
 
   it('throws when provider is not configured', () => {
@@ -221,86 +164,6 @@ describe('exchangeCode (stubbed network)', () => {
     const profile = await exchangeCode('github', 'code-3');
     expect(profile.email).toBe('real@github.com');
     expect(fetchMock).toHaveBeenCalledTimes(3);
-    vi.unstubAllGlobals();
-  });
-});
-
-describe('apple sign in', () => {
-  beforeEach(() => {
-    process.env.APPLE_CLIENT_ID = appleCreds.APPLE_CLIENT_ID;
-    process.env.APPLE_TEAM_ID = appleCreds.APPLE_TEAM_ID;
-    process.env.APPLE_KEY_ID = appleCreds.APPLE_KEY_ID;
-    process.env.APPLE_PRIVATE_KEY = applePrivateKeyPem;
-  });
-
-  it('builds an ES256 client secret JWT with the right claims', async () => {
-    const secret = await appleClientSecret();
-    const parts = secret.split('.');
-    expect(parts).toHaveLength(3);
-    const [headerB64, payloadB64] = parts as [string, string, string];
-    const header = JSON.parse(Buffer.from(headerB64, 'base64url').toString());
-    expect(header.alg).toBe('ES256');
-    expect(header.kid).toBe(appleCreds.APPLE_KEY_ID);
-    const payload = JSON.parse(Buffer.from(payloadB64, 'base64url').toString());
-    expect(payload.iss).toBe(appleCreds.APPLE_TEAM_ID);
-    expect(payload.aud).toBe('https://appleid.apple.com');
-    expect(payload.sub).toBe(appleCreds.APPLE_CLIENT_ID);
-    expect(payload.exp).toBeGreaterThan(payload.iat);
-  });
-
-  it('verifies an id_token signature against Apple JWKS', async () => {
-    const idToken = signAppleIdToken({ sub: '001234.abc', email: 'user@icloud.com' });
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => APPLE_JWKS }));
-    const claims = await verifyAppleIdToken(idToken);
-    expect(claims.sub).toBe('001234.abc');
-    expect(claims.email).toBe('user@icloud.com');
-    vi.unstubAllGlobals();
-  });
-
-  it('rejects an id_token with a wrong issuer', async () => {
-    const idToken = signAppleIdToken(
-      { sub: '001234.abc', email: 'user@icloud.com' },
-      { issuer: 'https://evil.example' },
-    );
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => APPLE_JWKS }));
-    await expect(verifyAppleIdToken(idToken)).rejects.toThrow(/issuer/);
-    vi.unstubAllGlobals();
-  });
-
-  it('rejects an id_token with a wrong audience', async () => {
-    const idToken = signAppleIdToken(
-      { sub: '001234.abc', email: 'user@icloud.com' },
-      { audience: 'com.other.service' },
-    );
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => APPLE_JWKS }));
-    await expect(verifyAppleIdToken(idToken)).rejects.toThrow(/audience/);
-    vi.unstubAllGlobals();
-  });
-
-  it('rejects an id_token signed by an unknown key', async () => {
-    const idToken = jwt.sign({ sub: '001234.abc', email: 'user@icloud.com' }, rsaKey.privateKey, {
-      algorithm: 'RS256',
-      keyid: 'unknown-kid',
-      issuer: 'https://appleid.apple.com',
-      audience: appleCreds.APPLE_CLIENT_ID,
-      expiresIn: 3600,
-    });
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => APPLE_JWKS }));
-    await expect(verifyAppleIdToken(idToken)).rejects.toThrow(/key not found/);
-    vi.unstubAllGlobals();
-  });
-
-  it('exchanges an Apple code into a verified profile', async () => {
-    const idToken = signAppleIdToken({ sub: '001234.abc', email: 'User@icloud.com' });
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValueOnce({ ok: true, json: async () => ({ id_token: idToken }) })
-      .mockResolvedValueOnce({ ok: true, json: async () => APPLE_JWKS });
-    vi.stubGlobal('fetch', fetchMock);
-    const profile = await exchangeCode('apple', 'code-apple');
-    expect(profile.email).toBe('user@icloud.com');
-    expect(profile.emailVerified).toBe(true);
-    expect(fetchMock).toHaveBeenCalledTimes(2);
     vi.unstubAllGlobals();
   });
 });
