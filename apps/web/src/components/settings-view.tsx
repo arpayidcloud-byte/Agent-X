@@ -17,6 +17,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import SocialAuthButtons from './social-auth-buttons';
+import TurnstileWidget from './turnstile-widget';
 
 // Web Pro user settings: profile (id/email/roles) + change password.
 // Requires a Bearer token; shows an inline login form when not authed.
@@ -29,6 +30,7 @@ export default function SettingsView() {
   // Login form state
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
 
   // Change-password form state
   const [current, setCurrent] = useState('');
@@ -59,7 +61,7 @@ export default function SettingsView() {
     e.preventDefault();
     setError(null);
     try {
-      const res = await loginAccount(loginEmail, loginPassword);
+      const res = await loginAccount(loginEmail, loginPassword, turnstileToken ?? undefined);
       setToken(res.tokens.accessToken);
       setAuthed(true);
       setLoginPassword('');
@@ -117,6 +119,7 @@ export default function SettingsView() {
             value={loginPassword}
             onChange={(e) => setLoginPassword(e.target.value)}
           />
+          <TurnstileWidget onVerify={setTurnstileToken} />
           <Button type="submit" className="w-full">
             Sign in
           </Button>
