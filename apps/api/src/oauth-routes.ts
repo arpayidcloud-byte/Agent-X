@@ -14,7 +14,7 @@ import {
 const logger = new Logger('agentx-api:oauth-routes');
 
 function parseProvider(value: unknown): OAuthProvider | null {
-  return value === 'google' || value === 'github' || value === 'apple' ? value : null;
+  return value === 'google' || value === 'github' ? value : null;
 }
 
 export function registerOAuthRoutes(app: Express): void {
@@ -22,7 +22,7 @@ export function registerOAuthRoutes(app: Express): void {
   app.get('/v1/auth/oauth/:provider', (req: Request, res: Response) => {
     const provider = parseProvider(req.params.provider);
     if (!provider) {
-      res.status(400).json({ error: 'Unknown provider (expected google, github or apple)' });
+      res.status(400).json({ error: 'Unknown provider (expected google or github)' });
       return;
     }
     if (!isOAuthConfigured(provider)) {

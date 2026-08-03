@@ -1,27 +1,22 @@
-// OAuth social login (Google OIDC + GitHub OAuth2 + Apple Sign In) for Web Pro.
+// OAuth social login (Google OIDC + GitHub OAuth2) for Web Pro.
 //
-// Deliberately dependency-light: uses global fetch (Node 18+) plus the
-// already-present jsonwebtoken for Apple's ES256 client secret and RS256
-// id_token verification. Credentials are read from env vars and the flow is
-// feature-flagged by presence of those vars — when unset, the authorize
-// endpoint returns 501 so the UI can show "not configured" without breaking
-// the email/password flow.
+// Deliberately dependency-free: uses global fetch (Node 18+). Credentials are
+// read from env vars and the flow is feature-flagged by presence of those
+// vars — when unset, the authorize endpoint returns 501 so the UI can show
+// "not configured" without breaking the email/password flow.
 //
 //   GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET
 //   GITHUB_CLIENT_ID / GITHUB_CLIENT_SECRET
-//   APPLE_CLIENT_ID / APPLE_TEAM_ID / APPLE_KEY_ID / APPLE_PRIVATE_KEY (P8 PEM)
 //   OAUTH_BASE_URL   (API base used to build redirect_uri, default localhost:30400)
 //   OAUTH_WEB_URL    (web base for the success redirect, default localhost:30500)
 
-import jwt from 'jsonwebtoken';
-import { createPublicKey } from 'node:crypto';
 import { v4 as uuidv4 } from 'uuid';
 import { getUserBackend, issueTokens, rolesFor, type AuthUser, type AuthTokens } from './auth.js';
 import { Logger } from '@agent-xai/observability';
 
 const logger = new Logger('agentx-api:oauth');
 
-export type OAuthProvider = 'google' | 'github' | 'apple';
+export type OAuthProvider = 'google' | 'github';
 
 export interface OAuthProfile {
   email: string;
@@ -53,25 +48,9 @@ function clientCredentials(provider: OAuthProvider): { id: string; secret: strin
     const secret = process.env.GITHUB_CLIENT_SECRET;
     return id && secret ? { id, secret } : null;
   }
-  // Apple: the client secret is a signed JWT generated per-exchange, so only
-  // the client id is returned here (secret filled by appleClientSecret()).
-  const env = appleEnv();
-  return env ? { id: env.clientId, secret: '' } : null;
-}
-
-/** Apple Sign In env (Service ID + team + key). */
-function appleEnv(): {
-  clientId: string;
-  teamId: string;
-  keyId: string;
-  privateKey: string;
-} | null {
-  const clientId = process.env.APPLE_CLIENT_ID;
-  const teamId = process.env.APPLE_TEAM_ID;
-  const keyId = process.env.APPLE_KEY_ID;
-  const privateKey = process.env.APPLE_PRIVATE_KEY;
-  if (!clientId || !teamId || !keyId || !privateKey) return null;
-  return { clientId, teamId, keyId, privateKey };
+  const id = process.env.GOOGLE_CLIENT_ID;
+  const secret = process.env.GOOGLE_CLIENT_SECRET;
+  return id && secret ? { id, secret } : null;
 }
 
 export function isOAuthConfigured(provider: OAuthProvider): boolean {
@@ -104,17 +83,15 @@ export function buildAuthorizeUrl(provider: OAuthProvider, state: string): strin
     });
     return `https://github.com/login/oauth/authorize?${params.toString()}`;
   }
-  // Apple Sign In web: response_mode=query so the code arrives on the
-  // redirect_uri query string (form_post would need an HTML form POST page).
   const params = new URLSearchParams({
     client_id: creds.id,
-    redirect_uri: redirectUri('apple'),
+    redirect_uri: redirectUri('google'),
     response_type: 'code',
-    scope: 'name email',
-    response_mode: 'query',
+    scope: 'openid email profile',
     state,
+    prompt: 'select_account',
   });
-  return `https://appleid.apple.com/auth/authorize?${params.toString()}`;
+  return `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
 }
 
 async function exchangeGoogleCode(code: string): Promise<OAuthProfile> {
@@ -209,120 +186,8 @@ async function exchangeGitHubCode(code: string): Promise<OAuthProfile> {
   return { email, name: user.name ?? user.login, emailVerified: verified };
 }
 
-// ─── Apple Sign In ──────────────────────────────────────────────────────────
-// Apple's OAuth is OIDC with two twists: the client secret is a JWT signed
-// (ES256) with a per-key private key from the Apple Developer portal, and the
-// user profile comes from the id_token (RS256) verified against Apple's JWKS.
-
-let cachedAppleSecret: { jwt: string; expiresAt: number } | null = null;
-
-/** Build the Apple client_secret JWT (ES256, kid=APPLE_KEY_ID). Cached until ~1h before expiry. */
-export async function appleClientSecret(): Promise<string> {
-  const env = appleEnv();
-  if (!env) throw new Error('Apple OAuth not configured');
-  if (cachedAppleSecret && cachedAppleSecret.expiresAt - Date.now() > 60 * 60 * 1000) {
-    return cachedAppleSecret.jwt;
-  }
-  const now = Math.floor(Date.now() / 1000);
-  const token = jwt.sign({}, env.privateKey, {
-    algorithm: 'ES256',
-    keyid: env.keyId,
-    issuer: env.teamId,
-    audience: 'https://appleid.apple.com',
-    subject: env.clientId,
-    expiresIn: 180 * 24 * 60 * 60, // 180 days = Apple max
-    notBefore: now - 60,
-  });
-  const decoded = jwt.decode(token) as { exp?: number };
-  cachedAppleSecret = { jwt: token, expiresAt: (decoded.exp ?? now) * 1000 };
-  return token;
-}
-
-let jwksCache: { keys: Array<{ kid?: string; n?: string; e?: string }>; fetchedAt: number } | null =
-  null;
-
-/** Reset cached Apple client secret / JWKS — used by tests. */
-export function resetAppleOAuthCaches(): void {
-  cachedAppleSecret = null;
-  jwksCache = null;
-}
-
-async function appleJwks(): Promise<Array<{ kid?: string; n?: string; e?: string }>> {
-  if (jwksCache && Date.now() - jwksCache.fetchedAt < 12 * 60 * 60 * 1000) {
-    return jwksCache.keys;
-  }
-  const res = await fetch('https://appleid.apple.com/auth/keys');
-  if (!res.ok) throw new Error(`Apple keys fetch failed: ${res.status}`);
-  const data = (await res.json()) as { keys: Array<{ kid?: string; n?: string; e?: string }> };
-  jwksCache = { keys: data.keys, fetchedAt: Date.now() };
-  return data.keys;
-}
-
-/** Verify an Apple id_token (RS256, JWKS) and return its claims. Exported for tests. */
-export async function verifyAppleIdToken(idToken: string): Promise<{
-  sub: string;
-  email?: string;
-  email_verified?: boolean;
-}> {
-  const env = appleEnv();
-  if (!env) throw new Error('Apple OAuth not configured');
-  const decoded = jwt.decode(idToken, { complete: true }) as {
-    header: { kid?: string };
-    payload: { iss?: string; aud?: string; exp?: number };
-  } | null;
-  if (!decoded) throw new Error('id_token invalid');
-  if (decoded.payload.iss !== 'https://appleid.apple.com') {
-    throw new Error('id_token bad issuer');
-  }
-  if (decoded.payload.aud !== env.clientId) {
-    throw new Error('id_token bad audience');
-  }
-  const keys = await appleJwks();
-  const key = keys.find((k) => k.kid === decoded.header.kid);
-  if (!key || !key.n || !key.e) throw new Error('id_token signing key not found');
-  const publicKey = createPublicKey({ key: { kty: 'RSA', n: key.n, e: key.e }, format: 'jwk' });
-  const payload = jwt.verify(idToken, publicKey, {
-    algorithms: ['RS256'],
-    issuer: 'https://appleid.apple.com',
-    audience: env.clientId,
-  }) as { sub: string; email?: string; email_verified?: boolean };
-  return { sub: payload.sub, email: payload.email, email_verified: payload.email_verified };
-}
-
-async function exchangeAppleCode(code: string): Promise<OAuthProfile> {
-  const env = appleEnv();
-  if (!env) throw new Error('Apple OAuth not configured');
-  const secret = await appleClientSecret();
-  const tokenRes = await fetch('https://appleid.apple.com/auth/token', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({
-      client_id: env.clientId,
-      client_secret: secret,
-      code,
-      grant_type: 'authorization_code',
-      redirect_uri: redirectUri('apple'),
-    }),
-  });
-  if (!tokenRes.ok) {
-    throw new Error(`Apple token exchange failed: ${tokenRes.status}`);
-  }
-  const tokenData = (await tokenRes.json()) as { id_token?: string; error?: string };
-  if (!tokenData.id_token) {
-    throw new Error(`Apple token exchange failed: ${JSON.stringify(tokenData)}`);
-  }
-  const claims = await verifyAppleIdToken(tokenData.id_token);
-  const email = claims.email?.toLowerCase();
-  if (!email) throw new Error('Apple account has no email');
-  // Apple does not expose a name claim over response_mode=query; fall back to
-  // the local part of the email. Email from Apple is always verified.
-  return { email, name: email.split('@')[0], emailVerified: true };
-}
-
 export async function exchangeCode(provider: OAuthProvider, code: string): Promise<OAuthProfile> {
-  if (provider === 'google') return exchangeGoogleCode(code);
-  if (provider === 'github') return exchangeGitHubCode(code);
-  return exchangeAppleCode(code);
+  return provider === 'google' ? exchangeGoogleCode(code) : exchangeGitHubCode(code);
 }
 
 /**
