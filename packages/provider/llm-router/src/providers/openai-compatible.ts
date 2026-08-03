@@ -7,12 +7,18 @@ export class OpenAICompatibleProvider implements LLMProvider {
   private apiKey: string;
   private endpoint: string;
 
-  constructor(name: string, models: Record<string, ModelMetadata>) {
+  constructor(
+    name: string,
+    models: Record<string, ModelMetadata>,
+    config?: { apiKey?: string; endpoint?: string },
+  ) {
     this.name = name;
     this.models = models;
 
-    // Read from env vars with fallback
+    // Read from env vars with fallback (config override wins for
+    // admin-managed providers registered at runtime from the DB).
     this.apiKey =
+      config?.apiKey ||
       process.env[
         `${name.toUpperCase()}${name === 'openai' ? '_API_KEY' : '_COMPATIBLE_API_KEY'}`
       ] ||
@@ -20,6 +26,7 @@ export class OpenAICompatibleProvider implements LLMProvider {
       'sk-mock-key';
 
     this.endpoint =
+      config?.endpoint ||
       process.env[
         `${name.toUpperCase()}${name === 'openai' ? '_ENDPOINT' : '_COMPATIBLE_ENDPOINT'}`
       ] ||
@@ -108,11 +115,16 @@ export class AnthropicCompatibleProvider implements LLMProvider {
   private apiKey: string;
   private endpoint: string;
 
-  constructor(name: string, models: Record<string, ModelMetadata>) {
+  constructor(
+    name: string,
+    models: Record<string, ModelMetadata>,
+    config?: { apiKey?: string; endpoint?: string },
+  ) {
     this.name = name;
     this.models = models;
 
     this.apiKey =
+      config?.apiKey ||
       process.env[
         `${name.toUpperCase()}${name === 'anthropic' ? '_API_KEY' : '_COMPATIBLE_API_KEY'}`
       ] ||
@@ -120,6 +132,7 @@ export class AnthropicCompatibleProvider implements LLMProvider {
       'sk-ant-mock-key';
 
     this.endpoint =
+      config?.endpoint ||
       process.env[
         `${name.toUpperCase()}${name === 'anthropic' ? '_ENDPOINT' : '_COMPATIBLE_ENDPOINT'}`
       ] ||
