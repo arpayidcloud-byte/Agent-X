@@ -558,62 +558,6 @@ export async function fetchMe(): Promise<{ user: AuthUser }> {
   return authJson<{ user: AuthUser }>('/v1/auth/me', {}, true);
 }
 
-// ─── Admin: LLM provider management (admin-only endpoints) ────
-
-export interface AdminLlmProviderView {
-  name: string;
-  type: 'openai-compatible' | 'anthropic-compatible';
-  baseUrl: string;
-  apiKeyMasked: string;
-  models: string[];
-  enabled: boolean;
-  updatedAt: string | null;
-}
-
-export interface AdminLlmUpsertInput {
-  name: string;
-  type: 'openai-compatible' | 'anthropic-compatible';
-  baseUrl: string;
-  apiKey: string;
-  models: string[];
-  enabled?: boolean;
-}
-
-export async function adminListLlmProviders(): Promise<{ providers: AdminLlmProviderView[] }> {
-  return authJson<{ providers: AdminLlmProviderView[] }>('/v1/admin/llm-providers', {}, true);
-}
-
-export async function adminUpsertLlmProvider(
-  input: AdminLlmUpsertInput,
-): Promise<{ provider: AdminLlmProviderView }> {
-  return authJson<{ provider: AdminLlmProviderView }>(
-    '/v1/admin/llm-providers',
-    {
-      method: 'POST',
-      body: JSON.stringify(input),
-    },
-    true,
-  );
-}
-
-export async function adminTestLlmProvider(
-  name: string,
-): Promise<{ ok: boolean; latencyMs?: number; cost?: number; error?: string }> {
-  return authJson<{ ok: boolean; latencyMs?: number; cost?: number; error?: string }>(
-    `/v1/admin/llm-providers/${encodeURIComponent(name)}/test`,
-    { method: 'POST' },
-    true,
-  );
-}
-
-export async function adminDeleteLlmProvider(name: string): Promise<{ ok: boolean }> {
-  return authJson<{ ok: boolean }>(
-    `/v1/admin/llm-providers/${encodeURIComponent(name)}`,
-    { method: 'DELETE' },
-    true,
-  );
-}
-
 export async function changePassword(
   currentPassword: string,
   newPassword: string,
