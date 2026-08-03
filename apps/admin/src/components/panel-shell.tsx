@@ -124,11 +124,17 @@ export default function PanelShell({ children }: { children: React.ReactNode }) 
     router.replace('/login');
   };
 
+  const navAndFooter = (
+    <>
+      <NavLinks pathname={pathname} onNavigate={() => setDrawerOpen(false)} />
+      <UserFooter user={user} onLogout={handleLogout} />
+    </>
+  );
+
   const sidebar = (
     <>
       <Brand />
-      <NavLinks pathname={pathname} onNavigate={() => setDrawerOpen(false)} />
-      <UserFooter user={user} onLogout={handleLogout} />
+      {navAndFooter}
     </>
   );
 
@@ -175,7 +181,7 @@ export default function PanelShell({ children }: { children: React.ReactNode }) 
                     <X className="h-4 w-4" strokeWidth={1.8} aria-hidden />
                   </button>
                 </div>
-                {sidebar}
+                {navAndFooter}
               </aside>
             </div>
           )}
