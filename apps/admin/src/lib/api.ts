@@ -233,6 +233,35 @@ export async function changeAccountPassword(
   );
 }
 
+// ─── Admin: CLI sync token ────
+
+export interface CliTokenView {
+  id: string;
+  name: string;
+  createdAt: string;
+  lastUsedAt: string | null;
+  revokedAt: string | null;
+}
+
+export async function adminGetCliToken(): Promise<{ token: CliTokenView | null }> {
+  return authJson<{ token: CliTokenView | null }>('/v1/admin/cli/token', {}, true);
+}
+
+export async function adminCreateCliToken(name?: string): Promise<{
+  token: string;
+  view: CliTokenView;
+}> {
+  return authJson<{ token: string; view: CliTokenView }>(
+    '/v1/admin/cli/token',
+    { method: 'POST', body: JSON.stringify({ name: name ?? 'default' }) },
+    true,
+  );
+}
+
+export async function adminRevokeCliToken(): Promise<{ ok: boolean }> {
+  return authJson<{ ok: boolean }>('/v1/admin/cli/token', { method: 'DELETE' }, true);
+}
+
 // ─── Admin: audit log ────
 
 export interface AuditLogEntry {

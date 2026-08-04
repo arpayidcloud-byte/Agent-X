@@ -26,6 +26,7 @@ import type { WaitlistEntry, FeedbackEntry } from './beta-store.js';
 import { registerAuthRoutes } from './auth-routes.js';
 import { registerOAuthRoutes } from './oauth-routes.js';
 import { registerAdminLlmRoutes } from './admin-llm-routes.js';
+import { registerCliRoutes } from './cli-routes.js';
 import { syncProvidersFromDb } from './llm-providers.js';
 import {
   publishEvent,
@@ -104,6 +105,7 @@ export const router = new LLMRouter();
 
 // ─── Admin LLM provider management + boot-time sync from DB ────
 registerAdminLlmRoutes(app, router);
+registerCliRoutes(app);
 void syncProvidersFromDb(router).then((n) => {
   if (n > 0) logger.info(`Registered ${n} admin-managed LLM provider(s) from DB`);
 });

@@ -121,6 +121,19 @@ model AdminAuditLog {
   @@index([target, createdAt])
 }
 
+// CLI sync token (agentx config pull). Only the SHA-256 hash is stored;
+// the plaintext token is shown once at creation and can be revoked.
+model CliToken {
+  id         String    @id @default(cuid())
+  tokenHash  String    @unique
+  name       String    @default("default")
+  createdAt  DateTime  @default(now())
+  lastUsedAt DateTime?
+  revokedAt  DateTime?
+
+  @@index([createdAt])
+}
+
 model WaitlistEntry {
   id        String   @id
   email     String   @unique
