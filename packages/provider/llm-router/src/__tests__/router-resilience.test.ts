@@ -117,3 +117,59 @@ describe('Router resilience (benchmark findings)', () => {
     }
   });
 });
+
+describe('Provider pinning (combo member resolution)', () => {
+  it('selectBestModel honors req.provider (pins to that provider only)', () => {
+    const router = new LLMRouter();
+    router.registerProvider(OpenAIMock);
+    router.registerProvider(DeepSeekMock);
+
+    const model = router.selectBestModel({
+      taskId: 'pin-1',
+      description: 'x',
+      provider: 'deepseek',
+    });
+    expect(model.startsWith('deepseek:')).toBe(true);
+  });
+
+  it('selectBestModel honors req.model ("provider:model") exactly', () => {
+    const router = new LLMRouter();
+    router.registerProvider(OpenAIMock);
+
+    const model = router.selectBestModel({
+      taskId: 'pin-2',
+      description: 'x',
+      model: 'openai:gpt-4o',
+    });
+    expect(model).toBe('openai:gpt-4o');
+  });
+
+  it('selectBestModel throws for an unknown pinned provider', () => {
+    const router = new LLMRouter();
+    router.registerProvider(OpenAIMock);
+
+    expect(() =>
+      router.selectBestModel({ taskId: 'pin-3', description: 'x', provider: 'nope' }),
+    ).toThrow(/not found or not registered/);
+  });
+
+  it('execute with pinned provider returns response from that provider', async () => {
+    const router = new LLMRouter();
+    router.registerProvider(OpenAIMock);
+    router.registerProvider(DeepSeekMock);
+
+    const res = await router.execute(
+      { taskId: 'pin-4', description: 'x', provider: 'deepseek' },
+      PROMPT,
+    );
+    expect(res.provider).toBe('deepseek');
+  });
+
+  it('getProvider / listProviderNames expose the registry', () => {
+    const router = new LLMRouter();
+    router.registerProvider(OpenAIMock);
+    expect(router.getProvider('openai')).toBeDefined();
+    expect(router.getProvider('missing')).toBeUndefined();
+    expect(router.listProviderNames()).toContain('openai');
+  });
+});

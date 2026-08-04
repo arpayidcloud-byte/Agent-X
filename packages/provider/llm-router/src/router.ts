@@ -38,6 +38,16 @@ export class LLMRouter {
     healthChecker.registerProvider(provider.name, 'healthy');
   }
 
+  /** Return a registered provider by name (undefined if not registered). */
+  getProvider(name: string): LLMProvider | undefined {
+    return this.providers.get(name);
+  }
+
+  /** Names of all registered providers (for combo member validation). */
+  listProviderNames(): string[] {
+    return [...this.providers.keys()];
+  }
+
   /**
    * Cost-aware model selection (roadmap OKR: 70% cost reduction).
    *
@@ -54,6 +64,42 @@ export class LLMRouter {
    *   within it.
    */
   selectBestModel(req: RouteRequest): string {
+    // Explicit pinning: req.provider (or req.model "provider:model") wins.
+    // Combo providers rely on this — the combo layer resolves a group name
+    // to a concrete member and pins it per attempt.
+    if (req.model) {
+      if (!req.model.includes(':')) {
+        throw new Error(
+          `Invalid model resolution result: ${req.model} — expected "provider:model"`,
+        );
+      }
+      const [p, m] = req.model.split(':') as [string, string];
+      if (this.providers.has(p) && this.providers.get(p)!.models[m]) {
+        return req.model;
+      }
+      throw new Error(`Model ${req.model} not registered.`);
+    }
+    if (req.provider) {
+      const pinned = this.providers.get(req.provider);
+      if (!pinned) {
+        throw new Error(`Provider ${req.provider} not found or not registered.`);
+      }
+      const pinnedModels = new Map<string, ModelMetadata>(
+        Object.entries(pinned.models).map(([modelId, meta]) => [`${pinned.name}:${modelId}`, meta]),
+      );
+      const floor = resolveComplexityFloor(req);
+      const caps = requiredCapabilities(req.type);
+      const cheapest = pickCheapestAdequate(pinnedModels, {
+        complexityFloor: floor,
+        capabilities: caps,
+      });
+      if (cheapest) return `${cheapest.provider}:${cheapest.model}`;
+      // Provider has no adequate model — fall back to its cheapest any.
+      const any = pickCheapestOverall(pinnedModels);
+      if (any) return `${any.provider}:${any.model}`;
+      throw new Error(`Provider ${req.provider} has no registered models.`);
+    }
+
     // Confidential data: prefer on-device inference; fall back to the
     // cheapest registered model if no local provider is available.
     if (req.security === 'confidential') {
@@ -144,8 +190,10 @@ export class LLMRouter {
         },
       );
 
-      // Auto-fallback via fallback chain
-      const fallbackIndex = this.fallbackChain.indexOf(providerName);
+      // Auto-fallback via fallback chain (skip when _noFallback — combo layer handles failover)
+      const fallbackIndex = (req as { _noFallback?: boolean })._noFallback
+        ? this.fallbackChain.length // skip: effectively "no fallbacks available"
+        : this.fallbackChain.indexOf(providerName);
       for (let i = fallbackIndex + 1; i < this.fallbackChain.length; i++) {
         const fallbackName: string = this.fallbackChain[i] as string;
         const fallbackProvider = this.providers.get(fallbackName);

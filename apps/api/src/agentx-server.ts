@@ -1,6 +1,7 @@
 import express from 'express';
 import { llmMetrics, alertManager, healthChecker, Logger } from '@agent-xai/observability';
 import { LLMRouter, OpenAIMock, DeepSeekMock, AnthropicMock } from '@agent-xai/llm-router';
+import { executeRoute } from './combo-router.js';
 import { createRequestLogger } from './request-logger.js';
 import { computeAnalyticsSummary } from './analytics.js';
 import { agentConfigStore, AGENT_MODEL_OPTIONS } from './agent-config.js';
@@ -27,6 +28,7 @@ import { registerAuthRoutes } from './auth-routes.js';
 import { registerOAuthRoutes } from './oauth-routes.js';
 import { registerAdminLlmRoutes } from './admin-llm-routes.js';
 import { registerCliRoutes } from './cli-routes.js';
+import { registerProviderGroupRoutes } from './provider-group-routes.js';
 import { syncProvidersFromDb } from './llm-providers.js';
 import {
   publishEvent,
@@ -106,6 +108,7 @@ export const router = new LLMRouter();
 // ─── Admin LLM provider management + boot-time sync from DB ────
 registerAdminLlmRoutes(app, router);
 registerCliRoutes(app);
+registerProviderGroupRoutes(app);
 void syncProvidersFromDb(router).then((n) => {
   if (n > 0) logger.info(`Registered ${n} admin-managed LLM provider(s) from DB`);
 });
@@ -146,7 +149,7 @@ app.get('/health', async (_req, res) => {
 // ─── LLM run endpoint (wired to router) ────
 app.post('/v1/agentx/run', async (req, res): Promise<void> => {
   try {
-    const { prompt, taskId, description, complexity, type, budget } = req.body ?? {};
+    const { prompt, taskId, description, complexity, type, budget, provider } = req.body ?? {};
 
     if (!prompt || typeof prompt !== 'string') {
       res.status(400).json({ error: 'Missing required field: prompt (string)' });
@@ -159,6 +162,7 @@ app.post('/v1/agentx/run', async (req, res): Promise<void> => {
       complexity: complexity ?? 'medium',
       type: type ?? 'reasoning',
       budget: budget ?? 'medium',
+      provider: typeof provider === 'string' ? provider : undefined,
     };
 
     const startedAt = new Date().toISOString();
@@ -171,7 +175,7 @@ app.post('/v1/agentx/run', async (req, res): Promise<void> => {
     });
 
     try {
-      const response = await router.execute(request, prompt);
+      const response = await executeRoute(router, request, prompt);
       const completed = taskStore.get(request.taskId);
       if (completed) {
         completed.status = 'success';
@@ -202,7 +206,7 @@ app.post('/v1/agentx/run', async (req, res): Promise<void> => {
 // emits lifecycle events consumed via GET /v1/agentx/tasks/:id/events.
 app.post('/v1/agentx/run/stream', async (req, res): Promise<void> => {
   try {
-    const { prompt, taskId, description, complexity, type, budget } = req.body ?? {};
+    const { prompt, taskId, description, complexity, type, budget, provider } = req.body ?? {};
 
     if (!prompt || typeof prompt !== 'string') {
       res.status(400).json({ error: 'Missing required field: prompt (string)' });
@@ -215,6 +219,7 @@ app.post('/v1/agentx/run/stream', async (req, res): Promise<void> => {
       complexity: complexity ?? 'medium',
       type: type ?? 'reasoning',
       budget: budget ?? 'medium',
+      provider: typeof provider === 'string' ? provider : undefined,
     };
 
     const startedAt = new Date().toISOString();
@@ -238,7 +243,7 @@ app.post('/v1/agentx/run/stream', async (req, res): Promise<void> => {
           taskId: request.taskId,
           at: new Date().toISOString(),
         });
-        const response = await router.execute(request, prompt);
+        const response = await executeRoute(router, request, prompt);
         const task = taskStore.get(request.taskId);
         if (task) {
           task.status = 'success';
@@ -375,7 +380,7 @@ app.get('/v1/agentx/tasks/:id/events', (req, res) => {
 // through the LLM router like any other task.
 app.post('/v1/agentx/chat', async (req, res): Promise<void> => {
   try {
-    const { messages, taskId, complexity, type, budget } = req.body ?? {};
+    const { messages, taskId, complexity, type, budget, provider } = req.body ?? {};
     const parsed = parseChatMessages(messages);
     if (!parsed) {
       res.status(400).json({
@@ -391,8 +396,9 @@ app.post('/v1/agentx/chat', async (req, res): Promise<void> => {
       complexity: complexity ?? 'medium',
       type: type ?? 'reasoning',
       budget: budget ?? 'medium',
+      provider: typeof provider === 'string' ? provider : undefined,
     };
-    const response = await router.execute(request, buildChatPrompt(parsed));
+    const response = await executeRoute(router, request, buildChatPrompt(parsed));
     res.json({ ...response, taskId: request.taskId });
   } catch (e) {
     const err = e instanceof Error ? e.message : String(e);
@@ -405,7 +411,7 @@ app.post('/v1/agentx/chat', async (req, res): Promise<void> => {
 // consumed via GET /v1/agentx/chat/:id/events.
 app.post('/v1/agentx/chat/stream', async (req, res): Promise<void> => {
   try {
-    const { messages, taskId, complexity, type, budget } = req.body ?? {};
+    const { messages, taskId, complexity, type, budget, provider } = req.body ?? {};
     const parsed = parseChatMessages(messages);
     if (!parsed) {
       res.status(400).json({
@@ -422,13 +428,14 @@ app.post('/v1/agentx/chat/stream', async (req, res): Promise<void> => {
       complexity: complexity ?? 'medium',
       type: type ?? 'reasoning',
       budget: budget ?? 'medium',
+      provider: typeof provider === 'string' ? provider : undefined,
     };
 
     res.status(202).json({ chatId, status: 'accepted' });
 
     void (async () => {
       try {
-        const response = await router.execute(request, buildChatPrompt(parsed));
+        const response = await executeRoute(router, request, buildChatPrompt(parsed));
         const startedAt = new Date().toISOString();
         publishChatEvent({
           type: 'start',

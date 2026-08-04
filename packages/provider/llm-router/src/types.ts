@@ -13,6 +13,10 @@ export interface RouteRequest {
   latency?: LatencyPreference;
   security?: SecurityLevel;
   context?: Record<string, unknown>;
+  /** Pin a specific registered provider (used by combo groups per attempt). */
+  provider?: string;
+  /** Pin an exact "provider:model" pair. */
+  model?: string;
 }
 
 export interface TokenUsage {

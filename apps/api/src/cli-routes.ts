@@ -15,6 +15,7 @@ import type { Express, Request, Response } from 'express';
 import type { AuthenticatedRequest } from './auth.js';
 import { maybeRequireAdmin } from './auth.js';
 import { listProviders } from './llm-provider-store.js';
+import { listGroups } from './provider-group-store.js';
 import {
   activeCliToken,
   createCliToken,
@@ -101,8 +102,9 @@ export function registerCliRoutes(app: Express): void {
         return;
       }
       const providers = await listProviders();
+      const groups = await listGroups();
       res.json({
-        schema: 1,
+        schema: 2,
         syncedAt: new Date().toISOString(),
         providers: providers.map((p) => ({
           name: p.name,
@@ -112,6 +114,13 @@ export function registerCliRoutes(app: Express): void {
           enabled: p.enabled,
           provider: p.provider ?? 'custom',
           authMethod: p.authMethod ?? 'api-key',
+        })),
+        groups: groups.map((g) => ({
+          name: g.name,
+          description: g.description,
+          strategy: g.strategy,
+          members: g.members.map((m) => m.provider),
+          enabled: g.enabled,
         })),
       });
     } catch (e) {

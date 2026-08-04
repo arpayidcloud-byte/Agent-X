@@ -7,6 +7,7 @@ import {
   Cable,
   History,
   LayoutDashboard,
+  Layers,
   LogOut,
   Menu,
   Settings,
@@ -18,6 +19,7 @@ import { isAuthed, clearToken, fetchMe, isAdminUser, type AuthUser } from '@/lib
 const NAV_ITEMS = [
   { href: '/', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/providers', label: 'LLM Providers', icon: Cable },
+  { href: '/groups', label: 'Combo Providers', icon: Layers },
   { href: '/audit', label: 'Audit Log', icon: History },
   { href: '/settings', label: 'Settings', icon: Settings },
 ];

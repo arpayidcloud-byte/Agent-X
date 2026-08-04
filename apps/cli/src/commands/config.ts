@@ -31,6 +31,14 @@ interface SyncedProvider {
   apiKey?: string;
 }
 
+interface SyncedGroup {
+  name: string;
+  description: string | null;
+  strategy: string;
+  members: string[];
+  enabled: boolean;
+}
+
 /**
  * agentx config pull --token <cli-token> [--api <url>]
  *
@@ -70,6 +78,7 @@ export async function pull(args: string[]): Promise<void> {
     schema: number;
     syncedAt: string;
     providers: SyncedProvider[];
+    groups?: SyncedGroup[];
   };
 
   const cfg = loadConfig();
@@ -83,6 +92,7 @@ export async function pull(args: string[]): Promise<void> {
   }));
 
   cfg.providers = providers;
+  if (body.groups) cfg.groups = body.groups;
   if (options.token) cfg.cliToken = options.token;
   if (options.api) cfg.cliApi = options.api;
   cfg.lastSyncAt = body.syncedAt;
@@ -90,12 +100,18 @@ export async function pull(args: string[]): Promise<void> {
 
   const enabled = providers.filter((p) => p.enabled).length;
   const withKey = providers.filter((p) => p.apiKey).length;
+  const groups = (cfg.groups ?? []) as SyncedGroup[];
   console.log(
-    `Synced ${providers.length} provider(s) (${enabled} enabled, ${withKey} with local API key) at ${body.syncedAt}`,
+    `Synced ${providers.length} provider(s) (${enabled} enabled, ${withKey} with local API key) + ${groups.length} combo group(s) at ${body.syncedAt}`,
   );
   for (const p of providers) {
     const keyNote = p.apiKey ? 'key ✓' : 'key — set via config set';
     console.log(`  • ${p.name} (${p.provider}) ${p.enabled ? 'enabled' : 'disabled'} — ${keyNote}`);
+  }
+  for (const g of groups) {
+    console.log(
+      `  • combo ${g.name} [${g.strategy}] ${g.enabled ? 'enabled' : 'disabled'}: ${g.members.join(' → ')}`,
+    );
   }
 }
 
@@ -160,6 +176,16 @@ export async function config(args: string[]): Promise<void> {
           for (const p of providers) {
             console.log(
               `    ${p.name} (${p.provider}) ${p.enabled ? 'enabled' : 'disabled'} — ${p.apiKey ? 'key set' : 'key not set'}`,
+            );
+          }
+          continue;
+        }
+        if (k === 'groups') {
+          const groups = v as SyncedGroup[];
+          console.log(`  groups: ${groups.length} combo(s)`);
+          for (const g of groups) {
+            console.log(
+              `    ${g.name} [${g.strategy}] ${g.enabled ? 'enabled' : 'disabled'}: ${g.members.join(' → ')}`,
             );
           }
           continue;
