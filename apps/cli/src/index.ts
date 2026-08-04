@@ -84,11 +84,15 @@ program
   });
 
 program
-  .command('config')
-  .description('Manage configuration')
-  .action(async () => {
+  .command('config [args...]')
+  .description('Manage configuration (get|set|pull)')
+  .option('--token <token>', 'CLI sync token (for pull)')
+  .option('--api <url>', 'API base URL (default: https://api.id-tech.cloud)')
+  .action(async (args: string[], options: { token?: string; api?: string }) => {
     try {
-      await config([]);
+      if (options.token) args.push('--token', options.token);
+      if (options.api) args.push('--api', options.api);
+      await config(args);
     } catch (error) {
       console.error(error instanceof Error ? error.message : String(error));
       process.exit(1);

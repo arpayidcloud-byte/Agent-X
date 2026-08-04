@@ -1,13 +1,15 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   CheckCircle2,
+  Copy,
   Download,
   KeyRound,
   Loader2,
   RefreshCw,
   ShieldCheck,
+  TerminalSquare,
   Upload,
   XCircle,
 } from 'lucide-react';
@@ -15,7 +17,11 @@ import {
   changeAccountPassword,
   adminExportProviders,
   adminImportProviders,
+  adminGetCliToken,
+  adminCreateCliToken,
+  adminRevokeCliToken,
   type ImportResult,
+  type CliTokenView,
 } from '@/lib/api';
 
 // ─── Shared card shell ────
@@ -310,6 +316,198 @@ function BackupCard() {
   );
 }
 
+// ─── Card 3: CLI sync ────
+function CliSyncCard() {
+  const [token, setToken] = useState<CliTokenView | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [freshToken, setFreshToken] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    adminGetCliToken()
+      .then((d) => {
+        if (!cancelled) setToken(d.token);
+      })
+      .catch(() => {
+        if (!cancelled) setMessage({ ok: false, text: 'Gagal memuat status token CLI.' });
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const generate = async () => {
+    if (busy) return;
+    setBusy(true);
+    setMessage(null);
+    try {
+      const d = await adminCreateCliToken();
+      setToken(d.view);
+      setFreshToken(d.token); // plaintext — shown once
+      setCopied(false);
+    } catch (err) {
+      setMessage({ ok: false, text: err instanceof Error ? err.message : 'Gagal generate token.' });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const revoke = async () => {
+    if (busy || !token) return;
+    setBusy(true);
+    setMessage(null);
+    try {
+      await adminRevokeCliToken();
+      setToken(null);
+      setFreshToken('');
+    } catch (err) {
+      setMessage({ ok: false, text: err instanceof Error ? err.message : 'Gagal revoke token.' });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const copy = async () => {
+    if (!freshToken) return;
+    try {
+      await navigator.clipboard.writeText(freshToken);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      setMessage({ ok: false, text: 'Gagal menyalin — salin manual dari kotak di bawah.' });
+    }
+  };
+
+  const exampleCmd = (withToken: string) =>
+    `agentx config pull --token ${withToken} --api https://api.id-tech.cloud`;
+
+  return (
+    <Card title="CLI Sync" icon={<TerminalSquare className="h-4 w-4" strokeWidth={1.8} />}>
+      <p className="mb-4 text-xs leading-relaxed text-slate-500">
+        Sinkronkan konfigurasi provider ke CLI (
+        <code className="text-slate-300">agentx config pull</code>). Token hanya ditampilkan{' '}
+        <span className="text-slate-300">sekali</span> saat dibuat dan disimpan sebagai hash di
+        server — generate ulang akan menonaktifkan token lama.
+      </p>
+
+      {loading ? (
+        <div className="flex items-center gap-2 text-xs text-slate-500">
+          <Loader2 className="h-4 w-4 animate-spin" strokeWidth={2} />
+          Memuat status…
+        </div>
+      ) : (
+        <>
+          <div className="mb-4 rounded-lg border border-surface-3 bg-surface-0 p-3 text-xs">
+            {token ? (
+              <div className="space-y-1.5">
+                <p className="flex items-center gap-1.5 text-emerald-400">
+                  <CheckCircle2 className="h-3.5 w-3.5" strokeWidth={1.8} />
+                  Token aktif: <span className="font-medium text-slate-200">{token.name}</span>
+                </p>
+                <p className="text-slate-500">
+                  Dibuat {new Date(token.createdAt).toLocaleString('id-ID')}
+                  {token.lastUsedAt
+                    ? ` · terakhir dipakai ${new Date(token.lastUsedAt).toLocaleString('id-ID')}`
+                    : ' · belum pernah dipakai'}
+                </p>
+              </div>
+            ) : (
+              <p className="text-slate-500">Belum ada token CLI aktif.</p>
+            )}
+          </div>
+
+          {freshToken && (
+            <div className="mb-4 rounded-lg border border-secondary-500/30 bg-secondary-500/5 p-3">
+              <p className="mb-1.5 flex items-center gap-1.5 text-[11px] font-medium text-secondary-300">
+                <KeyRound className="h-3 w-3" strokeWidth={1.8} />
+                Token baru — salin sekarang, hanya tampil sekali:
+              </p>
+              <div className="flex items-center gap-2">
+                <code className="min-w-0 flex-1 truncate rounded-md bg-surface-0 px-2.5 py-1.5 font-mono text-[11px] text-secondary-200">
+                  {freshToken}
+                </code>
+                <button
+                  type="button"
+                  onClick={() => void copy()}
+                  className="inline-flex shrink-0 items-center gap-1 rounded-md border border-surface-3 px-2 py-1.5 text-[11px] font-medium text-slate-300 transition-colors hover:bg-surface-2"
+                >
+                  {copied ? (
+                    <CheckCircle2 className="h-3 w-3 text-emerald-400" strokeWidth={2} />
+                  ) : (
+                    <Copy className="h-3 w-3" strokeWidth={2} />
+                  )}
+                  {copied ? 'Tersalin' : 'Salin'}
+                </button>
+              </div>
+              <pre className="mt-2.5 overflow-x-auto rounded-md bg-surface-0 p-2.5 font-mono text-[11px] leading-relaxed text-slate-300">
+                {exampleCmd(freshToken)}
+              </pre>
+            </div>
+          )}
+
+          {message && (
+            <p
+              className={`mb-3 flex items-center gap-1.5 text-xs ${
+                message.ok ? 'text-emerald-400' : 'text-red-400'
+              }`}
+            >
+              {message.ok ? (
+                <CheckCircle2 className="h-3.5 w-3.5" strokeWidth={1.8} />
+              ) : (
+                <XCircle className="h-3.5 w-3.5" strokeWidth={1.8} />
+              )}
+              {message.text}
+            </p>
+          )}
+
+          <div className="flex flex-wrap gap-3">
+            <button
+              type="button"
+              onClick={() => void generate()}
+              disabled={busy}
+              className="inline-flex items-center gap-2 rounded-lg bg-accent-400 px-4 py-2 text-sm font-medium text-slate-950 transition-colors hover:bg-accent-300 disabled:opacity-50"
+            >
+              {busy ? (
+                <Loader2 className="h-4 w-4 animate-spin" strokeWidth={2} />
+              ) : (
+                <KeyRound className="h-4 w-4" strokeWidth={1.8} />
+              )}
+              {token ? 'Generate Ulang' : 'Generate Token'}
+            </button>
+            {token && (
+              <button
+                type="button"
+                onClick={() => void revoke()}
+                disabled={busy}
+                className="inline-flex items-center gap-2 rounded-lg border border-red-500/30 px-4 py-2 text-sm font-medium text-red-400 transition-colors hover:bg-red-500/10 disabled:opacity-50"
+              >
+                <XCircle className="h-4 w-4" strokeWidth={1.8} />
+                Revoke
+              </button>
+            )}
+          </div>
+
+          <div className="mt-4 space-y-1 rounded-lg border border-surface-3 bg-surface-0 p-3 text-[11px] text-slate-500">
+            <p className="font-medium text-slate-400">Cara pakai di CLI:</p>
+            <pre className="overflow-x-auto font-mono leading-relaxed">
+              {`agentx config pull --token <token>          # tarik konfigurasi provider\nagentx config set providers.<name>.apiKey <key>  # isi API key lokal\nagentx config get                                # lihat config`}
+            </pre>
+            <p className="pt-1">
+              API key provider tidak dikirim dari server — CLI menyimpan key secara lokal per mesin.
+            </p>
+          </div>
+        </>
+      )}
+    </Card>
+  );
+}
+
 export default function SettingsView() {
   return (
     <div className="space-y-6">
@@ -321,6 +519,7 @@ export default function SettingsView() {
         <ChangePasswordCard />
         <BackupCard />
       </div>
+      <CliSyncCard />
     </div>
   );
 }
