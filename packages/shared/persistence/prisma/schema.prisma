@@ -124,14 +124,28 @@ model AdminAuditLog {
 // CLI sync token (agentx config pull). Only the SHA-256 hash is stored;
 // the plaintext token is shown once at creation and can be revoked.
 model CliToken {
-  id         String    @id @default(cuid())
-  tokenHash  String    @unique
-  name       String    @default("default")
-  createdAt  DateTime  @default(now())
+  id        String   @id @default(cuid())
+  tokenHash String   @unique
+  name      String   @default("default")
+  createdAt DateTime @default(now())
   lastUsedAt DateTime?
-  revokedAt  DateTime?
+  revokedAt DateTime?
 
   @@index([createdAt])
+}
+
+/// Combo provider: a named group of member providers resolved at request time.
+/// CLI/API users can set provider = group name; the server picks members in
+/// order (priority) or rotates (round-robin) with automatic failover.
+model ProviderGroup {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String?
+  strategy    String   @default("priority") // 'priority' | 'round-robin'
+  members     Json // [{ provider: string }] in priority order
+  enabled     Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }
 
 model WaitlistEntry {

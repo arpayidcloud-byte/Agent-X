@@ -100,7 +100,7 @@ describe('CLI sync API', () => {
     });
     expect(res.status).toBe(200);
     const body = (await res.json()) as { schema: number; providers: unknown[] };
-    expect(body.schema).toBe(1);
+    expect(body.schema).toBe(2);
     expect(Array.isArray(body.providers)).toBe(true);
     expect(JSON.stringify(body)).not.toMatch(/apiKey|secret|sk-/i);
 

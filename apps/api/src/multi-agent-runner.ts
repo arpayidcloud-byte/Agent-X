@@ -14,6 +14,7 @@ import {
   type ParallelWorkflowResult,
 } from '@agent-xai/multi-agent-collaboration';
 import { router } from './agentx-server.js';
+import { executeRoute } from './combo-router.js';
 import { publishMultiAgentEvent, type MultiAgentStreamEvent } from './multi-agent-stream.js';
 
 export interface MultiAgentRun {
@@ -74,7 +75,7 @@ function makeRouterExecutor(): PhaseExecutor {
       type: 'reasoning' as const,
       budget: 'medium' as const,
     };
-    const response = await router.execute(request, prompt);
+    const response = await executeRoute(router, request, prompt);
     return response.message;
   };
 }

@@ -277,6 +277,80 @@ export async function adminListAuditLogs(limit = 100): Promise<{ logs: AuditLogE
   return authJson<{ logs: AuditLogEntry[] }>(`/v1/admin/audit-logs?limit=${limit}`, {}, true);
 }
 
+// ─── Admin: combo provider groups ────
+
+export type GroupStrategy = 'priority' | 'round-robin';
+
+export interface ProviderGroupView {
+  id: string;
+  name: string;
+  description: string | null;
+  strategy: GroupStrategy;
+  members: Array<{ provider: string }>;
+  enabled: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface GroupTestResult {
+  name: string;
+  strategy: GroupStrategy;
+  enabled: boolean;
+  chain: string[];
+  members: Array<{ provider: string; registered: boolean }>;
+  usable: boolean;
+}
+
+export async function adminListGroups(): Promise<{ groups: ProviderGroupView[] }> {
+  return authJson<{ groups: ProviderGroupView[] }>('/v1/admin/provider-groups', {}, true);
+}
+
+export async function adminCreateGroup(input: {
+  name: string;
+  description?: string | null;
+  strategy?: GroupStrategy;
+  members: Array<{ provider: string }>;
+  enabled?: boolean;
+}): Promise<{ group: ProviderGroupView }> {
+  return authJson<{ group: ProviderGroupView }>(
+    '/v1/admin/provider-groups',
+    { method: 'POST', body: JSON.stringify(input) },
+    true,
+  );
+}
+
+export async function adminUpdateGroup(
+  name: string,
+  input: Partial<{
+    description: string | null;
+    strategy: GroupStrategy;
+    members: Array<{ provider: string }>;
+    enabled: boolean;
+  }>,
+): Promise<{ group: ProviderGroupView }> {
+  return authJson<{ group: ProviderGroupView }>(
+    `/v1/admin/provider-groups/${encodeURIComponent(name)}`,
+    { method: 'PATCH', body: JSON.stringify(input) },
+    true,
+  );
+}
+
+export async function adminDeleteGroup(name: string): Promise<{ ok: boolean }> {
+  return authJson<{ ok: boolean }>(
+    `/v1/admin/provider-groups/${encodeURIComponent(name)}`,
+    { method: 'DELETE' },
+    true,
+  );
+}
+
+export async function adminTestGroup(name: string): Promise<GroupTestResult> {
+  return authJson<GroupTestResult>(
+    `/v1/admin/provider-groups/${encodeURIComponent(name)}/test`,
+    { method: 'POST' },
+    true,
+  );
+}
+
 // ─── Admin: dashboard status ────
 
 export async function fetchHealth(): Promise<{ status: string; uptime: number }> {
