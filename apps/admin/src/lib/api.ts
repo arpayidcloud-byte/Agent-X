@@ -167,6 +167,72 @@ export async function adminListPresets(): Promise<{ presets: ProviderPreset[] }>
   return authJson<{ presets: ProviderPreset[] }>('/v1/admin/llm-providers/presets', {}, true);
 }
 
+// ─── Admin: export / import config (API keys never exported) ────
+
+export interface ExportProvider {
+  name: string;
+  type: ProviderType;
+  baseUrl: string;
+  models: string[];
+  enabled: boolean;
+  provider: string;
+  authMethod: AuthMethod;
+  accountRef: string | null;
+  updatedAt: string | null;
+}
+
+export interface ImportProviderInput {
+  name: string;
+  type: ProviderType;
+  baseUrl: string;
+  models: string[];
+  enabled?: boolean;
+  provider?: string;
+  authMethod?: AuthMethod;
+  apiKey?: string;
+}
+
+export interface ImportResult {
+  imported: number;
+  updated: number;
+  errors: { name: string; error: string }[];
+}
+
+export async function adminExportProviders(): Promise<{
+  schema: number;
+  exportedAt: string;
+  providers: ExportProvider[];
+}> {
+  return authJson<{ schema: number; exportedAt: string; providers: ExportProvider[] }>(
+    '/v1/admin/llm-providers/export',
+    {},
+    true,
+  );
+}
+
+export async function adminImportProviders(
+  providers: ImportProviderInput[],
+): Promise<ImportResult> {
+  return authJson<ImportResult>(
+    '/v1/admin/llm-providers/import',
+    { method: 'POST', body: JSON.stringify({ providers }) },
+    true,
+  );
+}
+
+// ─── Auth: change password ────
+
+export async function changeAccountPassword(
+  currentPassword: string,
+  newPassword: string,
+): Promise<{ ok: boolean }> {
+  return authJson<{ ok: boolean }>(
+    '/v1/auth/change-password',
+    { method: 'POST', body: JSON.stringify({ currentPassword, newPassword }) },
+    true,
+  );
+}
+
 // ─── Admin: audit log ────
 
 export interface AuditLogEntry {

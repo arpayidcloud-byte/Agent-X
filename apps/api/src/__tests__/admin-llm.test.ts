@@ -220,6 +220,74 @@ describe('Admin LLM provider API', () => {
     expect(body.logs.every((l) => l.email === ADMIN_EMAIL)).toBe(true);
   });
 
+  it('exports providers without any API key material', async () => {
+    const res = await fetch(`${baseUrl}/v1/admin/llm-providers/export`, {
+      headers: authHeaders(),
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      schema: number;
+      exportedAt: string;
+      providers: Array<Record<string, unknown>>;
+    };
+    expect(body.schema).toBe(1);
+    const raw = JSON.stringify(body);
+    expect(raw).not.toMatch(/apiKey|secret|sk-/i);
+    const p = body.providers.find((x) => x.name === 'stub-provider');
+    expect(p?.models).toEqual(['stub-model']);
+    expect(p?.baseUrl).toBe(stubUrl);
+    expect(p?.enabled).toBe(true);
+  });
+
+  it('imports: creates new providers (with key), updates existing (keeps key), reports errors', async () => {
+    const res = await fetch(`${baseUrl}/v1/admin/llm-providers/import`, {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify({
+        providers: [
+          // 1) brand-new provider WITH a key → imported
+          {
+            name: 'imported-new',
+            type: 'openai-compatible',
+            baseUrl: stubUrl,
+            apiKey: TEST_KEY,
+            models: ['imported-model'],
+            provider: 'custom',
+          },
+          // 2) existing provider WITHOUT a key → updated, key preserved
+          {
+            name: 'stub-provider',
+            type: 'openai-compatible',
+            baseUrl: stubUrl,
+            models: ['stub-model'],
+          },
+          // 3) brand-new provider WITHOUT a key → error
+          { name: 'imported-nokey', type: 'openai-compatible', baseUrl: stubUrl, models: ['x'] },
+        ],
+      }),
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      imported: number;
+      updated: number;
+      errors: Array<{ name: string; error: string }>;
+    };
+    expect(body.imported).toBe(1);
+    expect(body.updated).toBe(1);
+    expect(body.errors).toHaveLength(1);
+    expect(body.errors[0]?.name).toBe('imported-nokey');
+
+    const list = await fetch(`${baseUrl}/v1/admin/llm-providers`, { headers: authHeaders() });
+    const lb = (await list.json()) as {
+      providers: Array<{ name: string; apiKeyMasked: string; models: string[] }>;
+    };
+    const imported = lb.providers.find((x) => x.name === 'imported-new');
+    expect(imported?.apiKeyMasked).toBe(TEST_KEY_MASKED);
+    const existing = lb.providers.find((x) => x.name === 'stub-provider');
+    expect(existing?.apiKeyMasked).toBe('sk-***123'); // key preserved (rotated earlier, not blanked)
+    expect(existing?.models).toEqual(['stub-model']);
+  });
+
   it('deletes provider (ok:true) then 404 on next fetch', async () => {
     const del = await fetch(`${baseUrl}/v1/admin/llm-providers/stub-provider`, {
       method: 'DELETE',

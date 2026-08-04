@@ -101,6 +101,135 @@ export function registerAdminLlmRoutes(app: Express, router: LLMRouter): void {
     },
   );
 
+  // ─── Export providers (config backup — API keys are never included) ────
+  app.get(
+    '/v1/admin/llm-providers/export',
+    maybeRequireAdmin,
+    async (req: AuthenticatedRequest, res: Response) => {
+      try {
+        const rows = await listProviders();
+        const providers = rows.map((r) => ({
+          name: r.name,
+          type: r.type,
+          baseUrl: r.baseUrl,
+          models: r.models.map((m) => m.id),
+          enabled: r.enabled,
+          provider: r.provider ?? 'custom',
+          authMethod: r.authMethod ?? 'api-key',
+          accountRef: r.accountRef ?? null,
+          updatedAt: r.updatedAt ?? null,
+        }));
+        await appendAuditLog(adminEmail(req), 'export', 'providers', {
+          count: providers.length,
+        });
+        res.json({ schema: 1, exportedAt: new Date().toISOString(), providers });
+      } catch (e) {
+        res.status(500).json({ error: e instanceof Error ? e.message : String(e) });
+      }
+    },
+  );
+
+  // ─── Import providers (config restore — apiKey optional per item) ────
+  app.post(
+    '/v1/admin/llm-providers/import',
+    maybeRequireAdmin,
+    async (req: AuthenticatedRequest, res: Response) => {
+      try {
+        const raw = (req.body ?? {}).providers;
+        if (!Array.isArray(raw) || raw.length === 0) {
+          res.status(400).json({ error: 'providers: non-empty array required' });
+          return;
+        }
+        const imported: string[] = [];
+        const updated: string[] = [];
+        const errors: { name: string; error: string }[] = [];
+        for (const item of raw) {
+          const base = (item ?? {}) as Record<string, unknown>;
+          const name = base.name;
+          if (typeof name !== 'string' || !NAME_RE.test(name)) {
+            errors.push({
+              name: typeof name === 'string' ? name : '?',
+              error: 'name: lowercase slug 2-64 chars (a-z0-9-_)',
+            });
+            continue;
+          }
+          if (typeof base.type !== 'string' || !TYPES.has(base.type)) {
+            errors.push({ name, error: 'type: openai-compatible | anthropic-compatible' });
+            continue;
+          }
+          if (typeof base.baseUrl !== 'string' || !URL_RE.test(base.baseUrl)) {
+            errors.push({ name, error: 'baseUrl: must be http(s)://...' });
+            continue;
+          }
+          if (
+            base.authMethod !== undefined &&
+            (typeof base.authMethod !== 'string' ||
+              !AUTH_METHODS.has(base.authMethod as AuthMethod))
+          ) {
+            errors.push({ name, error: 'authMethod: api-key | oauth | account' });
+            continue;
+          }
+          let models: ProviderModel[];
+          try {
+            models = parseModels(base.models);
+          } catch (e) {
+            errors.push({ name, error: e instanceof Error ? e.message : String(e) });
+            continue;
+          }
+          const apiKey = typeof base.apiKey === 'string' ? base.apiKey.trim() : '';
+          const existing = await getProvider(name);
+          if (!existing && apiKey.length < 8) {
+            errors.push({ name, error: 'apiKey: required for new providers (min 8 chars)' });
+            continue;
+          }
+          if (existing) {
+            const patch: Partial<LlmProviderRow> = {
+              type: base.type as LlmProviderRow['type'],
+              baseUrl: (base.baseUrl as string).replace(/\/+$/, ''),
+              models,
+              enabled: base.enabled !== false,
+              provider: (base.provider as string | undefined) ?? existing.provider ?? 'custom',
+              authMethod:
+                (base.authMethod as AuthMethod | undefined) ?? existing.authMethod ?? 'api-key',
+              accountRef:
+                (base.accountRef as string | null | undefined) ?? existing.accountRef ?? null,
+            };
+            if (apiKey.length >= 8) patch.apiKey = apiKey;
+            const row = await updateProvider(name, patch);
+            if (!row) {
+              errors.push({ name, error: 'update failed' });
+              continue;
+            }
+            registerProviderNow(router, row);
+            updated.push(name);
+          } else {
+            const row: LlmProviderRow = {
+              name,
+              type: base.type as LlmProviderRow['type'],
+              baseUrl: (base.baseUrl as string).replace(/\/+$/, ''),
+              apiKey,
+              models,
+              enabled: base.enabled !== false,
+              provider: (base.provider as string | undefined) ?? 'custom',
+              authMethod: (base.authMethod as AuthMethod | undefined) ?? 'api-key',
+            };
+            await upsertProvider(row);
+            registerProviderNow(router, row);
+            imported.push(name);
+          }
+        }
+        await appendAuditLog(adminEmail(req), 'import', 'providers', {
+          imported: imported.length,
+          updated: updated.length,
+          errors: errors.length,
+        });
+        res.json({ imported: imported.length, updated: updated.length, errors });
+      } catch (e) {
+        res.status(500).json({ error: e instanceof Error ? e.message : String(e) });
+      }
+    },
+  );
+
   // ─── Create provider ────
   app.post(
     '/v1/admin/llm-providers',
