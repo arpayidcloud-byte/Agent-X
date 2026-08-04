@@ -18,6 +18,15 @@ export default function LoginForm() {
     e.preventDefault();
     if (loading) return;
     setError('');
+
+    // Reset Turnstile to get a fresh token right before submission
+    const widgetEl = document.querySelector('[data-testid="turnstile-widget"]');
+    if (widgetEl && typeof (widgetEl as unknown as { resetTurnstile?: () => void }).resetTurnstile === 'function') {
+      (widgetEl as unknown as { resetTurnstile: () => void }).resetTurnstile();
+      // Brief wait for the token callback to fire
+      await new Promise((r) => setTimeout(r, 500));
+    }
+
     setLoading(true);
     try {
       const res = await loginAccount(email, password, turnstileToken || undefined);
