@@ -3,12 +3,23 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { Cable, History, LogOut, Menu, X, ShieldCheck } from 'lucide-react';
+import {
+  Cable,
+  History,
+  LayoutDashboard,
+  LogOut,
+  Menu,
+  Settings,
+  X,
+  ShieldCheck,
+} from 'lucide-react';
 import { isAuthed, clearToken, fetchMe, isAdminUser, type AuthUser } from '@/lib/api';
 
 const NAV_ITEMS = [
+  { href: '/', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/providers', label: 'LLM Providers', icon: Cable },
   { href: '/audit', label: 'Audit Log', icon: History },
+  { href: '/settings', label: 'Settings', icon: Settings },
 ];
 
 function Brand() {
@@ -28,7 +39,7 @@ function NavLinks({ pathname, onNavigate }: { pathname: string; onNavigate?: () 
   return (
     <nav className="flex flex-col gap-0.5 px-2">
       {NAV_ITEMS.map((item) => {
-        const active = pathname.startsWith(item.href);
+        const active = item.href === '/' ? pathname === '/' : pathname.startsWith(item.href);
         const Icon = item.icon;
         return (
           <Link
