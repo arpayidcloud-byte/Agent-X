@@ -353,8 +353,125 @@ export async function adminTestGroup(name: string): Promise<GroupTestResult> {
 
 // ─── Admin: dashboard status ────
 
-export async function fetchHealth(): Promise<{ status: string; uptime: number }> {
+export interface ProviderHealth {
+  name: string;
+  status: 'healthy' | 'unhealthy' | 'degraded';
+  lastChecked: string;
+}
+
+export interface HealthReport {
+  status: string;
+  uptime: number;
+  providers: ProviderHealth[];
+  timestamp: string;
+}
+
+export async function fetchHealth(): Promise<HealthReport> {
   const res = await fetch(`${API_URL}/health`, { cache: 'no-store' });
   if (!res.ok) throw new Error(`GET /health failed: ${res.status}`);
-  return (await res.json()) as { status: string; uptime: number };
+  return (await res.json()) as HealthReport;
+}
+
+// ─── Tasks (public endpoints) ────
+
+export interface TaskRecord {
+  id: string;
+  prompt: string;
+  description: string;
+  status: 'pending' | 'success' | 'error';
+  provider?: string;
+  model?: string;
+  response?: string;
+  error?: string;
+  createdAt: string;
+  completedAt?: string;
+}
+
+export interface TasksResponse {
+  tasks: TaskRecord[];
+  total: number;
+}
+
+export async function fetchTasks(limit = 50): Promise<TasksResponse> {
+  const res = await fetch(`${API_URL}/v1/agentx/tasks?limit=${limit}`, { cache: 'no-store' });
+  if (!res.ok) throw new Error(`GET /v1/agentx/tasks failed: ${res.status}`);
+  return (await res.json()) as TasksResponse;
+}
+
+export async function fetchStats(): Promise<{ stats: Record<string, number> }> {
+  const res = await fetch(`${API_URL}/v1/agentx/stats`, { cache: 'no-store' });
+  if (!res.ok) throw new Error(`GET /v1/agentx/stats failed: ${res.status}`);
+  return (await res.json()) as { stats: Record<string, number> };
+}
+
+// ─── Agents (public endpoints) ────
+
+export interface AgentConfig {
+  id: string;
+  role: 'architect' | 'coder' | 'reviewer' | 'tester';
+  name: string;
+  description: string;
+  capabilities: string[];
+  enabled: boolean;
+  model: string;
+  complexity: 'simple' | 'medium' | 'complex';
+}
+
+export interface AgentsResponse {
+  agents: AgentConfig[];
+  modelOptions: string[];
+}
+
+export async function fetchAgents(): Promise<AgentsResponse> {
+  const res = await fetch(`${API_URL}/v1/agents`, { cache: 'no-store' });
+  if (!res.ok) throw new Error(`GET /v1/agents failed: ${res.status}`);
+  return (await res.json()) as AgentsResponse;
+}
+
+export async function updateAgent(
+  id: string,
+  patch: { enabled?: boolean; model?: string; complexity?: string },
+): Promise<{ agent: AgentConfig }> {
+  return authJson<{ agent: AgentConfig }>(
+    `/v1/agents/${encodeURIComponent(id)}`,
+    { method: 'PATCH', body: JSON.stringify(patch) },
+    true,
+  );
+}
+
+// ─── Analytics (public endpoints) ────
+
+export interface AnalyticsSummary {
+  generatedAt: string;
+  overview: {
+    totalRequests: number;
+    totalErrors: number;
+    successRate: number;
+    totalCacheHits: number;
+    cacheHitRate: number;
+    totalFallbacks: number;
+    activeProviders: number;
+    avgLatencyMs: number;
+    p50LatencyMs: number;
+    p95LatencyMs: number;
+    inputTokens: number;
+    outputTokens: number;
+    totalTokens: number;
+    totalCostUsd: number;
+  };
+  byProvider: Array<{
+    provider: string;
+    requests: number;
+    errors: number;
+    avgLatencyMs: number;
+    tokens: number;
+    costUsd: number;
+  }>;
+  byModel: Array<{ model: string; requests: number; costUsd: number }>;
+}
+
+export async function fetchAnalytics(): Promise<AnalyticsSummary> {
+  const res = await fetch(`${API_URL}/v1/analytics/summary`, { cache: 'no-store' });
+  if (!res.ok) throw new Error(`GET /v1/analytics/summary failed: ${res.status}`);
+  return (await res.json()) as AnalyticsSummary;
 }
