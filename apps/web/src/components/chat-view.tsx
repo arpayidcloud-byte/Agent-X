@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from 'react';
 import { Send, Loader2, Bot, User, Info } from 'lucide-react';
 import { startChatStream, type ChatMessage, type ChatStreamEvent } from '@/lib/api';
 import { openEventStream, type StreamHandle } from '@/lib/stream';
+import { MarkdownRenderer } from './markdown-renderer';
 
 interface Bubble {
   role: 'user' | 'assistant';
@@ -165,18 +166,21 @@ export default function ChatView() {
             >
               {b.role === 'user' ? (
                 <p className="whitespace-pre-wrap">{b.content}</p>
+              ) : b.error ? (
+                <p className="whitespace-pre-wrap">{b.content}</p>
               ) : (
                 <>
-                  <p className="whitespace-pre-wrap">
-                    {b.content}
-                    {streaming && !b.content && (
+                  {b.content ? (
+                    <MarkdownRenderer content={b.content} />
+                  ) : (
+                    streaming && (
                       <span className="inline-flex items-center gap-1">
                         <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-accent-400 [animation-delay:0ms]" />
                         <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-accent-400 [animation-delay:120ms]" />
                         <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-accent-400 [animation-delay:240ms]" />
                       </span>
-                    )}
-                  </p>
+                    )
+                  )}
                   {b.meta && b.meta !== '…' && (
                     <p className="mt-2 text-[10px] text-slate-500">{b.meta}</p>
                   )}
