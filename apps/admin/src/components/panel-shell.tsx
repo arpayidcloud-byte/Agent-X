@@ -13,13 +13,19 @@ import {
   Settings,
   X,
   ShieldCheck,
+  CheckSquare,
+  Bot,
+  BarChart3,
 } from 'lucide-react';
 import { isAuthed, clearToken, fetchMe, isAdminUser, type AuthUser } from '@/lib/api';
 
 const NAV_ITEMS = [
   { href: '/', label: 'Dashboard', icon: LayoutDashboard },
+  { href: '/tasks', label: 'Tasks', icon: CheckSquare },
+  { href: '/agents', label: 'Agents', icon: Bot },
   { href: '/providers', label: 'LLM Providers', icon: Cable },
   { href: '/groups', label: 'Combo Providers', icon: Layers },
+  { href: '/analytics', label: 'Analytics', icon: BarChart3 },
   { href: '/audit', label: 'Audit Log', icon: History },
   { href: '/settings', label: 'Settings', icon: Settings },
 ];
