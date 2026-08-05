@@ -58,7 +58,7 @@ export default function AdminDashboard() {
   const [totalTasks, setTotalTasks] = useState(0);
   const [stats, setStats] = useState<Record<string, number>>({});
   const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(() => !isAuthed());
 
   useEffect(() => {
     if (!isAuthed()) return;
@@ -89,7 +89,7 @@ export default function AdminDashboard() {
     };
   }, []);
 
-  if (!isAuthed() && !loading) {
+  if (!isAuthed()) {
     return (
       <div className="flex min-h-[60vh] items-center justify-center">
         <div className="glass-card rounded-2xl p-8 text-center">
@@ -107,7 +107,7 @@ export default function AdminDashboard() {
     );
   }
 
-  if (loading && !isAuthed()) {
+  if (loading) {
     return (
       <div className="flex min-h-[60vh] items-center justify-center">
         <Loader2 className="h-6 w-6 animate-spin text-slate-500" />
