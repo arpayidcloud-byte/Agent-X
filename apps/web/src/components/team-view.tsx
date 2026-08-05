@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { LogOut } from 'lucide-react';
+import { LogOut, Users } from 'lucide-react';
 import {
   fetchTeam,
   loginAccount,
@@ -14,10 +14,10 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Card } from '@/components/ui/card';
 import SocialAuthButtons from './social-auth-buttons';
 
-// Web Pro team management (basic): admin-only user table. Shows an inline
-// login form when not authed; non-admin users get a 403 message.
+// Team management: admin-only user table with inline login when not authed.
 export default function TeamView() {
   const [users, setUsers] = useState<TeamMember[] | null>(null);
   const [authed, setAuthed] = useState(() => isAuthed());
@@ -66,16 +66,20 @@ export default function TeamView() {
 
   if (!authed) {
     return (
-      <div className="mx-auto w-full max-w-md rounded-2xl border border-surface-3 bg-surface-1 p-6 sm:p-8">
-        <h2 className="mb-1 text-lg font-semibold text-slate-100">Sign in</h2>
-        <p className="mb-4 text-xs text-slate-500">
-          Team management lists registered users. Only accounts with the{' '}
-          <code className="text-amber-300">admin</code> role can view it.
-        </p>
+      <Card className="mx-auto max-w-md rounded-2xl p-6 sm:p-8">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-accent-500/10">
+            <Users className="h-4 w-4 text-accent-300" strokeWidth={2} />
+          </div>
+          <div>
+            <h2 className="text-base font-semibold text-slate-100">Sign in</h2>
+            <p className="text-[11px] text-slate-500">Team management lists registered users.</p>
+          </div>
+        </div>
         {error && (
-          <p className="mb-3 rounded-lg border border-rose-500/30 bg-rose-950/30 px-3 py-2 text-xs text-rose-300">
-            ⚠ {error}
-          </p>
+          <div className="mb-3 rounded-xl border border-rose-500/25 bg-rose-500/5 p-3">
+            <p className="text-xs text-rose-300">⚠ {error}</p>
+          </div>
         )}
         <form onSubmit={(e) => void handleLogin(e)} className="space-y-3">
           <Input
@@ -105,13 +109,13 @@ export default function TeamView() {
             Create an account
           </Link>
         </p>
-      </div>
+      </Card>
     );
   }
 
   if (error && !users) {
     return (
-      <div className="rounded-xl border border-rose-500/30 bg-rose-950/20 p-5">
+      <div className="rounded-xl border border-rose-500/25 bg-rose-500/5 p-5">
         <p className="text-sm text-rose-300">⚠ {error}</p>
         {error.includes('403') && (
           <p className="mt-2 text-xs text-slate-400">
@@ -126,7 +130,7 @@ export default function TeamView() {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="section space-y-4">
       <div className="flex items-center justify-between">
         <p className="text-sm text-slate-400">
           {users ? `${users.length} registered user${users.length === 1 ? '' : 's'}` : '…'}
@@ -139,27 +143,27 @@ export default function TeamView() {
       {loading && !users ? (
         <p className="text-sm text-slate-500">Loading…</p>
       ) : users ? (
-        <div className="overflow-hidden rounded-xl border border-surface-3 bg-surface-1">
-          <table className="w-full text-left text-sm">
+        <div className="glass-card overflow-hidden rounded-xl">
+          <table className="data-table">
             <thead>
-              <tr className="border-b border-surface-3 text-xs uppercase tracking-wide text-slate-500">
-                <th className="px-4 py-3 font-medium">Email</th>
-                <th className="px-4 py-3 font-medium">Roles</th>
-                <th className="px-4 py-3 font-medium">Joined</th>
+              <tr>
+                <th className="font-medium">Email</th>
+                <th className="font-medium">Roles</th>
+                <th className="font-medium">Joined</th>
               </tr>
             </thead>
             <tbody>
               {users.map((u) => (
-                <tr key={u.id} className="border-b border-surface-3/60 last:border-0">
-                  <td className="px-4 py-3 text-slate-200">{u.email}</td>
-                  <td className="px-4 py-3">
+                <tr key={u.id}>
+                  <td className="text-slate-200">{u.email}</td>
+                  <td>
                     {u.roles.map((r) => (
                       <Badge key={r} tone={r === 'admin' ? 'warning' : 'neutral'} className="mr-1">
                         {r}
                       </Badge>
                     ))}
                   </td>
-                  <td className="px-4 py-3 text-xs text-slate-500">
+                  <td className="text-xs text-slate-500">
                     {new Date(u.createdAt).toLocaleDateString()}
                   </td>
                 </tr>

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { CheckCircle2, XCircle, Play } from 'lucide-react';
+import { CheckCircle2, XCircle, Play, Users, Loader2 } from 'lucide-react';
 import {
   startMultiAgentRun,
   fetchMultiAgentRun,
@@ -12,6 +12,7 @@ import { openEventStream, type StreamHandle } from '@/lib/stream';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/input';
+import { Card } from '@/components/ui/card';
 
 interface GoalCard {
   goalId: string;
@@ -22,10 +23,8 @@ interface GoalCard {
   error?: string;
 }
 
-// Web Pro parallel multi-agent execution: submit multiple goals (one per
-// line), they run through the specialist team concurrently (bounded pool).
-// Progress streams live via SSE with WebSocket fallback; the final status is
-// also fetched as JSON so the page survives a refresh.
+// Multi-agent parallel execution: submit goals, run through specialist team
+// concurrently with bounded pool, streaming live progress.
 export default function MultiAgentView() {
   const [goalsText, setGoalsText] = useState(
     'Design an API gateway rate limiter\nBuild a user profile service\nAdd a search indexer',
@@ -63,7 +62,7 @@ export default function MultiAgentView() {
       goals.map((g) => ({
         goalId: `local-${Math.random().toString(36).slice(2, 8)}`,
         description: g,
-        status: 'queued',
+        status: 'queued' as const,
       })),
     );
     serverGoalIdsRef.current = [];
@@ -146,11 +145,21 @@ export default function MultiAgentView() {
     }
   }
 
+  const activeCount = goalCards.filter((c) => c.status === 'running').length;
+  const doneCount = goalCards.filter((c) => c.status === 'done').length;
+  const errorCount = goalCards.filter((c) => c.status === 'error').length;
+
   return (
-    <div className="space-y-6">
-      <div className="rounded-xl border border-secondary-500/20 bg-surface-1 p-6">
-        <h2 className="mb-1 text-base font-semibold text-slate-200">Parallel Multi-Agent Run</h2>
-        <p className="mb-4 text-xs text-slate-500">
+    <div className="section space-y-6">
+      {/* Command panel */}
+      <Card className="rounded-2xl p-6">
+        <div className="flex items-center gap-3 mb-1">
+          <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-accent-500/10">
+            <Users className="h-4 w-4 text-accent-300" strokeWidth={2} />
+          </div>
+          <h2 className="text-base font-semibold text-slate-200">Parallel Multi-Agent Run</h2>
+        </div>
+        <p className="mb-5 ml-11 text-xs text-slate-500">
           One goal per line. Goals run through the specialist team (architect → coder → reviewer →
           tester) concurrently with a bounded pool, streaming live progress.
         </p>
@@ -169,7 +178,7 @@ export default function MultiAgentView() {
                 value={concurrency}
                 onChange={(e) => setConcurrency(Number(e.target.value))}
                 disabled={running}
-                className="rounded-lg border border-surface-3 bg-surface-0 px-2 py-1 text-xs text-slate-200 focus:border-secondary-500/60 focus:outline-none focus:ring-2 focus:ring-secondary-500/20 disabled:opacity-50"
+                className="rounded-lg border border-white/[0.06] bg-surface-2/60 px-2.5 py-1.5 text-xs text-slate-200 focus:border-accent-500/40 focus:outline-none focus:ring-2 focus:ring-accent-500/15 disabled:opacity-50"
               >
                 <option value={1}>1</option>
                 <option value={2}>2</option>
@@ -179,23 +188,48 @@ export default function MultiAgentView() {
             </label>
             <Button type="submit" disabled={running || !goalsText.trim()}>
               {running ? (
-                'Running…'
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" strokeWidth={2} aria-hidden />
+                  Running…
+                </>
               ) : (
                 <>
-                  <Play className="h-4 w-4" strokeWidth={2} aria-hidden /> Run in parallel
+                  <Play className="h-4 w-4" strokeWidth={2} aria-hidden />
+                  Run in parallel
                 </>
               )}
             </Button>
             {runId && <span className="font-mono text-xs text-slate-500">run: {runId}</span>}
           </div>
         </form>
-        {error && (
-          <p className="mt-3 rounded-lg border border-rose-500/30 bg-rose-950/30 px-3 py-2 text-xs text-rose-300">
-            ⚠ {error}
-          </p>
-        )}
-      </div>
 
+        {error && (
+          <div className="mt-3 rounded-xl border border-rose-500/25 bg-rose-500/5 p-3">
+            <p className="text-xs text-rose-300">⚠ {error}</p>
+          </div>
+        )}
+      </Card>
+
+      {/* Progress bar */}
+      {goalCards.length > 0 && running && (
+        <div className="rounded-xl border border-white/[0.04] bg-surface-1/60 p-4">
+          <div className="mb-2 flex items-center justify-between text-xs">
+            <span className="text-slate-400">Progress</span>
+            <span className="text-slate-500">
+              {doneCount + errorCount}/{goalCards.length} complete
+              {activeCount > 0 && ` · ${activeCount} running`}
+            </span>
+          </div>
+          <div className="h-1.5 overflow-hidden rounded-full bg-surface-3">
+            <div
+              className="h-full rounded-full bg-gradient-to-r from-accent-500 to-accent-400 transition-all duration-500"
+              style={{ width: `${((doneCount + errorCount) / goalCards.length) * 100}%` }}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Summary */}
       {summary && (
         <div className="flex items-center gap-3 rounded-xl border border-emerald-500/25 bg-emerald-500/5 p-5">
           <CheckCircle2 className="h-5 w-5 shrink-0 text-emerald-400" aria-hidden />
@@ -210,50 +244,78 @@ export default function MultiAgentView() {
         </div>
       )}
 
+      {/* Goal cards */}
       {goalCards.length > 0 && (
         <div className="space-y-3">
-          {goalCards.map((card, i) => (
-            <div
-              key={`${card.goalId}-${i}`}
-              className={`rounded-xl border p-4 ${
-                card.status === 'done'
-                  ? 'border-emerald-500/25 bg-emerald-500/5'
-                  : card.status === 'error'
-                    ? 'border-rose-500/25 bg-rose-500/5'
-                    : card.status === 'running'
-                      ? 'border-secondary-500/30 bg-secondary-500/5'
-                      : 'border-surface-3 bg-surface-1'
-              }`}
-            >
-              <div className="flex items-start justify-between gap-3">
-                <p className="text-sm text-slate-200">{card.description}</p>
-                <Badge
-                  tone={
-                    card.status === 'done'
-                      ? 'success'
+          {goalCards.map((card, i) => {
+            const isActive = card.status === 'running';
+            return (
+              <div
+                key={`${card.goalId}-${i}`}
+                className={`glass-card group relative rounded-xl p-4 transition-all ${
+                  isActive ? 'border-accent-500/20 shadow-glow' : ''
+                }`}
+              >
+                {/* Active pulse indicator */}
+                {isActive && (
+                  <div className="absolute left-0 top-0 bottom-0 w-0.5 rounded-l-xl bg-gradient-to-b from-accent-400 to-secondary-400" />
+                )}
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-start gap-3">
+                    <span
+                      className={`mt-1 flex h-6 w-6 shrink-0 items-center justify-center rounded-lg ${
+                        card.status === 'done'
+                          ? 'bg-emerald-500/10 text-emerald-400'
+                          : card.status === 'error'
+                            ? 'bg-rose-500/10 text-rose-400'
+                            : card.status === 'running'
+                              ? 'bg-accent-500/10 text-accent-400'
+                              : 'bg-surface-3 text-slate-500'
+                      }`}
+                    >
+                      {card.status === 'done' && (
+                        <CheckCircle2 className="h-3.5 w-3.5" strokeWidth={2} />
+                      )}
+                      {card.status === 'error' && (
+                        <XCircle className="h-3.5 w-3.5" strokeWidth={2} />
+                      )}
+                      {card.status === 'running' && (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" strokeWidth={2} />
+                      )}
+                      {card.status === 'queued' && (
+                        <span className="text-[10px] font-mono">{i + 1}</span>
+                      )}
+                    </span>
+                    <p className="text-sm text-slate-200">{card.description}</p>
+                  </div>
+                  <Badge
+                    tone={
+                      card.status === 'done'
+                        ? 'success'
+                        : card.status === 'error'
+                          ? 'danger'
+                          : card.status === 'running'
+                            ? 'accent'
+                            : 'neutral'
+                    }
+                  >
+                    {card.status === 'done'
+                      ? `approved (${card.iterations ?? 1} iter)`
                       : card.status === 'error'
-                        ? 'danger'
-                        : card.status === 'running'
-                          ? 'accent'
-                          : 'neutral'
-                  }
-                >
-                  {card.status === 'done'
-                    ? `approved (${card.iterations ?? 1} iter)`
-                    : card.status === 'error'
-                      ? card.approved === false
-                        ? 'rejected'
-                        : 'failed'
-                      : card.status}
-                </Badge>
+                        ? card.approved === false
+                          ? 'rejected'
+                          : 'failed'
+                        : card.status}
+                  </Badge>
+                </div>
+                {card.status === 'error' && (
+                  <p className="mt-2 ml-9 flex items-center gap-1.5 text-xs text-rose-400">
+                    <XCircle className="h-3.5 w-3.5" aria-hidden /> {card.error}
+                  </p>
+                )}
               </div>
-              {card.status === 'error' && (
-                <p className="mt-2 flex items-center gap-1.5 text-xs text-rose-400">
-                  <XCircle className="h-3.5 w-3.5" aria-hidden /> {card.error}
-                </p>
-              )}
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>

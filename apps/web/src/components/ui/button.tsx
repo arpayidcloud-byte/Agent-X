@@ -4,7 +4,7 @@ import { forwardRef, type ButtonHTMLAttributes } from 'react';
 import { Loader2 } from 'lucide-react';
 
 type Variant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'outline';
-type Size = 'sm' | 'md';
+type Size = 'sm' | 'md' | 'lg';
 
 export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: Variant;
@@ -13,19 +13,19 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 const VARIANT_CLASSES: Record<Variant, string> = {
-  primary:
-    'bg-accent-500 text-slate-950 font-semibold hover:bg-accent-400 active:bg-accent-600 shadow-soft',
+  primary: 'btn-gradient text-white font-semibold',
   secondary:
-    'bg-surface-2 text-slate-200 border border-surface-3 hover:bg-surface-3 hover:text-white',
-  ghost: 'text-slate-400 hover:bg-surface-2 hover:text-slate-200',
-  danger: 'bg-rose-500/90 text-white hover:bg-rose-500',
+    'bg-surface-3/80 text-slate-200 border border-white/[0.06] hover:bg-surface-4 hover:text-white',
+  ghost: 'text-slate-400 hover:bg-surface-3/60 hover:text-slate-200',
+  danger: 'bg-rose-500/90 text-white hover:bg-rose-500 shadow-[0_2px_8px_rgba(244,63,94,0.25)]',
   outline:
-    'border border-surface-3 bg-transparent text-slate-300 hover:border-surface-4 hover:text-white',
+    'border border-white/[0.08] bg-transparent text-slate-300 hover:border-white/[0.12] hover:text-white',
 };
 
 const SIZE_CLASSES: Record<Size, string> = {
   sm: 'h-8 px-3 text-xs gap-1.5 rounded-lg',
-  md: 'h-10 px-4 text-sm gap-2 rounded-lg',
+  md: 'h-10 px-4 text-sm gap-2 rounded-xl',
+  lg: 'h-12 px-6 text-sm gap-2.5 rounded-xl',
 };
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button(
@@ -44,7 +44,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
     <button
       ref={ref}
       disabled={disabled || loading}
-      className={`inline-flex items-center justify-center whitespace-nowrap transition-colors duration-150 disabled:cursor-not-allowed disabled:opacity-50 ${VARIANT_CLASSES[variant]} ${SIZE_CLASSES[size]} ${className}`}
+      className={`inline-flex items-center justify-center whitespace-nowrap transition-all duration-150 disabled:cursor-not-allowed disabled:opacity-50 ${VARIANT_CLASSES[variant]} ${SIZE_CLASSES[size]} ${className}`}
       {...rest}
     >
       {loading && <Loader2 className="h-4 w-4 animate-spin" aria-hidden />}

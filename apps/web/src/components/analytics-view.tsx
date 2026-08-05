@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { Activity, CheckCircle2, Gauge, Braces, DollarSign, Wallet } from 'lucide-react';
 import { fetchAnalytics, type AnalyticsSummary } from '@/lib/api';
 import { StatCard } from '@/components/ui/stat-card';
-import { SkeletonCard } from '@/components/ui/skeleton';
+import { SkeletonCard, SkeletonStat } from '@/components/ui/skeleton';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 
 function fmt(n: number): string {
@@ -30,7 +30,7 @@ function BarChart({
 }) {
   const max = Math.max(1, ...rows.map((r) => r.value));
   return (
-    <div className="space-y-2.5">
+    <div className="space-y-3">
       {rows.length === 0 && (
         <p className="py-6 text-center text-sm text-slate-500">
           No data yet — run a task to see it here.
@@ -38,15 +38,15 @@ function BarChart({
       )}
       {rows.map((r, i) => (
         <div key={i} className="flex items-center gap-3 text-sm">
-          <span className="w-28 shrink-0 truncate text-right font-medium text-slate-300">
+          <span className="w-28 shrink-0 truncate text-right text-xs font-medium text-slate-400">
             {r.label}
           </span>
-          <div className="h-5 flex-1 overflow-hidden rounded bg-surface-2">
+          <div className="h-6 flex-1 overflow-hidden rounded-lg bg-surface-3/60">
             <div
-              className={`flex h-full items-center rounded px-2 ${color}`}
-              style={{ width: `${Math.max(2, (r.value / max) * 100)}%` }}
+              className={`flex h-full items-center rounded-lg px-2.5 transition-all duration-500 ${color}`}
+              style={{ width: `${Math.max(4, (r.value / max) * 100)}%` }}
             >
-              <span className="truncate text-[10px] font-semibold text-slate-950">
+              <span className="truncate text-[10px] font-semibold text-white">
                 {format(r.value)}
                 {r.sub ? ` · ${r.sub}` : ''}
               </span>
@@ -82,10 +82,10 @@ export default function AnalyticsView() {
 
   if (loading) {
     return (
-      <div className="space-y-4">
+      <div className="section space-y-4">
         <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
           {Array.from({ length: 4 }).map((_, i) => (
-            <SkeletonCard key={i} rows={1} />
+            <SkeletonStat key={i} />
           ))}
         </div>
         <SkeletonCard rows={4} />
@@ -94,9 +94,9 @@ export default function AnalyticsView() {
   }
   if (error || !data) {
     return (
-      <p className="rounded-lg border border-rose-500/30 bg-rose-950/30 px-4 py-3 text-sm text-rose-300">
-        ⚠ Failed to load analytics: {error ?? 'no data'}
-      </p>
+      <div className="rounded-xl border border-rose-500/25 bg-rose-500/5 p-5">
+        <p className="text-sm text-rose-300">⚠ Failed to load analytics: {error ?? 'no data'}</p>
+      </div>
     );
   }
 
@@ -113,7 +113,7 @@ export default function AnalyticsView() {
     .sort((a, b) => b.value - a.value);
 
   return (
-    <div className="space-y-6">
+    <div className="section space-y-6">
       <p className="text-xs text-slate-500">
         Live metrics · generated {new Date(data.generatedAt).toLocaleString()}
       </p>
@@ -148,14 +148,14 @@ export default function AnalyticsView() {
         />
       </div>
 
-      <Card className="border-emerald-500/25 bg-emerald-500/5">
+      <Card className="border-emerald-500/20 bg-emerald-500/[0.03]">
         <CardHeader className="pb-2">
           <CardTitle className="flex items-center gap-2 text-emerald-300">
             <Wallet className="h-4 w-4" aria-hidden /> Total cost
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-3xl font-semibold tracking-tight text-emerald-200">
+          <p className="text-3xl font-bold tracking-tight text-emerald-200">
             {fmtUsd(o.totalCostUsd)}
           </p>
           <p className="mt-1 text-xs text-slate-500">

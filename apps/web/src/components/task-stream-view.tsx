@@ -1,17 +1,18 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { Inbox, Check, Cog, Send } from 'lucide-react';
+import { Inbox, Check, Cog, Send, RotateCcw, Sparkles } from 'lucide-react';
 import { startStreamTask, type TaskStreamEvent } from '@/lib/api';
 import { notifyTaskComplete, requestNotifyPermission } from '@/lib/notify';
 import { openEventStream, type StreamHandle } from '@/lib/stream';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 
 const QUICK_PROMPTS = [
-  'Design an API gateway rate limiter',
-  'Build a user profile service',
-  'Explain how SSE works with WebSocket fallback',
-  'Draft a REST API spec for a todo app',
+  { text: 'Design an API gateway rate limiter', icon: '🏗️' },
+  { text: 'Build a user profile service', icon: '⚙️' },
+  { text: 'Explain how SSE works with WebSocket fallback', icon: '📡' },
+  { text: 'Draft a REST API spec for a todo app', icon: '📋' },
 ];
 
 const STAGE_ORDER: TaskStreamEvent['type'][] = ['accepted', 'generating', 'complete'];
@@ -22,9 +23,8 @@ const STAGE_META: Record<TaskStreamEvent['type'], { label: string; Icon: typeof 
   complete: { label: 'Complete', Icon: Check },
 };
 
-// Devin-style task composer + live session. Idle state shows a large hero
-// composer with quick prompts; once a task is submitted the view becomes a
-// session card with a live stage timeline (SSE with WS fallback).
+// AI command panel: idle state shows hero composer; once a task is submitted
+// the view becomes a session card with live stage timeline (SSE with WS fallback).
 export default function TaskStreamView() {
   const [prompt, setPrompt] = useState('');
   const [events, setEvents] = useState<TaskStreamEvent[]>([]);
@@ -32,6 +32,7 @@ export default function TaskStreamView() {
   const [error, setError] = useState<string | null>(null);
   const [taskId, setTaskId] = useState<string | null>(null);
   const sourceRef = useRef<StreamHandle | null>(null);
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
 
   useEffect(() => {
     requestNotifyPermission();
@@ -39,6 +40,15 @@ export default function TaskStreamView() {
       sourceRef.current?.close();
     };
   }, []);
+
+  // Auto-resize textarea
+  useEffect(() => {
+    const el = textareaRef.current;
+    if (el) {
+      el.style.height = 'auto';
+      el.style.height = `${Math.min(el.scrollHeight, 200)}px`;
+    }
+  }, [prompt]);
 
   async function handleRun(e?: React.FormEvent) {
     e?.preventDefault();
@@ -80,22 +90,27 @@ export default function TaskStreamView() {
 
   const lastComplete = [...events].reverse().find((e) => e.type === 'complete');
   const generating = events.some((e) => e.type === 'generating');
-  const reached: Record<string, boolean> = {};
-  for (const ev of events) reached[ev.type] = true;
 
   // ── Hero composer (idle) ──
   if (status === 'idle') {
     return (
-      <div className="mx-auto flex min-h-[60vh] max-w-2xl flex-col items-center justify-center text-center">
-        <h1 className="bg-gradient-to-r from-accent-300 via-sky-300 to-secondary-300 bg-clip-text text-3xl font-semibold tracking-tight text-transparent lg:text-4xl">
-          What can I help you build?
-        </h1>
-        <p className="mt-3 text-sm text-slate-500">
-          Describe a task — AgentX runs it through the LLM router and streams progress live.
-        </p>
-        <form onSubmit={(e) => void handleRun(e)} className="mt-8 w-full">
+      <div className="glass-card mx-auto max-w-2xl rounded-2xl p-8 sm:p-10">
+        <div className="text-center">
+          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-accent-500/10">
+            <Sparkles className="h-5 w-5 text-accent-300" strokeWidth={1.8} />
+          </div>
+          <h2 className="text-xl font-bold tracking-tight text-slate-100 sm:text-2xl">
+            What would you like AgentX to accomplish?
+          </h2>
+          <p className="mt-2 text-sm text-slate-500">
+            Describe a task — AgentX runs it through the LLM router and streams progress live.
+          </p>
+        </div>
+
+        <form onSubmit={(e) => void handleRun(e)} className="mt-6">
           <div className="relative">
             <textarea
+              ref={textareaRef}
               value={prompt}
               onChange={(e) => setPrompt(e.target.value)}
               onKeyDown={(e) => {
@@ -104,16 +119,16 @@ export default function TaskStreamView() {
                   void handleRun();
                 }
               }}
-              placeholder="e.g. Explain how SSE works with WebSocket fallback…"
-              rows={3}
+              placeholder="Describe your task…"
+              rows={2}
               autoFocus
-              className="w-full resize-none rounded-2xl border border-surface-3 bg-surface-1 p-4 pr-16 text-base text-slate-100 shadow-soft placeholder:text-slate-600 focus:border-accent-500/60 focus:outline-none focus:ring-2 focus:ring-accent-500/20"
+              className="w-full resize-none rounded-xl border border-white/[0.06] bg-surface-2/60 p-4 pr-14 text-sm text-slate-100 placeholder:text-slate-500 transition-all focus:border-accent-500/40 focus:ring-2 focus:ring-accent-500/15 focus:outline-none"
             />
             <button
               type="submit"
               disabled={!prompt.trim()}
               aria-label="Run task"
-              className="absolute bottom-3 right-3 flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-accent-500 to-secondary-500 text-slate-950 transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-30"
+              className="absolute bottom-3 right-3 flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-accent-500 to-accent-400 text-white shadow-lg transition-all hover:shadow-accent-500/25 hover:shadow-xl disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:shadow-none"
             >
               <Send className="h-4 w-4" strokeWidth={2.2} aria-hidden />
             </button>
@@ -122,15 +137,17 @@ export default function TaskStreamView() {
             Enter to run · Shift+Enter for newline
           </p>
         </form>
-        <div className="mt-6 flex flex-wrap justify-center gap-2">
+
+        <div className="mt-5 flex flex-wrap justify-center gap-2">
           {QUICK_PROMPTS.map((q) => (
             <button
-              key={q}
+              key={q.text}
               type="button"
-              onClick={() => setPrompt(q)}
-              className="rounded-full border border-surface-3 bg-surface-1 px-3 py-1.5 text-xs text-slate-400 transition hover:border-accent-500/40 hover:text-accent-300"
+              onClick={() => setPrompt(q.text)}
+              className="rounded-full border border-white/[0.06] bg-surface-2/40 px-3 py-1.5 text-xs text-slate-400 transition-all hover:border-accent-500/30 hover:bg-accent-500/5 hover:text-accent-300"
             >
-              {q}
+              <span className="mr-1.5">{q.icon}</span>
+              {q.text}
             </button>
           ))}
         </div>
@@ -141,16 +158,17 @@ export default function TaskStreamView() {
   // ── Session card (running / done / error) ──
   return (
     <div className="mx-auto max-w-3xl">
-      <div className="rounded-2xl border border-surface-3 bg-surface-1 p-5 shadow-soft">
-        <div className="mb-4 flex items-start justify-between gap-3">
+      <div className="glass-card rounded-2xl p-6">
+        {/* Header */}
+        <div className="mb-5 flex items-start justify-between gap-3">
           <div className="flex items-start gap-3">
             <span
               className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${
                 status === 'done'
-                  ? 'bg-emerald-400'
+                  ? 'bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.4)]'
                   : status === 'error'
-                    ? 'bg-rose-400'
-                    : 'animate-pulse bg-accent-400'
+                    ? 'bg-rose-400 shadow-[0_0_8px_rgba(248,113,113,0.4)]'
+                    : 'animate-pulse bg-accent-400 shadow-[0_0_8px_rgba(99,102,241,0.4)]'
               }`}
             />
             <div>
@@ -161,12 +179,13 @@ export default function TaskStreamView() {
             </div>
           </div>
           <Button type="button" variant="secondary" size="sm" onClick={reset}>
+            <RotateCcw className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
             New task
           </Button>
         </div>
 
         {/* Stage timeline */}
-        <div className="mb-4 flex items-center gap-1">
+        <div className="mb-5 flex items-center gap-1">
           {STAGE_ORDER.map((stage, i) => {
             const active =
               stage === 'accepted'
@@ -177,48 +196,56 @@ export default function TaskStreamView() {
             const { label, Icon } = STAGE_META[stage];
             return (
               <div key={stage} className="flex flex-1 items-center gap-1">
-                <span
-                  className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-medium transition ${
+                <Badge
+                  tone={
                     active
                       ? stage === 'complete'
                         ? status === 'error'
-                          ? 'bg-rose-500/15 text-rose-300'
-                          : 'bg-emerald-500/15 text-emerald-300'
+                          ? 'danger'
+                          : 'success'
                         : stage === 'generating'
-                          ? 'bg-amber-500/15 text-amber-300'
-                          : 'bg-sky-500/15 text-sky-300'
-                      : 'bg-surface-2 text-slate-600'
-                  }`}
+                          ? 'warning'
+                          : 'info'
+                      : 'neutral'
+                  }
                 >
                   <Icon className="h-3 w-3" strokeWidth={2} aria-hidden />
                   {label}
-                </span>
-                {i < STAGE_ORDER.length - 1 && <span className="h-px flex-1 bg-surface-3" />}
+                </Badge>
+                {i < STAGE_ORDER.length - 1 && <span className="h-px flex-1 bg-white/[0.06]" />}
               </div>
             );
           })}
         </div>
 
+        {/* Error */}
         {error && (
-          <p className="mb-3 rounded-lg border border-rose-500/30 bg-rose-950/30 px-3 py-2 text-xs text-rose-300">
-            ⚠ {error}
-          </p>
+          <div className="mb-4 rounded-xl border border-rose-500/25 bg-rose-500/5 p-3">
+            <p className="text-xs text-rose-300">⚠ {error}</p>
+          </div>
         )}
 
+        {/* Success response */}
         {lastComplete?.status === 'success' && lastComplete.response && (
-          <pre className="max-h-72 overflow-auto whitespace-pre-wrap rounded-xl border border-surface-3 bg-surface-0 p-4 text-xs leading-relaxed text-slate-300">
+          <pre className="max-h-72 overflow-auto whitespace-pre-wrap rounded-xl border border-white/[0.06] bg-surface-0 p-4 font-mono text-xs leading-relaxed text-slate-300">
             {lastComplete.response}
           </pre>
         )}
+
+        {/* Error response */}
         {lastComplete?.status === 'error' && (
-          <pre className="max-h-72 overflow-auto whitespace-pre-wrap rounded-xl border border-rose-800 bg-rose-950 p-4 text-xs text-rose-200">
+          <pre className="max-h-72 overflow-auto whitespace-pre-wrap rounded-xl border border-rose-500/20 bg-rose-500/5 p-4 font-mono text-xs text-rose-200">
             {lastComplete.error}
           </pre>
         )}
+
+        {/* Running indicator */}
         {status === 'running' && (
-          <div className="flex items-center gap-2 rounded-xl border border-surface-3 bg-surface-0 p-4 text-xs text-slate-500">
-            <span className="h-3 w-3 animate-spin rounded-full border-2 border-surface-4 border-t-accent-400" />
-            {generating ? 'Generating response…' : 'Waiting for task to start…'}
+          <div className="flex items-center gap-3 rounded-xl border border-white/[0.04] bg-surface-2/40 p-4">
+            <span className="h-4 w-4 animate-spin rounded-full border-2 border-surface-4 border-t-accent-400" />
+            <span className="text-xs text-slate-400">
+              {generating ? 'Generating response…' : 'Waiting for task to start…'}
+            </span>
           </div>
         )}
       </div>

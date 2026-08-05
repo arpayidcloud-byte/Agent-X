@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Copy, Wand2, RefreshCw } from 'lucide-react';
+import { Copy, Wand2, RefreshCw, MessageSquare } from 'lucide-react';
 import {
   fetchAgentFeedback,
   fetchAgentFeedbackStats,
@@ -13,6 +13,8 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/input';
 import { StatCard } from '@/components/ui/stat-card';
+import { Card } from '@/components/ui/card';
+import { SkeletonStat } from '@/components/ui/skeleton';
 
 const GRADE_TONE: Record<string, 'success' | 'info' | 'warning' | 'danger'> = {
   Excellent: 'success',
@@ -76,15 +78,15 @@ export default function FeedbackView() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="section space-y-6">
       {error && (
-        <p className="rounded-lg border border-rose-500/30 bg-rose-950/30 px-3 py-2 text-xs text-rose-300">
-          ⚠ {error}
-        </p>
+        <div className="rounded-xl border border-rose-500/25 bg-rose-500/5 p-3">
+          <p className="text-xs text-rose-300">⚠ {error}</p>
+        </div>
       )}
 
       {/* Stats */}
-      {stats && (
+      {stats ? (
         <section className="grid grid-cols-2 gap-3 lg:grid-cols-3">
           <StatCard
             label="Total feedback"
@@ -105,22 +107,33 @@ export default function FeedbackView() {
             tone="text-emerald-300"
           />
         </section>
+      ) : (
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
+          <SkeletonStat />
+          <SkeletonStat />
+          <SkeletonStat />
+        </div>
       )}
 
       {/* How it works */}
-      <section className="rounded-2xl border border-surface-3 bg-surface-1 p-5">
-        <h2 className="mb-2 text-sm font-semibold text-slate-200">How the feedback loop works</h2>
-        <p className="text-xs leading-relaxed text-slate-500">
+      <Card className="rounded-2xl p-5">
+        <div className="flex items-center gap-3 mb-2">
+          <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-accent-500/10">
+            <MessageSquare className="h-4 w-4 text-accent-300" strokeWidth={2} />
+          </div>
+          <h2 className="text-sm font-semibold text-slate-200">How the feedback loop works</h2>
+        </div>
+        <p className="ml-11 text-xs leading-relaxed text-slate-500">
           When a task output scores below 70, the system automatically generates actionable
           feedback: the weakest quality dimensions, concrete improvement suggestions, and a ready
           revision prompt. Run the revision prompt on the next attempt to close the loop — score,
           feedback, improve, re-score.
         </p>
-      </section>
+      </Card>
 
       {/* Revision builder */}
       {revisionFor && (
-        <section className="rounded-2xl border border-secondary-500/25 bg-surface-1 p-5">
+        <Card className="rounded-2xl border-accent-500/15 p-5">
           <h2 className="mb-1 text-sm font-semibold text-slate-200">
             Revision builder —{' '}
             <Badge tone={GRADE_TONE[revisionFor.grade] ?? 'neutral'}>
@@ -163,25 +176,27 @@ export default function FeedbackView() {
             </Button>
           </div>
           {revisionPrompt && (
-            <pre className="mt-3 max-h-64 overflow-auto whitespace-pre-wrap rounded-lg border border-surface-3 bg-surface-0 p-3 text-xs text-slate-300">
+            <pre className="mt-3 max-h-64 overflow-auto whitespace-pre-wrap rounded-xl border border-white/[0.04] bg-surface-0 p-4 font-mono text-xs text-slate-300">
               {revisionPrompt}
             </pre>
           )}
-        </section>
+        </Card>
       )}
 
       {/* History */}
       <section>
-        <h2 className="mb-3 text-sm font-semibold text-slate-200">Feedback history</h2>
+        <h2 className="mb-4 text-sm font-semibold text-slate-200">Feedback history</h2>
         {feedback.length === 0 ? (
-          <p className="rounded-xl border border-dashed border-surface-3 bg-surface-1/50 p-6 text-sm text-slate-500">
-            No feedback yet. Run a task with a low-scoring output (or score one on the Quality page)
-            — feedback is generated automatically for outputs below 70.
-          </p>
+          <div className="rounded-xl border border-dashed border-white/[0.06] bg-surface-1/30 p-8 text-center">
+            <p className="text-sm text-slate-500">
+              No feedback yet. Run a task with a low-scoring output (or score one on the Quality
+              page) — feedback is generated automatically for outputs below 70.
+            </p>
+          </div>
         ) : (
           <div className="space-y-2">
             {feedback.map((fb) => (
-              <div key={fb.id} className="rounded-xl border border-surface-3 bg-surface-1 p-4">
+              <Card key={fb.id} className="p-4">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <p className="max-w-md truncate text-sm text-slate-300" title={fb.prompt}>
                     {fb.prompt}
@@ -195,13 +210,13 @@ export default function FeedbackView() {
                   {fb.weakDimensions.map((d) => (
                     <div
                       key={d.name}
-                      className="rounded-lg border border-surface-3 bg-surface-0 px-3 py-2"
+                      className="rounded-lg border border-white/[0.04] bg-surface-2/40 px-3 py-2.5"
                     >
                       <div className="flex items-center justify-between">
                         <span className="text-xs font-medium capitalize text-slate-300">
                           {d.name}
                         </span>
-                        <span className="text-xs font-semibold text-rose-400">{d.score}</span>
+                        <span className="text-xs font-bold text-rose-400">{d.score}</span>
                       </div>
                       {d.suggestions[0] && (
                         <p className="mt-1 text-[11px] leading-relaxed text-slate-500">
@@ -229,7 +244,7 @@ export default function FeedbackView() {
                     <Wand2 className="h-3.5 w-3.5" strokeWidth={2} aria-hidden /> Build revision
                   </Button>
                 </div>
-              </div>
+              </Card>
             ))}
           </div>
         )}

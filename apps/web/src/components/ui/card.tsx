@@ -4,9 +4,7 @@ interface CardProps {
 }
 
 export function Card({ children, className = '' }: CardProps) {
-  return (
-    <div className={`rounded-xl border border-surface-3 bg-surface-1 ${className}`}>{children}</div>
-  );
+  return <div className={`glass-card rounded-xl ${className}`}>{children}</div>;
 }
 
 interface CardHeaderProps {
@@ -24,7 +22,20 @@ interface CardTitleProps {
 }
 
 export function CardTitle({ children, className = '' }: CardTitleProps) {
-  return <h3 className={`text-sm font-semibold text-slate-200 ${className}`}>{children}</h3>;
+  return (
+    <h3 className={`text-sm font-semibold tracking-tight text-slate-200 ${className}`}>
+      {children}
+    </h3>
+  );
+}
+
+interface CardDescriptionProps {
+  children: React.ReactNode;
+  className?: string;
+}
+
+export function CardDescription({ children, className = '' }: CardDescriptionProps) {
+  return <p className={`mt-1 text-xs text-slate-500 ${className}`}>{children}</p>;
 }
 
 interface CardContentProps {
@@ -33,5 +44,5 @@ interface CardContentProps {
 }
 
 export function CardContent({ children, className = '' }: CardContentProps) {
-  return <div className={`p-5 pt-2 ${className}`}>{children}</div>;
+  return <div className={`p-5 pt-0 ${className}`}>{children}</div>;
 }

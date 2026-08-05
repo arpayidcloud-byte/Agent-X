@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { LogOut, KeyRound } from 'lucide-react';
+import { LogOut, KeyRound, User, Shield } from 'lucide-react';
 import {
   fetchMe,
   loginAccount,
@@ -15,12 +15,11 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
 import SocialAuthButtons from './social-auth-buttons';
 import TurnstileWidget from './turnstile-widget';
 
-// Web Pro user settings: profile (id/email/roles) + change password.
-// Requires a Bearer token; shows an inline login form when not authed.
+// User settings: profile + change password with inline login when not authed.
 export default function SettingsView() {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [authed, setAuthed] = useState(() => isAuthed());
@@ -97,12 +96,12 @@ export default function SettingsView() {
 
   if (!authed) {
     return (
-      <div className="mx-auto max-w-md rounded-xl border border-surface-3 bg-surface-1 p-6">
+      <Card className="mx-auto max-w-md rounded-2xl p-6 sm:p-8">
         <h2 className="mb-4 text-base font-semibold text-slate-100">Sign in to manage settings</h2>
         {error && (
-          <p className="mb-3 rounded-lg border border-rose-500/30 bg-rose-950/30 px-3 py-2 text-xs text-rose-300">
-            ⚠ {error}
-          </p>
+          <div className="mb-3 rounded-xl border border-rose-500/25 bg-rose-500/5 p-3">
+            <p className="text-xs text-rose-300">⚠ {error}</p>
+          </div>
         )}
         <form onSubmit={(e) => void handleLogin(e)} className="space-y-3">
           <Input
@@ -133,15 +132,18 @@ export default function SettingsView() {
             Create an account
           </Link>
         </p>
-      </div>
+      </Card>
     );
   }
 
   return (
-    <div className="grid gap-4 md:grid-cols-2">
+    <div className="section grid gap-4 md:grid-cols-2">
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle>Profile</CardTitle>
+          <CardTitle className="flex items-center gap-2">
+            <User className="h-4 w-4 text-accent-400" aria-hidden /> Profile
+          </CardTitle>
+          <CardDescription>Your account information</CardDescription>
         </CardHeader>
         <CardContent>
           {loading ? (
@@ -149,12 +151,16 @@ export default function SettingsView() {
           ) : user ? (
             <dl className="space-y-3 text-sm">
               <div>
-                <dt className="text-xs uppercase tracking-wide text-slate-500">Email</dt>
-                <dd className="mt-0.5 text-slate-200">{user.email}</dd>
+                <dt className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                  Email
+                </dt>
+                <dd className="mt-1 text-slate-200">{user.email}</dd>
               </div>
               <div>
-                <dt className="text-xs uppercase tracking-wide text-slate-500">Roles</dt>
-                <dd className="mt-0.5">
+                <dt className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                  Roles
+                </dt>
+                <dd className="mt-1">
                   {user.roles.map((r) => (
                     <Badge key={r} tone={r === 'admin' ? 'warning' : 'neutral'} className="mr-1">
                       {r}
@@ -163,8 +169,10 @@ export default function SettingsView() {
                 </dd>
               </div>
               <div>
-                <dt className="text-xs uppercase tracking-wide text-slate-500">User ID</dt>
-                <dd className="mt-0.5 font-mono text-xs text-slate-400">{user.id}</dd>
+                <dt className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                  User ID
+                </dt>
+                <dd className="mt-1 font-mono text-xs text-slate-400">{user.id}</dd>
               </div>
             </dl>
           ) : (
@@ -181,17 +189,18 @@ export default function SettingsView() {
           <CardTitle className="flex items-center gap-2">
             <KeyRound className="h-4 w-4 text-accent-400" aria-hidden /> Change password
           </CardTitle>
+          <CardDescription>Update your account password</CardDescription>
         </CardHeader>
         <CardContent>
           {pwMsg && (
-            <p className="mb-3 rounded-lg border border-emerald-500/30 bg-emerald-950/30 px-3 py-2 text-xs text-emerald-300">
-              ✓ {pwMsg}
-            </p>
+            <div className="mb-3 rounded-xl border border-emerald-500/25 bg-emerald-500/5 p-3">
+              <p className="text-xs text-emerald-300">✓ {pwMsg}</p>
+            </div>
           )}
           {pwErr && (
-            <p className="mb-3 rounded-lg border border-rose-500/30 bg-rose-950/30 px-3 py-2 text-xs text-rose-300">
-              ⚠ {pwErr}
-            </p>
+            <div className="mb-3 rounded-xl border border-rose-500/25 bg-rose-500/5 p-3">
+              <p className="text-xs text-rose-300">⚠ {pwErr}</p>
+            </div>
           )}
           <form onSubmit={(e) => void handleChangePassword(e)} className="space-y-3">
             <Input
@@ -216,6 +225,7 @@ export default function SettingsView() {
               onChange={(e) => setConfirm(e.target.value)}
             />
             <Button type="submit" className="w-full">
+              <Shield className="h-4 w-4" strokeWidth={2} aria-hidden />
               Update password
             </Button>
           </form>

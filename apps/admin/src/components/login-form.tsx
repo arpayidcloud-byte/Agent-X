@@ -21,7 +21,10 @@ export default function LoginForm() {
 
     // Reset Turnstile to get a fresh token right before submission
     const widgetEl = document.querySelector('[data-testid="turnstile-widget"]');
-    if (widgetEl && typeof (widgetEl as unknown as { resetTurnstile?: () => void }).resetTurnstile === 'function') {
+    if (
+      widgetEl &&
+      typeof (widgetEl as unknown as { resetTurnstile?: () => void }).resetTurnstile === 'function'
+    ) {
       (widgetEl as unknown as { resetTurnstile: () => void }).resetTurnstile();
       // Brief wait for the token callback to fire
       await new Promise((r) => setTimeout(r, 500));
@@ -52,24 +55,27 @@ export default function LoginForm() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center px-4">
+    <div className="flex min-h-screen items-center justify-center bg-black px-4">
       <div className="w-full max-w-sm">
         <div className="mb-8 text-center">
-          <span className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-accent-400 to-secondary-500 text-slate-950 shadow-glow">
-            <ShieldAlert className="h-6 w-6" strokeWidth={1.8} aria-hidden />
+          <span className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-accent-500 to-secondary-600 text-white shadow-[0_0_20px_-5px_rgba(79,70,229,0.5)]">
+            <ShieldAlert className="h-7 w-7" strokeWidth={1.8} aria-hidden />
           </span>
-          <h1 className="text-xl font-semibold text-slate-100">AgentX Panel</h1>
-          <p className="mt-1 text-sm text-slate-500">
-            Konfigurasi LLM provider untuk app &amp; CLI
-          </p>
+          <h1 className="text-2xl font-bold tracking-tight text-white">
+            AgentX <span className="text-gradient">Panel</span>
+          </h1>
+          <p className="mt-1 text-sm text-slate-500">Secure administration configuration</p>
         </div>
 
         <form
           onSubmit={(e) => void handleSubmit(e)}
-          className="space-y-4 rounded-xl border border-surface-3 bg-surface-1 p-6 shadow-soft"
+          className="glass-card space-y-5 rounded-3xl p-8"
         >
           <div>
-            <label htmlFor="email" className="mb-1.5 block text-xs font-medium text-slate-400">
+            <label
+              htmlFor="email"
+              className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-slate-400"
+            >
               Email
             </label>
             <input
@@ -80,12 +86,15 @@ export default function LoginForm() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="admin@example.com"
-              className="w-full rounded-lg border border-surface-3 bg-surface-0 px-3 py-2 text-sm text-slate-200 placeholder:text-slate-600 focus:border-accent-500/60"
+              className="glass-input w-full rounded-xl px-4 py-2.5 text-sm text-white placeholder:text-slate-600"
             />
           </div>
 
           <div>
-            <label htmlFor="password" className="mb-1.5 block text-xs font-medium text-slate-400">
+            <label
+              htmlFor="password"
+              className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-slate-400"
+            >
               Password
             </label>
             <div className="relative">
@@ -97,20 +106,22 @@ export default function LoginForm() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
-                className="w-full rounded-lg border border-surface-3 bg-surface-0 px-3 py-2 pl-9 text-sm text-slate-200 placeholder:text-slate-600 focus:border-accent-500/60"
+                className="glass-input w-full rounded-xl px-4 py-2.5 pl-10 text-sm text-white placeholder:text-slate-600"
               />
               <Lock
-                className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-500"
-                strokeWidth={1.8}
+                className="absolute left-3.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-500"
+                strokeWidth={2}
                 aria-hidden
               />
             </div>
           </div>
 
-          <TurnstileWidget onToken={setTurnstileToken} />
+          <div className="pt-2">
+            <TurnstileWidget onToken={setTurnstileToken} />
+          </div>
 
           {error && (
-            <p className="rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-2 text-xs text-red-300">
+            <p className="rounded-xl border border-rose-500/20 bg-rose-950/20 px-4 py-3 text-xs text-rose-300">
               {error}
             </p>
           )}
@@ -118,24 +129,24 @@ export default function LoginForm() {
           <button
             type="submit"
             disabled={loading}
-            className="flex w-full items-center justify-center gap-2 rounded-lg bg-accent-500 px-4 py-2 text-sm font-semibold text-slate-950 transition-colors hover:bg-accent-400 disabled:cursor-not-allowed disabled:opacity-60"
+            className="btn-gradient flex w-full items-center justify-center gap-2 rounded-xl py-3 text-sm font-bold text-white transition-all disabled:opacity-50"
           >
             {loading ? (
               <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
             ) : (
-              <LogIn className="h-4 w-4" strokeWidth={2} aria-hidden />
+              <LogIn className="h-4 w-4" strokeWidth={2.5} aria-hidden />
             )}
-            {loading ? 'Signing in…' : 'Sign in'}
+            {loading ? 'Authenticating...' : 'Sign in'}
           </button>
         </form>
 
-        <p className="mt-4 text-center text-xs text-slate-600">
-          Belum punya akun? Daftar di{' '}
+        <p className="mt-8 text-center text-xs text-slate-600">
+          Need access? Request at{' '}
           <a
-            href="https://app.id-tech.cloud/signup"
+            href="https://app.id-tech.cloud"
             target="_blank"
             rel="noreferrer"
-            className="text-accent-400 hover:text-accent-300"
+            className="font-medium text-accent-300 hover:text-white transition-colors"
           >
             app.id-tech.cloud
           </a>

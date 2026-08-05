@@ -15,118 +15,164 @@ import {
   Settings,
   Menu,
   X,
+  Hexagon,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { isAuthed } from '@/lib/api';
+
+/* ─── Navigation config ──────────────────────────────────────── */
 
 interface NavItem {
   href: string;
   label: string;
   icon: LucideIcon;
   exact?: boolean;
+  group: 'core' | 'insights' | 'admin';
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { href: '/', label: 'Home', icon: Home, exact: true },
-  { href: '/chat', label: 'Chat', icon: MessageSquare },
-  { href: '/multi-agent', label: 'Multi-Agent', icon: Users },
-  { href: '/agents', label: 'Agents', icon: Bot },
-  { href: '/quality', label: 'Quality', icon: Medal },
-  { href: '/feedback', label: 'Feedback', icon: Repeat },
-  { href: '/analytics', label: 'Analytics', icon: BarChart3 },
-  { href: '/team', label: 'Team', icon: Users2 },
-  { href: '/settings', label: 'Settings', icon: Settings },
+  { href: '/', label: 'Home', icon: Home, exact: true, group: 'core' },
+  { href: '/chat', label: 'Chat', icon: MessageSquare, group: 'core' },
+  { href: '/multi-agent', label: 'Multi-Agent', icon: Users, group: 'core' },
+  { href: '/agents', label: 'Agents', icon: Bot, group: 'core' },
+  { href: '/quality', label: 'Quality', icon: Medal, group: 'insights' },
+  { href: '/feedback', label: 'Feedback', icon: Repeat, group: 'insights' },
+  { href: '/analytics', label: 'Analytics', icon: BarChart3, group: 'insights' },
+  { href: '/team', label: 'Team', icon: Users2, group: 'admin' },
+  { href: '/settings', label: 'Settings', icon: Settings, group: 'admin' },
 ];
+
+const GROUP_LABELS: Record<string, string> = {
+  core: undefined as unknown as string,
+  insights: 'Insights',
+  admin: 'Administration',
+};
 
 function isActive(item: NavItem, pathname: string): boolean {
   return item.exact ? pathname === item.href : pathname.startsWith(item.href);
 }
 
-function NavLinks({
-  pathname,
-  authed,
-  onNavigate,
-}: {
-  pathname: string;
-  authed: boolean;
-  onNavigate?: () => void;
-}) {
+/* ─── Sidebar nav links ──────────────────────────────────────── */
+
+function NavLinks({ pathname, onNavigate }: { pathname: string; onNavigate?: () => void }) {
+  const seenGroups = new Set<string>();
+
   return (
-    <div className="flex h-full flex-col">
-      <nav className="flex flex-col gap-0.5 px-2">
-        {NAV_ITEMS.map((item) => {
-          const active = isActive(item, pathname);
-          const Icon = item.icon;
-          return (
+    <nav className="flex flex-col gap-1 px-3 py-2">
+      {NAV_ITEMS.map((item) => {
+        const active = isActive(item, pathname);
+        const Icon = item.icon;
+        const isFirstInGroup = !seenGroups.has(item.group);
+        if (isFirstInGroup) seenGroups.add(item.group);
+        const showGroup = isFirstInGroup && GROUP_LABELS[item.group];
+
+        return (
+          <div key={item.href}>
+            {showGroup && (
+              <p className="mt-4 mb-1.5 px-3 text-[10px] font-semibold uppercase tracking-widest text-slate-600">
+                {GROUP_LABELS[item.group]}
+              </p>
+            )}
             <Link
-              key={item.href}
               href={item.href}
               onClick={onNavigate}
               aria-current={active ? 'page' : undefined}
-              className={`flex items-center gap-3 rounded-lg px-3 py-2 text-[13px] font-medium transition-colors ${
+              className={`group relative flex items-center gap-3 rounded-lg px-3 py-2 text-[13px] font-medium transition-all duration-150 ${
                 active
                   ? 'bg-surface-2 text-white'
-                  : 'text-slate-400 hover:bg-surface-2/60 hover:text-slate-200'
+                  : 'text-slate-400 hover:bg-white/[0.03] hover:text-slate-200'
               }`}
             >
+              {/* Active indicator — indigo gradient bar */}
+              {active && (
+                <div className="absolute left-0 top-1 bottom-1 w-0.5 rounded-r-full bg-gradient-to-b from-accent-400 to-secondary-400" />
+              )}
               <Icon
-                className={`h-4 w-4 shrink-0 ${active ? 'text-accent-400' : 'text-slate-500'}`}
+                className={`h-4 w-4 shrink-0 transition-colors duration-150 ${
+                  active ? 'text-accent-300' : 'text-slate-500 group-hover:text-slate-300'
+                }`}
                 strokeWidth={1.8}
                 aria-hidden
               />
               {item.label}
             </Link>
-          );
-        })}
-      </nav>
-      <div className="mt-auto border-t border-surface-3 px-5 py-4">
-        <div className="flex items-center gap-2 text-xs text-slate-500">
+          </div>
+        );
+      })}
+    </nav>
+  );
+}
+
+/* ─── Brand ──────────────────────────────────────────────────── */
+
+function Brand() {
+  return (
+    <Link
+      href="/"
+      className="group flex items-center gap-3 px-5 py-5 transition-transform active:scale-[0.98]"
+    >
+      <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-accent-500 to-secondary-600 text-white shadow-[0_0_20px_-5px_rgba(99,102,241,0.5)] transition-shadow group-hover:shadow-[0_0_30px_-5px_rgba(99,102,241,0.6)]">
+        <Hexagon className="h-4.5 w-4.5" strokeWidth={2} fill="currentColor" />
+      </span>
+      <div className="flex flex-col">
+        <span className="text-[17px] font-bold tracking-tight text-white group-hover:text-accent-300 transition-colors">
+          AgentX
+        </span>
+        <span className="text-[10px] font-medium tracking-wider text-slate-600 uppercase">
+          AI Workspace
+        </span>
+      </div>
+    </Link>
+  );
+}
+
+/* ─── Sidebar footer ─────────────────────────────────────────── */
+
+function SidebarFooter({ authed }: { authed: boolean }) {
+  return (
+    <div className="mt-auto border-t border-white/[0.04] px-5 py-4">
+      <div className="flex items-center gap-2 text-[11px] text-slate-500">
+        <span
+          className={`relative flex h-2 w-2 items-center justify-center ${
+            authed ? 'text-emerald-400' : 'text-slate-600'
+          }`}
+        >
           <span
-            className={`h-1.5 w-1.5 rounded-full ${authed ? 'bg-emerald-400' : 'bg-slate-600'}`}
+            className={`absolute h-full w-full animate-ping rounded-full opacity-75 ${
+              authed ? 'bg-emerald-400' : 'bg-slate-600'
+            }`}
           />
-          {authed ? (
-            <Link href="/settings" className="hover:text-slate-300">
-              Signed in · Settings
+          <span
+            className={`relative h-1.5 w-1.5 rounded-full ${
+              authed ? 'bg-emerald-400' : 'bg-slate-600'
+            }`}
+          />
+        </span>
+        {authed ? (
+          <Link href="/settings" className="hover:text-accent-300 transition-colors">
+            Connected · System
+          </Link>
+        ) : (
+          <div className="flex items-center gap-2">
+            <Link href="/settings" className="hover:text-accent-300 transition-colors">
+              Sign in
             </Link>
-          ) : (
-            <div className="flex items-center gap-1">
-              <Link
-                href="/settings"
-                className="rounded-md px-1.5 py-0.5 hover:bg-surface-2 hover:text-slate-300"
-              >
-                Sign in
-              </Link>
-              <span className="text-slate-700">·</span>
-              <Link
-                href="/signup"
-                className="rounded-md bg-accent-500/15 px-1.5 py-0.5 font-medium text-accent-300 hover:bg-accent-500/25"
-              >
-                Sign up
-              </Link>
-            </div>
-          )}
-        </div>
+            <span className="text-slate-700">·</span>
+            <Link
+              href="/signup"
+              className="font-medium text-accent-300 hover:text-white transition-colors"
+            >
+              Sign up
+            </Link>
+          </div>
+        )}
       </div>
     </div>
   );
 }
 
-function Brand() {
-  return (
-    <Link href="/" className="flex items-center gap-2.5 px-5 py-5">
-      <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-accent-400 to-secondary-500 text-slate-950 shadow-soft">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
-          <path d="M12 2 4 7v10l8 5 8-5V7l-8-5Zm0 2.2 6 3.75v7.1l-6 3.75-6-3.75v-7.1l6-3.75Z" />
-        </svg>
-      </span>
-      <span className="text-[15px] font-semibold tracking-tight text-slate-100">AgentX</span>
-    </Link>
-  );
-}
+/* ─── Main shell ─────────────────────────────────────────────── */
 
-// App shell: persistent sidebar on desktop, slide-in drawer with hamburger
-// on mobile. Every page renders inside <main> — the shell owns the background,
-// navigation, and responsive layout.
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -134,14 +180,17 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="min-h-screen bg-surface-0 text-slate-100">
-      {/* Desktop sidebar (fixed, hidden on mobile) */}
-      <aside className="fixed inset-y-0 left-0 z-40 hidden w-60 border-r border-surface-3 bg-surface-1/70 backdrop-blur lg:block">
+      {/* ── Desktop sidebar (fixed, hidden on mobile) ── */}
+      <aside className="fixed inset-y-0 left-0 z-40 hidden w-60 border-r border-white/[0.04] bg-surface-1/80 backdrop-blur-xl lg:flex lg:flex-col">
         <Brand />
-        <NavLinks pathname={pathname} authed={authed} />
+        <div className="flex-1 overflow-y-auto">
+          <NavLinks pathname={pathname} />
+        </div>
+        <SidebarFooter authed={authed} />
       </aside>
 
-      {/* Mobile top bar */}
-      <header className="fixed inset-x-0 top-0 z-40 flex h-13 items-center gap-3 border-b border-surface-3 bg-surface-0/80 px-3 backdrop-blur lg:hidden">
+      {/* ── Mobile top bar ── */}
+      <header className="fixed inset-x-0 top-0 z-40 flex h-13 items-center gap-3 border-b border-white/[0.04] bg-surface-0/80 px-3 backdrop-blur-xl lg:hidden">
         <button
           type="button"
           aria-label="Open navigation"
@@ -152,15 +201,13 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         </button>
         <Link href="/" className="flex items-center gap-1.5">
           <span className="flex h-5 w-5 items-center justify-center rounded bg-gradient-to-br from-accent-400 to-secondary-500 text-[10px] font-black text-slate-950">
-            <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
-              <path d="M12 2 4 7v10l8 5 8-5V7l-8-5Z" />
-            </svg>
+            <Hexagon width="10" height="10" strokeWidth={2.5} fill="currentColor" />
           </span>
           <span className="text-sm font-semibold text-slate-200">AgentX</span>
         </Link>
       </header>
 
-      {/* Mobile drawer + backdrop */}
+      {/* ── Mobile drawer + backdrop ── */}
       {drawerOpen && (
         <div className="fixed inset-0 z-50 lg:hidden">
           <div
@@ -168,7 +215,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             onClick={() => setDrawerOpen(false)}
             aria-hidden
           />
-          <aside className="absolute inset-y-0 left-0 w-64 border-r border-surface-3 bg-surface-1 shadow-2xl">
+          <aside className="absolute inset-y-0 left-0 flex w-64 flex-col border-r border-white/[0.04] bg-surface-1 shadow-2xl animate-slide-in-left">
             <div className="flex items-center justify-between pr-3">
               <Brand />
               <button
@@ -180,12 +227,15 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                 <X className="h-4 w-4" strokeWidth={1.8} aria-hidden />
               </button>
             </div>
-            <NavLinks pathname={pathname} authed={authed} onNavigate={() => setDrawerOpen(false)} />
+            <div className="flex-1 overflow-y-auto">
+              <NavLinks pathname={pathname} onNavigate={() => setDrawerOpen(false)} />
+            </div>
+            <SidebarFooter authed={authed} />
           </aside>
         </div>
       )}
 
-      {/* Main content */}
+      {/* ── Main content area ── */}
       <main className="pt-13 lg:pl-60 lg:pt-0">
         <div className="mx-auto min-h-screen w-full max-w-6xl px-4 py-6 sm:px-6 lg:px-8">
           {children}

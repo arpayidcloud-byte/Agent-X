@@ -5,6 +5,9 @@ import { Landmark, Code2, Search, FlaskConical } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { fetchAgents, updateAgent, isAuthed, getToken, type AgentConfig } from '@/lib/api';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Card } from '@/components/ui/card';
+import { SkeletonStat } from '@/components/ui/skeleton';
 
 const ROLE_ICON: Record<string, LucideIcon> = {
   architect: Landmark,
@@ -13,10 +16,16 @@ const ROLE_ICON: Record<string, LucideIcon> = {
   tester: FlaskConical,
 };
 
+const ROLE_COLOR: Record<string, string> = {
+  architect: 'text-accent-300 bg-accent-500/10',
+  coder: 'text-secondary-300 bg-secondary-500/10',
+  reviewer: 'text-amber-300 bg-amber-500/10',
+  tester: 'text-emerald-300 bg-emerald-500/10',
+};
+
 const COMPLEXITY_OPTIONS = ['simple', 'medium', 'complex'] as const;
 
-// Web Pro agent configuration: read-only view for visitors, full editing for
-// admins (PATCH requires a Bearer token with role admin).
+// Agent management: read-only for visitors, full editing for admins.
 export default function AgentsView() {
   const [agents, setAgents] = useState<AgentConfig[] | null>(null);
   const [modelOptions, setModelOptions] = useState<string[]>([]);
@@ -59,55 +68,72 @@ export default function AgentsView() {
   }
 
   if (loading) {
-    return <p className="py-10 text-center text-sm text-slate-500">Loading agents…</p>;
+    return (
+      <div className="space-y-4">
+        <SkeletonStat />
+        <SkeletonStat />
+        <SkeletonStat />
+      </div>
+    );
   }
   if (error && !agents) {
     return (
-      <p className="rounded-lg border border-rose-500/30 bg-rose-950/30 px-4 py-3 text-sm text-rose-300">
-        ⚠ Failed to load agents: {error}
-      </p>
+      <div className="rounded-xl border border-rose-500/25 bg-rose-500/5 p-5">
+        <p className="text-sm text-rose-300">⚠ Failed to load agents: {error}</p>
+      </div>
     );
   }
   if (!agents) return null;
 
   return (
-    <div className="space-y-4">
+    <div className="section space-y-4">
       {!authed && (
-        <p className="rounded-lg border border-amber-500/20 bg-amber-950/30 px-4 py-2 text-xs text-amber-300">
-          Read-only view — login as admin (via the Beta Recruitment page) to edit agent
-          configuration.
-        </p>
+        <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-3">
+          <p className="text-xs text-amber-300">
+            Read-only view — login as admin to edit agent configuration.
+          </p>
+        </div>
       )}
       {error && (
-        <p className="rounded-lg border border-rose-500/30 bg-rose-950/30 px-4 py-2 text-xs text-rose-300">
-          ⚠ {error}
-        </p>
+        <div className="rounded-xl border border-rose-500/25 bg-rose-500/5 p-3">
+          <p className="text-xs text-rose-300">⚠ {error}</p>
+        </div>
       )}
 
       {agents.map((agent) => {
         const RoleIcon = ROLE_ICON[agent.role] ?? Code2;
+        const roleColor = ROLE_COLOR[agent.role] ?? 'text-slate-300 bg-surface-3';
         return (
-          <div
+          <Card
             key={agent.id}
-            className={`rounded-xl border p-5 transition ${
-              agent.enabled
-                ? 'border-surface-3 bg-surface-1'
-                : 'border-surface-3 bg-surface-0 opacity-70'
-            }`}
+            className={`p-5 transition-all ${!agent.enabled ? 'opacity-60' : ''}`}
           >
             <div className="flex flex-wrap items-start justify-between gap-4">
-              <div>
-                <h3 className="flex items-center gap-2 text-base font-semibold text-slate-100">
-                  <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-surface-2 text-accent-400">
-                    <RoleIcon className="h-4 w-4" strokeWidth={1.8} aria-hidden />
-                  </span>
-                  {agent.name}
-                  <span className="rounded bg-surface-2 px-2 py-0.5 font-mono text-xs text-slate-400">
-                    {agent.id}
-                  </span>
-                </h3>
-                <p className="mt-1 max-w-2xl text-sm text-slate-400">{agent.description}</p>
-                <p className="mt-1 text-xs text-slate-500">{agent.capabilities.join(' · ')}</p>
+              <div className="flex items-start gap-3">
+                <div
+                  className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${roleColor}`}
+                >
+                  <RoleIcon className="h-5 w-5" strokeWidth={1.8} aria-hidden />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-base font-semibold text-slate-100">{agent.name}</h3>
+                    <Badge tone={agent.enabled ? 'success' : 'neutral'}>
+                      {agent.enabled ? 'Enabled' : 'Disabled'}
+                    </Badge>
+                  </div>
+                  <p className="mt-1 max-w-2xl text-sm text-slate-400">{agent.description}</p>
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    {agent.capabilities.map((cap) => (
+                      <span
+                        key={cap}
+                        className="rounded-md bg-surface-3/60 px-2 py-0.5 text-[10px] font-medium text-slate-400"
+                      >
+                        {cap}
+                      </span>
+                    ))}
+                  </div>
+                </div>
               </div>
               {authed && (
                 <Button
@@ -122,14 +148,14 @@ export default function AgentsView() {
             </div>
 
             {authed && (
-              <div className="mt-4 flex flex-wrap gap-4 border-t border-surface-3 pt-4 text-sm">
+              <div className="mt-4 flex flex-wrap gap-4 border-t border-white/[0.04] pt-4 text-sm">
                 <label className="flex items-center gap-2 text-slate-400">
                   Model
                   <select
                     value={agent.model}
                     onChange={(e) => void patch(agent.id, { model: e.target.value })}
                     disabled={saving === agent.id}
-                    className="rounded-lg border border-surface-3 bg-surface-0 px-2 py-1 text-xs text-slate-200 focus:border-accent-500/60 focus:outline-none focus:ring-2 focus:ring-accent-500/20 disabled:opacity-50"
+                    className="rounded-lg border border-white/[0.06] bg-surface-2/60 px-2.5 py-1.5 text-xs text-slate-200 focus:border-accent-500/40 focus:outline-none focus:ring-2 focus:ring-accent-500/15 disabled:opacity-50"
                   >
                     {modelOptions.map((m) => (
                       <option key={m} value={m}>
@@ -144,7 +170,7 @@ export default function AgentsView() {
                     value={agent.complexity}
                     onChange={(e) => void patch(agent.id, { complexity: e.target.value })}
                     disabled={saving === agent.id}
-                    className="rounded-lg border border-surface-3 bg-surface-0 px-2 py-1 text-xs text-slate-200 focus:border-accent-500/60 focus:outline-none focus:ring-2 focus:ring-accent-500/20 disabled:opacity-50"
+                    className="rounded-lg border border-white/[0.06] bg-surface-2/60 px-2.5 py-1.5 text-xs text-slate-200 focus:border-accent-500/40 focus:outline-none focus:ring-2 focus:ring-accent-500/15 disabled:opacity-50"
                   >
                     {COMPLEXITY_OPTIONS.map((c) => (
                       <option key={c} value={c}>
@@ -158,7 +184,7 @@ export default function AgentsView() {
                 )}
               </div>
             )}
-          </div>
+          </Card>
         );
       })}
     </div>

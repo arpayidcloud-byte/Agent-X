@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { Send, Loader2 } from 'lucide-react';
+import { Send, Loader2, Bot, User, Info } from 'lucide-react';
 import { startChatStream, type ChatMessage, type ChatStreamEvent } from '@/lib/api';
 import { openEventStream, type StreamHandle } from '@/lib/stream';
 
@@ -12,8 +12,7 @@ interface Bubble {
   error?: boolean;
 }
 
-// Web Pro chat: transcript UI + SSE token streaming. The chat starts via
-// POST /v1/agentx/chat/stream (202) and chunks arrive over EventSource.
+// Chat workspace: transcript UI + SSE token streaming.
 export default function ChatView() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [bubbles, setBubbles] = useState<Bubble[]>([]);
@@ -22,6 +21,7 @@ export default function ChatView() {
   const [error, setError] = useState<string | null>(null);
   const sourceRef = useRef<StreamHandle | null>(null);
   const bottomRef = useRef<HTMLDivElement | null>(null);
+  const inputRef = useRef<HTMLTextAreaElement | null>(null);
   const assistantRef = useRef('');
 
   useEffect(() => {
@@ -33,6 +33,15 @@ export default function ChatView() {
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [bubbles]);
+
+  // Auto-resize textarea
+  useEffect(() => {
+    const el = inputRef.current;
+    if (el) {
+      el.style.height = 'auto';
+      el.style.height = `${Math.min(el.scrollHeight, 120)}px`;
+    }
+  }, [input]);
 
   async function handleSend(e: React.FormEvent) {
     e.preventDefault();
@@ -107,41 +116,64 @@ export default function ChatView() {
   }
 
   return (
-    <div className="mx-auto flex h-[calc(100dvh-9rem)] max-w-3xl flex-col overflow-hidden rounded-2xl border border-surface-3 bg-surface-1 shadow-soft">
-      <div className="flex items-center gap-2 border-b border-surface-3 px-4 py-3.5 sm:px-6">
-        <span className="h-2 w-2 rounded-full bg-accent-400" />
-        <h2 className="text-sm font-semibold text-slate-200">Chat</h2>
-        <span className="ml-auto text-xs text-slate-500">Streaming responses</span>
+    <div className="mx-auto flex h-[calc(100dvh-9rem)] max-w-3xl flex-col overflow-hidden rounded-2xl border border-white/[0.04] bg-surface-1/60 shadow-soft">
+      {/* Header */}
+      <div className="flex items-center gap-3 border-b border-white/[0.04] px-5 py-3.5">
+        <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-accent-500/10">
+          <Bot className="h-3.5 w-3.5 text-accent-300" strokeWidth={2} />
+        </div>
+        <div>
+          <h2 className="text-sm font-semibold text-slate-200">Chat</h2>
+          <p className="text-[11px] text-slate-500">Streaming responses</p>
+        </div>
+        <div className="ml-auto flex items-center gap-1.5 text-[11px] text-slate-500">
+          <Info className="h-3 w-3" strokeWidth={2} />
+          <span className="hidden sm:inline">Multi-turn with streaming</span>
+        </div>
       </div>
 
-      <div className="flex-1 space-y-4 overflow-y-auto p-4 sm:p-6">
+      {/* Messages */}
+      <div className="flex-1 space-y-4 overflow-y-auto px-4 py-5 sm:px-6">
         {bubbles.length === 0 && (
-          <p className="pt-16 text-center text-sm text-slate-500">
-            Ask anything — responses stream in as they are generated.
-          </p>
+          <div className="flex flex-col items-center justify-center pt-16">
+            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-surface-2/80">
+              <Bot className="h-5 w-5 text-slate-500" strokeWidth={1.5} />
+            </div>
+            <p className="mt-4 text-sm text-slate-500">
+              Ask anything — responses stream in as they are generated.
+            </p>
+          </div>
         )}
         {bubbles.map((b, i) => (
-          <div key={i} className={`flex ${b.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+          <div
+            key={i}
+            className={`flex gap-3 ${b.role === 'user' ? 'justify-end' : 'justify-start'}`}
+          >
+            {b.role === 'assistant' && (
+              <div className="mt-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-accent-500/10">
+                <Bot className="h-3.5 w-3.5 text-accent-300" strokeWidth={2} />
+              </div>
+            )}
             <div
-              className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed sm:max-w-[80%] ${
+              className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-relaxed sm:max-w-[80%] ${
                 b.role === 'user'
-                  ? 'rounded-br-md bg-accent-500 text-slate-950'
+                  ? 'rounded-br-md bg-accent-500 text-white shadow-[0_2px_8px_rgba(79,70,229,0.25)]'
                   : b.error
-                    ? 'rounded-bl-md border border-rose-500/30 bg-rose-950/30 text-rose-200'
-                    : 'rounded-bl-md border border-surface-3 bg-surface-0 text-slate-100'
+                    ? 'rounded-bl-md border border-rose-500/25 bg-rose-500/5 text-rose-200'
+                    : 'rounded-bl-md border border-white/[0.04] bg-surface-2/60 text-slate-100'
               }`}
             >
               {b.role === 'user' ? (
-                b.content
+                <p className="whitespace-pre-wrap">{b.content}</p>
               ) : (
                 <>
                   <p className="whitespace-pre-wrap">
                     {b.content}
                     {streaming && !b.content && (
                       <span className="inline-flex items-center gap-1">
-                        <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-slate-500 [animation-delay:0ms]" />
-                        <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-slate-500 [animation-delay:120ms]" />
-                        <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-slate-500 [animation-delay:240ms]" />
+                        <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-accent-400 [animation-delay:0ms]" />
+                        <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-accent-400 [animation-delay:120ms]" />
+                        <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-accent-400 [animation-delay:240ms]" />
                       </span>
                     )}
                   </p>
@@ -151,39 +183,53 @@ export default function ChatView() {
                 </>
               )}
             </div>
+            {b.role === 'user' && (
+              <div className="mt-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-surface-3/80">
+                <User className="h-3.5 w-3.5 text-slate-400" strokeWidth={2} />
+              </div>
+            )}
           </div>
         ))}
         <div ref={bottomRef} />
       </div>
 
+      {/* Error bar */}
       {error && (
-        <p className="border-t border-rose-500/20 bg-rose-950/30 px-6 py-2 text-xs text-rose-300">
-          ⚠ {error}
-        </p>
+        <div className="border-t border-rose-500/20 bg-rose-500/5 px-5 py-2.5">
+          <p className="text-xs text-rose-300">⚠ {error}</p>
+        </div>
       )}
 
+      {/* Composer */}
       <form
         onSubmit={(e) => void handleSend(e)}
-        className="flex gap-2 border-t border-surface-3 p-3 sm:gap-3 sm:p-4"
+        className="flex gap-2 border-t border-white/[0.04] p-3 sm:gap-3 sm:p-4"
       >
-        <input
+        <textarea
+          ref={inputRef}
           value={input}
           onChange={(e) => setInput(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+              e.preventDefault();
+              void handleSend(e);
+            }
+          }}
           placeholder="Type a message…"
+          rows={1}
           disabled={streaming}
-          className="h-10 flex-1 rounded-lg border border-surface-3 bg-surface-0 px-3.5 text-sm text-slate-100 placeholder:text-slate-500 transition-colors focus:border-accent-500/60 focus:outline-none focus:ring-2 focus:ring-accent-500/20 disabled:opacity-50"
+          className="min-h-[40px] flex-1 resize-none rounded-xl border border-white/[0.06] bg-surface-2/60 px-3.5 py-2.5 text-sm text-slate-100 placeholder:text-slate-500 transition-all focus:border-accent-500/40 focus:ring-2 focus:ring-accent-500/15 focus:outline-none disabled:opacity-50"
         />
         <button
           type="submit"
           disabled={streaming || !input.trim()}
-          className="inline-flex h-10 items-center gap-1.5 rounded-lg bg-accent-500 px-4 text-sm font-semibold text-slate-950 transition-colors hover:bg-accent-400 disabled:cursor-not-allowed disabled:opacity-50"
+          className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-accent-500 to-accent-400 text-white transition-all shadow-lg hover:shadow-accent-500/25 disabled:cursor-not-allowed disabled:opacity-40 disabled:shadow-none"
         >
           {streaming ? (
             <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
           ) : (
             <Send className="h-4 w-4" strokeWidth={2} aria-hidden />
           )}
-          <span className="hidden sm:inline">{streaming ? 'Streaming' : 'Send'}</span>
         </button>
       </form>
     </div>

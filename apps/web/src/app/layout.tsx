@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: 'AgentX',
+  title: 'AgentX — AI Agent Workspace',
   description: 'Enterprise AI Agent Platform — tasks, multi-agent teams, and analytics.',
   applicationName: 'AgentX',
 };
@@ -22,7 +22,7 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
-  themeColor: '#020617',
+  themeColor: '#000000',
 };
 
 export default function RootLayout({
@@ -32,7 +32,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}>
-      <body className="min-h-full bg-slate-950">
+      <body className="min-h-full bg-surface-0">
         <AppShell>{children}</AppShell>
       </body>
     </html>
