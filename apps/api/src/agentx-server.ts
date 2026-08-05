@@ -15,7 +15,7 @@ import {
   type QualityGrade,
 } from '@agent-xai/quality-scoring';
 import { generateFeedback, buildRevisionPrompt } from '@agent-xai/agent-feedback';
-import { maybeRequireAdmin, listUsers } from './auth.js';
+import { maybeRequireAdmin, listUsers, register, deleteUser, updateUserRoles } from './auth.js';
 import { createHttpServer } from './ws-bridge.js';
 import { startParallelRun, getMultiAgentRun } from './multi-agent-runner.js';
 import {
@@ -517,6 +517,57 @@ app.get('/v1/team', maybeRequireAdmin, async (_req, res) => {
   } catch (e) {
     const err = e instanceof Error ? e.message : String(e);
     res.status(500).json({ error: err });
+  }
+});
+
+// ─── Admin user management ────
+// Create a new user account (admin invite)
+app.post('/v1/admin/users', maybeRequireAdmin, async (req, res) => {
+  try {
+    const { email, password, roles } = req.body ?? {};
+    const result = await register(email, password);
+    if (roles && Array.isArray(roles)) {
+      await updateUserRoles(result.user.id, roles);
+    }
+    res.json({ user: result.user });
+  } catch (e) {
+    const status = (e as { status?: number }).status ?? 400;
+    res.status(status).json({ error: e instanceof Error ? e.message : String(e) });
+  }
+});
+
+// Delete a user account
+app.delete('/v1/admin/users/:id', maybeRequireAdmin, async (req, res) => {
+  try {
+    const userId = req.params.id as string;
+    const deleted = await deleteUser(userId);
+    if (!deleted) {
+      res.status(404).json({ error: 'User not found' });
+      return;
+    }
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ error: e instanceof Error ? e.message : String(e) });
+  }
+});
+
+// Update user roles
+app.patch('/v1/admin/users/:id', maybeRequireAdmin, async (req, res) => {
+  try {
+    const { roles } = req.body ?? {};
+    if (!roles || !Array.isArray(roles)) {
+      res.status(400).json({ error: 'roles must be an array' });
+      return;
+    }
+    const userId = req.params.id as string;
+    const user = await updateUserRoles(userId, roles);
+    if (!user) {
+      res.status(404).json({ error: 'User not found' });
+      return;
+    }
+    res.json({ user });
+  } catch (e) {
+    res.status(500).json({ error: e instanceof Error ? e.message : String(e) });
   }
 });
 

@@ -55,4 +55,13 @@ export class PrismaUserRepository {
   async updatePassword(id: string, passwordHash: string): Promise<void> {
     await this.prisma.user.update({ where: { id }, data: { passwordHash } });
   }
+
+  async delete(id: string): Promise<void> {
+    await this.prisma.user.delete({ where: { id } });
+  }
+
+  async update(id: string, data: { roles?: string[] }): Promise<UserRecord> {
+    const row = await this.prisma.user.update({ where: { id }, data });
+    return toRecord(row);
+  }
 }

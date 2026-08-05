@@ -57,6 +57,8 @@ interface UserBackend {
   findById(id: string): Promise<UserRecord | undefined>;
   list(): Promise<UserRecord[]>;
   updatePassword(id: string, passwordHash: string): Promise<void>;
+  deleteUser(id: string): Promise<boolean>;
+  updateUserRoles(id: string, roles: string[]): Promise<UserRecord | undefined>;
 }
 
 const memoryUserBackend: UserBackend = {
@@ -78,6 +80,17 @@ const memoryUserBackend: UserBackend = {
     const user = userStore.get(id);
     if (user) user.passwordHash = passwordHash;
   },
+  async deleteUser(id) {
+    return userStore.delete(id);
+  },
+  async updateUserRoles(id, roles) {
+    const user = userStore.get(id);
+    if (user) {
+      user.roles = roles;
+      return user;
+    }
+    return undefined;
+  },
 };
 
 function prismaUserBackend(prisma: NonNullable<ReturnType<typeof getPrisma>>): UserBackend {
@@ -97,6 +110,21 @@ function prismaUserBackend(prisma: NonNullable<ReturnType<typeof getPrisma>>): U
     },
     async updatePassword(id, passwordHash) {
       await repo.updatePassword(id, passwordHash);
+    },
+    async deleteUser(id) {
+      try {
+        await repo.delete(id);
+        return true;
+      } catch {
+        return false;
+      }
+    },
+    async updateUserRoles(id, roles) {
+      try {
+        return await repo.update(id, { roles });
+      } catch {
+        return undefined;
+      }
     },
   };
 }
@@ -220,6 +248,23 @@ export async function changePassword(
   const passwordHash = await bcrypt.hash(newPassword, 10);
   await backend.updatePassword(user.id, passwordHash);
   logger.info('Password changed', { email: user.email });
+}
+
+/** Delete a user by ID. Returns true if deleted. */
+export async function deleteUser(userId: string): Promise<boolean> {
+  const backend = await getUserBackend();
+  return backend.deleteUser(userId);
+}
+
+/** Update a user's roles. Returns updated user (without password hash) or undefined. */
+export async function updateUserRoles(
+  userId: string,
+  roles: string[],
+): Promise<Omit<UserRecord, 'passwordHash'> | undefined> {
+  const backend = await getUserBackend();
+  const user = await backend.updateUserRoles(userId, roles);
+  if (!user) return undefined;
+  return { id: user.id, email: user.email, roles: user.roles, createdAt: user.createdAt };
 }
 
 /** All registered users (password hashes stripped) — for team management. */
