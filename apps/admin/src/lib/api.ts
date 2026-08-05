@@ -351,6 +351,50 @@ export async function adminTestGroup(name: string): Promise<GroupTestResult> {
   );
 }
 
+// ─── Admin: user management ────
+
+export interface TeamMember {
+  id: string;
+  email: string;
+  roles: string[];
+  createdAt: string;
+}
+
+export async function adminListUsers(): Promise<{ users: TeamMember[] }> {
+  return authJson<{ users: TeamMember[] }>('/v1/team', {}, true);
+}
+
+export async function adminCreateUser(input: {
+  email: string;
+  password: string;
+  roles?: string[];
+}): Promise<{ user: TeamMember }> {
+  return authJson<{ user: TeamMember }>(
+    '/v1/admin/users',
+    { method: 'POST', body: JSON.stringify(input) },
+    true,
+  );
+}
+
+export async function adminDeleteUser(id: string): Promise<{ ok: boolean }> {
+  return authJson<{ ok: boolean }>(
+    `/v1/admin/users/${encodeURIComponent(id)}`,
+    { method: 'DELETE' },
+    true,
+  );
+}
+
+export async function adminUpdateUserRoles(
+  id: string,
+  roles: string[],
+): Promise<{ user: TeamMember }> {
+  return authJson<{ user: TeamMember }>(
+    `/v1/admin/users/${encodeURIComponent(id)}`,
+    { method: 'PATCH', body: JSON.stringify({ roles }) },
+    true,
+  );
+}
+
 // ─── Admin: dashboard status ────
 
 export interface ProviderHealth {
