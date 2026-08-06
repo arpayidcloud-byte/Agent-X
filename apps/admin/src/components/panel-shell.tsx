@@ -18,6 +18,7 @@ import {
   BarChart3,
   Users2,
   FileText,
+  DollarSign,
 } from 'lucide-react';
 import { isAuthed, clearToken, fetchMe, isAdminUser, type AuthUser } from '@/lib/api';
 
@@ -27,6 +28,7 @@ const NAV_ITEMS = [
   { href: '/agents', label: 'Agents', icon: Bot },
   { href: '/members', label: 'Members', icon: Users2 },
   { href: '/templates', label: 'Templates', icon: FileText },
+  { href: '/cost', label: 'Cost Tracking', icon: DollarSign },
   { href: '/providers', label: 'LLM Providers', icon: Cable },
   { href: '/groups', label: 'Combo Providers', icon: Layers },
   { href: '/analytics', label: 'Analytics', icon: BarChart3 },
