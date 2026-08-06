@@ -1,0 +1,145 @@
+/**
+ * Cloud API client for AgentX CLI.
+ *
+ * Provides authenticated access to the AgentX API server.
+ * When a cloud token is configured, commands route through the cloud API
+ * instead of the local in-memory runtime.
+ */
+import * as fs from 'fs';
+import * as path from 'path';
+
+const CONFIG_DIR = path.resolve(process.cwd(), '.agentx');
+const CONFIG_FILE = path.join(CONFIG_DIR, 'config.json');
+
+export interface CloudConfig {
+  apiToken?: string;
+  apiUrl?: string;
+}
+
+export const DEFAULT_API_URL = 'https://api.id-tech.cloud';
+
+export function loadCloudConfig(): CloudConfig {
+  if (!fs.existsSync(CONFIG_FILE)) return {};
+  try {
+    const raw = JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf-8')) as Record<string, unknown>;
+    return {
+      apiToken: (raw.apiToken as string) || undefined,
+      apiUrl: (raw.apiUrl as string) || undefined,
+    };
+  } catch {
+    return {};
+  }
+}
+
+export function saveCloudConfig(patch: Partial<CloudConfig>): void {
+  if (!fs.existsSync(CONFIG_DIR)) fs.mkdirSync(CONFIG_DIR, { recursive: true });
+  const existing = loadCloudConfig();
+  const merged = { ...existing, ...patch };
+  const raw: Record<string, unknown> = {};
+  if (merged.apiToken) raw.apiToken = merged.apiToken;
+  if (merged.apiUrl) raw.apiUrl = merged.apiUrl;
+
+  // Preserve other config keys (providers, groups, cliToken, etc.)
+  if (fs.existsSync(CONFIG_FILE)) {
+    const full = JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf-8')) as Record<string, unknown>;
+    Object.assign(full, raw);
+    fs.writeFileSync(CONFIG_FILE, JSON.stringify(full, null, 2));
+  } else {
+    fs.writeFileSync(CONFIG_FILE, JSON.stringify(raw, null, 2));
+  }
+}
+
+/** Returns the API base URL (no trailing slash). */
+export function getApiUrl(): string {
+  const cfg = loadCloudConfig();
+  return (cfg.apiUrl || DEFAULT_API_URL).replace(/\/+$/, '');
+}
+
+/** Returns true if the user has a cloud auth token. */
+export function isCloudAuthed(): boolean {
+  return !!loadCloudConfig().apiToken;
+}
+
+/** Authenticated fetch wrapper. Throws on non-OK responses. */
+export async function cloudFetch<T = unknown>(
+  path: string,
+  options: { method?: string; body?: unknown; headers?: Record<string, string> } = {},
+): Promise<T> {
+  const cfg = loadCloudConfig();
+  const apiBase = getApiUrl();
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    ...(cfg.apiToken ? { Authorization: `Bearer ${cfg.apiToken}` } : {}),
+    ...options.headers,
+  };
+
+  const res = await fetch(`${apiBase}${path}`, {
+    method: options.method ?? 'GET',
+    headers,
+    body: options.body ? JSON.stringify(options.body) : undefined,
+  });
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    let msg = `HTTP ${res.status}`;
+    try {
+      const parsed = JSON.parse(text) as { error?: string };
+      if (parsed.error) msg = parsed.error;
+    } catch {
+      if (text) msg = text.slice(0, 200);
+    }
+    const err = new Error(msg) as Error & { status: number };
+    err.status = res.status;
+    throw err;
+  }
+
+  return res.json() as Promise<T>;
+}
+
+/**
+ * Start an SSE connection and yield parsed events.
+ * Returns an async iterator of parsed JSON events.
+ */
+export function cloudSSE(ssePath: string): { stream: ReadableStream<string>; close: () => void } {
+  const apiBase = getApiUrl();
+  const cfg = loadCloudConfig();
+  const url = `${apiBase}${ssePath}`;
+  const headers: Record<string, string> = {};
+  if (cfg.apiToken) headers.Authorization = `Bearer ${cfg.apiToken}`;
+
+  const controller = new AbortController();
+
+  return {
+    stream: new ReadableStream<string>({
+      async start(controller) {
+        try {
+          const res = await fetch(url, { headers });
+          if (!res.ok || !res.body) {
+            controller.close();
+            return;
+          }
+          const reader = res.body.getReader();
+          const decoder = new TextDecoder();
+          let buffer = '';
+
+          for (;;) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split('\n');
+            buffer = lines.pop() ?? '';
+            for (const line of lines) {
+              if (line.startsWith('data: ')) {
+                controller.enqueue(line.slice(6));
+              }
+            }
+          }
+          controller.close();
+        } catch {
+          controller.close();
+        }
+      },
+    }),
+    close: () => controller.abort(),
+  };
+}

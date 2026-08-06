@@ -13,6 +13,7 @@ import { watch } from './commands/watch.js';
 import { dlq } from './commands/dlq.js';
 import { shutdown } from './commands/shutdown.js';
 import { tui as tuiCommand } from './commands/tui.js';
+import { login } from './commands/login.js';
 
 const require = createRequire(import.meta.url);
 const pkg = require('../package.json');
@@ -177,6 +178,25 @@ program
   .action(async () => {
     try {
       await tuiCommand();
+    } catch (error) {
+      console.error(error instanceof Error ? error.message : String(error));
+      process.exit(1);
+    }
+  });
+
+program
+  .command('login')
+  .description('Authenticate with the AgentX cloud API')
+  .option('--email <email>', 'Account email')
+  .option('--password <password>', 'Account password')
+  .option('--api <url>', 'API base URL (default: https://api.id-tech.cloud)')
+  .action(async (options: { email?: string; password?: string; api?: string }) => {
+    try {
+      const args: string[] = [];
+      if (options.email) args.push('--email', options.email);
+      if (options.password) args.push('--password', options.password);
+      if (options.api) args.push('--api', options.api);
+      await login(args);
     } catch (error) {
       console.error(error instanceof Error ? error.message : String(error));
       process.exit(1);
