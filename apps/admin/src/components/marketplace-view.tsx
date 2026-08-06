@@ -100,7 +100,20 @@ export default function MarketplaceView() {
   };
 
   useEffect(() => {
-    void load();
+    let cancelled = false;
+    void (async () => {
+      try {
+        const data = await apiFetch('/v1/marketplace/templates');
+        if (!cancelled) setTemplates(data.templates);
+      } catch (e) {
+        if (!cancelled) setError(e instanceof Error ? e.message : String(e));
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const filtered = templates.filter(
