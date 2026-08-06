@@ -203,6 +203,114 @@ program
     }
   });
 
+// ─── Shell Completions ────
+program
+  .command('completions')
+  .description('Install shell completions (bash/zsh/fish)')
+  .argument('[shell]', 'Shell type: bash, zsh, or fish')
+  .action((shell?: string) => {
+    const shells = shell ? [shell] : ['bash', 'zsh', 'fish'];
+    const scripts: Record<string, string> = {
+      bash: `# Add to ~/.bashrc or ~/.bash_profile:
+eval "$(agentx completions bash)"
+
+# Or install directly:
+agentx completions bash > ~/.bash_completions/agentx
+echo 'source ~/.bash_completions/agentx' >> ~/.bashrc`,
+      zsh: `# Add to ~/.zshrc:
+eval "$(agentx completions zsh)"
+
+# Or install directly:
+agentx completions zsh > ~/.zsh/completions/_agentx
+echo 'fpath=(~/.zsh/completions $fpath)' >> ~/.zshrc
+echo 'autoload -Uz compinit && compinit' >> ~/.zshrc`,
+      fish: `# Add to ~/.config/fish/completions/:
+agentx completions fish > ~/.config/fish/completions/agentx.fish`,
+    };
+
+    if (shell && (shell === 'bash' || shell === 'zsh' || shell === 'fish')) {
+      if (shell === 'bash') {
+        console.log(`_agentx_completions() {
+  local cur prev commands
+  COMPREPLY=()
+  cur="\${COMP_WORDS[COMP_CWORD]}"
+  prev="\${COMP_WORDS[COMP_CWORD-1]}"
+  commands="submit approve reject status demo config cost audit plugin watch dlq shutdown tui login completions help"
+
+  if [[ \${cur} == -* ]]; then
+    COMPREPLY=( $(compgen -W "--help --version --email --password --api" -- \${cur}) )
+  elif [[ \${prev} == @(submit|config) ]]; then
+    COMPREPLY=( $(compgen -f -- \${cur}) )
+  else
+    COMPREPLY=( $(compgen -W "\${commands}" -- \${cur}) )
+  fi
+}
+complete -F _agentx_completions agentx`);
+      } else if (shell === 'zsh') {
+        console.log(`#compdef agentx
+
+_agentx() {
+  _arguments \
+    '1:command:(submit approve reject status demo config cost audit plugin watch dlq shutdown tui login completions help)' \
+    '*::arg:{ _files }'
+}
+
+_agentx "$@"`);
+      } else if (shell === 'fish') {
+        console.log(`complete -c agentx -f
+complete -c agentx -n '__fish_use_subcommand' -a 'submit' -d 'Submit a new task'
+complete -c agentx -n '__fish_use_subcommand' -a 'approve' -d 'Approve a pending task'
+complete -c agentx -n '__fish_use_subcommand' -a 'reject' -d 'Reject a pending task'
+complete -c agentx -n '__fish_use_subcommand' -a 'status' -d 'Check task status'
+complete -c agentx -n '__fish_use_subcommand' -a 'demo' -d 'Run E2E demo'
+complete -c agentx -n '__fish_use_subcommand' -a 'config' -d 'Manage configuration'
+complete -c agentx -n '__fish_use_subcommand' -a 'cost' -d 'Show cost analysis'
+complete -c agentx -n '__fish_use_subcommand' -a 'audit' -d 'Run security audit'
+complete -c agentx -n '__fish_use_subcommand' -a 'plugin' -d 'Manage plugins'
+complete -c agentx -n '__fish_use_subcommand' -a 'watch' -d 'Watch for changes'
+complete -c agentx -n '__fish_use_subcommand' -a 'dlq' -d 'Manage Dead Letter Queue'
+complete -c agentx -n '__fish_use_subcommand' -a 'shutdown' -d 'Trigger graceful shutdown'
+complete -c agentx -n '__fish_use_subcommand' -a 'tui' -d 'Launch interactive Terminal UI'
+complete -c agentx -n '__fish_use_subcommand' -a 'login' -d 'Authenticate with AgentX cloud'
+complete -c agentx -n '__fish_use_subcommand' -a 'completions' -d 'Install shell completions'
+complete -c agentx -n '__fish_use_subcommand' -a 'help' -d 'Display help'`);
+      }
+    } else {
+      console.log('Usage: agentx completions [bash|zsh|fish]');
+      console.log('');
+      for (const s of shells) {
+        console.log(`Install ${s} completions:`);
+        console.log(scripts[s]);
+        console.log('');
+      }
+    }
+  });
+
+// ─── Auto-update check ────
+async function checkForUpdates(): Promise<void> {
+  try {
+    const currentVersion = pkg.version;
+    const res = await fetch('https://registry.npmjs.org/@agent-xai/cli/latest', {
+      signal: AbortSignal.timeout(3000),
+    });
+    if (res.ok) {
+      const data = (await res.json()) as { version?: string };
+      if (data.version && data.version !== currentVersion) {
+        console.log(`\x1b[33m⚠ Update available: ${currentVersion} → ${data.version}\x1b[0m`);
+        console.log(`  Run: npm install -g @agent-xai/cli@latest\n`);
+      }
+    }
+  } catch {
+    // Silently ignore — offline or timeout
+  }
+}
+
+// Check for updates on non-completions commands
+const cmd = process.argv[2];
+if (cmd && cmd !== 'completions' && cmd !== '--help' && cmd !== '-h') {
+  void checkForUpdates();
+}
+
 // Execute CLI
 program.parse(process.argv);
 
