@@ -49,6 +49,9 @@ import {
   CHAT_CHUNK_DELAY_MS,
   type ChatStreamEvent,
 } from './chat-stream.js';
+import { CostEntryRepository } from '@agent-xai/persistence';
+
+const costRepo = new CostEntryRepository();
 
 export { waitlistStore, feedbackStore, resetBetaStores } from './beta-store.js';
 export { qualityStore, resetQualityStore } from './quality-store.js';
@@ -185,6 +188,25 @@ app.post('/v1/agentx/run', async (req, res): Promise<void> => {
         completed.model = response.model;
         completed.response = response.message;
       }
+
+      // Record cost entry for persistent tracking
+      try {
+        await costRepo.create({
+          taskId: request.taskId,
+          provider: response.provider ?? 'unknown',
+          model: response.model ?? 'unknown',
+          inputTokens: response.usage?.inputTokens ?? 0,
+          outputTokens: response.usage?.outputTokens ?? 0,
+          totalTokens: response.usage?.totalTokens ?? 0,
+          costUsd: response.cost ?? 0,
+          latencyMs: response.latencyMs ?? 0,
+          cached: response.cached ?? false,
+          source: 'api',
+        });
+      } catch {
+        /* cost recording is best-effort */
+      }
+
       res.json(response);
     } catch (runErr) {
       const err = runErr instanceof Error ? runErr.message : String(runErr);
@@ -321,6 +343,24 @@ app.post('/v1/agentx/run/stream', async (req, res): Promise<void> => {
           response: response.message,
           at: new Date().toISOString(),
         });
+
+        // Record cost entry for persistent tracking
+        try {
+          await costRepo.create({
+            taskId: request.taskId,
+            provider: response.provider ?? 'unknown',
+            model: response.model ?? 'unknown',
+            inputTokens: response.usage?.inputTokens ?? 0,
+            outputTokens: response.usage?.outputTokens ?? 0,
+            totalTokens: response.usage?.totalTokens ?? 0,
+            costUsd: response.cost ?? 0,
+            latencyMs: response.latencyMs ?? 0,
+            cached: response.cached ?? false,
+            source: 'api',
+          });
+        } catch {
+          /* cost recording is best-effort */
+        }
       } catch (runErr) {
         const err = runErr instanceof Error ? runErr.message : String(runErr);
         const task = taskStore.get(request.taskId);
@@ -400,6 +440,25 @@ app.post('/v1/agentx/chat', async (req, res): Promise<void> => {
       provider: typeof provider === 'string' ? provider : undefined,
     };
     const response = await executeRoute(router, request, buildChatPrompt(parsed));
+
+    // Record cost entry for persistent tracking
+    try {
+      await costRepo.create({
+        taskId: request.taskId,
+        provider: response.provider ?? 'unknown',
+        model: response.model ?? 'unknown',
+        inputTokens: response.usage?.inputTokens ?? 0,
+        outputTokens: response.usage?.outputTokens ?? 0,
+        totalTokens: response.usage?.totalTokens ?? 0,
+        costUsd: response.cost ?? 0,
+        latencyMs: response.latencyMs ?? 0,
+        cached: response.cached ?? false,
+        source: 'web',
+      });
+    } catch {
+      /* cost recording is best-effort */
+    }
+
     res.json({ ...response, taskId: request.taskId });
   } catch (e) {
     const err = e instanceof Error ? e.message : String(e);
@@ -896,6 +955,30 @@ app.post('/v1/feedback/:id/revision', async (req, res): Promise<void> => {
   } catch (e) {
     const err = e instanceof Error ? e.message : String(e);
     res.status(500).json({ error: err });
+  }
+});
+
+// ─── Cost tracking: summary ────
+// Persistent cost data from CostEntry table (historical).
+app.get('/v1/cost/summary', async (req, res) => {
+  try {
+    const days = Number(req.query.days) || 30;
+    const summary = await costRepo.getSummary(days);
+    res.json(summary);
+  } catch (e) {
+    res.status(500).json({ error: String(e) });
+  }
+});
+
+// ─── Cost tracking: entries list ────
+app.get('/v1/cost/entries', async (req, res) => {
+  try {
+    const limit = Math.min(Number(req.query.limit) || 50, 200);
+    const offset = Number(req.query.offset) || 0;
+    const entries = await costRepo.list(limit, offset);
+    res.json({ entries, total: entries.length });
+  } catch (e) {
+    res.status(500).json({ error: String(e) });
   }
 });
 

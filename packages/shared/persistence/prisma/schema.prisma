@@ -224,3 +224,23 @@ model PromptTemplate {
   @@index([tags])
   @@index([createdAt])
 }
+model CostEntry {
+  id          String   @id @default(cuid())
+  taskId      String?
+  userId      String?
+  provider    String   // e.g. "openai", "deepseek", "anthropic"
+  model       String   // e.g. "gpt-4", "deepseek-v3"
+  inputTokens Int      @default(0)
+  outputTokens Int     @default(0)
+  totalTokens Int      @default(0)
+  costUsd     Float    @default(0)
+  latencyMs   Int      @default(0)
+  cached      Boolean  @default(false)
+  source      String   @default("api") // "api", "cli", "web", "multi-agent"
+  createdAt   DateTime @default(now())
+
+  @@index([taskId])
+  @@index([userId])
+  @@index([provider])
+  @@index([createdAt])
+}
