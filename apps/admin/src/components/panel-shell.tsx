@@ -20,6 +20,7 @@ import {
   FileText,
   DollarSign,
   Activity,
+  Store,
 } from 'lucide-react';
 import { isAuthed, clearToken, fetchMe, isAdminUser, type AuthUser } from '@/lib/api';
 
@@ -29,6 +30,7 @@ const NAV_ITEMS = [
   { href: '/agents', label: 'Agents', icon: Bot },
   { href: '/members', label: 'Members', icon: Users2 },
   { href: '/templates', label: 'Templates', icon: FileText },
+  { href: '/marketplace', label: 'Marketplace', icon: Store },
   { href: '/cost', label: 'Cost Tracking', icon: DollarSign },
   { href: '/activity', label: 'Activity', icon: Activity },
   { href: '/providers', label: 'LLM Providers', icon: Cable },
