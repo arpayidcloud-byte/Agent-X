@@ -8,3 +8,4 @@ export * from './prisma-quality-score-repository.js';
 export * from './prisma-agent-feedback-repository.js';
 export * from './prisma-user-repository.js';
 export * from './prompt-template-repository.js';
+export * from './cost-entry-repository.js';
