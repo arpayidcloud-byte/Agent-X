@@ -18,6 +18,7 @@ import { generateFeedback, buildRevisionPrompt } from '@agent-xai/agent-feedback
 import { maybeRequireAdmin, listUsers, register, deleteUser, updateUserRoles } from './auth.js';
 import { createHttpServer } from './ws-bridge.js';
 import { PromptTemplateRepository, getPrisma } from '@agent-xai/persistence';
+import { mountSwagger } from './swagger.js';
 import { startParallelRun, getMultiAgentRun } from './multi-agent-runner.js';
 import {
   subscribeMultiAgent,
@@ -80,6 +81,9 @@ app.use((req, res, next) => {
 
 registerAuthRoutes(app);
 registerOAuthRoutes(app);
+
+// ─── Swagger / OpenAPI docs ────
+mountSwagger(app);
 
 const PORT = process.env.PORT || 4000;
 
