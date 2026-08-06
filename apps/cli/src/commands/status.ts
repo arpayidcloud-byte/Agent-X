@@ -76,7 +76,7 @@ export async function status(args: string[]): Promise<void> {
       console.log('Run "agentx login" to connect to the cloud.');
       return;
     }
-    console.log('Tasks (local):');
+    console.log('Tasks:');
     for (const task of tasks) {
       console.log(`  ${task.id} - ${task.status} - ${task.goal}`);
     }
