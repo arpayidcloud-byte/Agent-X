@@ -244,3 +244,29 @@ model CostEntry {
   @@index([provider])
   @@index([createdAt])
 }
+
+model AgentTemplate {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  authorId    String   // user id
+  authorName  String   // display name
+  systemPrompt String?
+  tags        String[]
+  category    String?  // "productivity", "coding", "research", "creative"
+  priceUsd    Float    @default(0) // 0 = free
+  installCount Int     @default(0)
+  rating      Float    @default(0)
+  ratingCount Int      @default(0)
+  isPublished Boolean  @default(false)
+  isFeatured  Boolean  @default(false)
+  config      Json?    // extra config (model, provider, params)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([authorId])
+  @@index([category])
+  @@index([isPublished])
+  @@index([installCount])
+  @@index([rating])
+}

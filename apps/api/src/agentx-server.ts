@@ -49,9 +49,11 @@ import {
   CHAT_CHUNK_DELAY_MS,
   type ChatStreamEvent,
 } from './chat-stream.js';
-import { CostEntryRepository } from '@agent-xai/persistence';
+import { CostEntryRepository, AgentTemplateRepository } from '@agent-xai/persistence';
+import { verifyTurnstile } from './turnstile.js';
 
 const costRepo = new CostEntryRepository();
+const templateRepo = new AgentTemplateRepository();
 
 export { waitlistStore, feedbackStore, resetBetaStores } from './beta-store.js';
 export { qualityStore, resetQualityStore } from './quality-store.js';
@@ -1302,6 +1304,152 @@ export { app };
 if (process.env.NODE_ENV !== 'test') {
   // HTTP + WebSocket fallback on the same port (SSE primary, WS fallback).
   const server = createHttpServer(app);
+  // ─── Agent Marketplace ────
+
+  // Browse published templates
+  app.get('/v1/marketplace/templates', async (req, res) => {
+    try {
+      const { category, search, sort, limit, offset } = req.query;
+      const templates = await templateRepo.listPublished({
+        category: typeof category === 'string' ? category : undefined,
+        search: typeof search === 'string' ? search : undefined,
+        sortBy: (typeof sort === 'string' ? sort : 'popular') as
+          'popular' | 'rating' | 'newest' | 'price',
+        limit: Number(limit) || 50,
+        offset: Number(offset) || 0,
+      });
+      res.json({ templates, total: templates.length });
+    } catch (e) {
+      res.status(500).json({ error: String(e) });
+    }
+  });
+
+  // Get featured templates
+  app.get('/v1/marketplace/featured', async (_req, res) => {
+    try {
+      const templates = await templateRepo.getFeatured();
+      res.json({ templates });
+    } catch (e) {
+      res.status(500).json({ error: String(e) });
+    }
+  });
+
+  // Get categories
+  app.get('/v1/marketplace/categories', async (_req, res) => {
+    try {
+      const categories = await templateRepo.getCategories();
+      res.json({ categories });
+    } catch (e) {
+      res.status(500).json({ error: String(e) });
+    }
+  });
+
+  // Get single template
+  app.get('/v1/marketplace/templates/:id', async (req, res) => {
+    try {
+      const template = await templateRepo.getById(req.params.id);
+      if (!template) {
+        res.status(404).json({ error: 'Template not found' });
+        return;
+      }
+      res.json(template);
+    } catch (e) {
+      res.status(500).json({ error: String(e) });
+    }
+  });
+
+  // Install template (increment count)
+  app.post('/v1/marketplace/templates/:id/install', async (req, res) => {
+    try {
+      const { turnstileToken } = req.body ?? {};
+      if (!(await verifyTurnstile(turnstileToken))) {
+        res.status(403).json({ error: 'Human verification failed' });
+        return;
+      }
+      await templateRepo.incrementInstall(req.params.id);
+      res.json({ success: true });
+    } catch (e) {
+      res.status(500).json({ error: String(e) });
+    }
+  });
+
+  // Rate template
+  app.post('/v1/marketplace/templates/:id/rate', async (req, res) => {
+    try {
+      const { rating, turnstileToken } = req.body ?? {};
+      if (!(await verifyTurnstile(turnstileToken))) {
+        res.status(403).json({ error: 'Human verification failed' });
+        return;
+      }
+      if (typeof rating !== 'number' || rating < 1 || rating > 5) {
+        res.status(400).json({ error: 'Rating must be 1-5' });
+        return;
+      }
+      await templateRepo.rate(req.params.id, rating);
+      res.json({ success: true });
+    } catch (e) {
+      res.status(500).json({ error: String(e) });
+    }
+  });
+
+  // ─── Admin: Create/Edit/Delete templates ────
+  app.post('/v1/admin/templates', maybeRequireAdmin, async (req, res) => {
+    try {
+      const {
+        name,
+        description,
+        authorId,
+        authorName,
+        systemPrompt,
+        tags,
+        category,
+        priceUsd,
+        isPublished,
+      } = req.body ?? {};
+      if (!name || typeof name !== 'string') {
+        res.status(400).json({ error: 'Missing name' });
+        return;
+      }
+      if (!authorId || typeof authorId !== 'string') {
+        res.status(400).json({ error: 'Missing authorId' });
+        return;
+      }
+      const template = await templateRepo.create({
+        name,
+        description,
+        authorId,
+        authorName: authorName ?? 'Admin',
+        systemPrompt,
+        tags,
+        category,
+        priceUsd,
+        isPublished,
+      });
+      res.status(201).json(template);
+    } catch (e) {
+      res.status(500).json({ error: String(e) });
+    }
+  });
+
+  app.put('/v1/admin/templates/:id', maybeRequireAdmin, async (req, res) => {
+    try {
+      const id = String(req.params.id);
+      const updated = await templateRepo.update(id, req.body ?? {});
+      res.json(updated);
+    } catch (e) {
+      res.status(500).json({ error: String(e) });
+    }
+  });
+
+  app.delete('/v1/admin/templates/:id', maybeRequireAdmin, async (req, res) => {
+    try {
+      await templateRepo.delete(String(req.params.id));
+      res.json({ success: true });
+    } catch (e) {
+      res.status(500).json({ error: String(e) });
+    }
+  });
+
   server.listen(PORT, () => {
     logger.info(`Agent-X server running at http://localhost:${PORT}`, { port: PORT });
     logger.info('Endpoints:', {
