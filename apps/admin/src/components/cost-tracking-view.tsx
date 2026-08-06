@@ -98,10 +98,17 @@ export default function CostTrackingView() {
     let cancelled = false;
     void (async () => {
       try {
-        const res = await api<AnalyticsData>('/v1/analytics/summary');
+        // Try persistent cost endpoint first (PR #64)
+        const res = await api<AnalyticsData>('/v1/cost/summary');
         if (!cancelled) setData(res);
-      } catch (e) {
-        if (!cancelled) setError(e instanceof Error ? e.message : String(e));
+      } catch {
+        try {
+          // Fallback to in-memory analytics
+          const res = await api<AnalyticsData>('/v1/analytics/summary');
+          if (!cancelled) setData(res);
+        } catch (e) {
+          if (!cancelled) setError(e instanceof Error ? e.message : String(e));
+        }
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -116,10 +123,15 @@ export default function CostTrackingView() {
     setError(null);
     void (async () => {
       try {
-        const res = await api<AnalyticsData>('/v1/analytics/summary');
+        const res = await api<AnalyticsData>('/v1/cost/summary');
         setData(res);
-      } catch (e) {
-        setError(e instanceof Error ? e.message : String(e));
+      } catch {
+        try {
+          const res = await api<AnalyticsData>('/v1/analytics/summary');
+          setData(res);
+        } catch (e) {
+          setError(e instanceof Error ? e.message : String(e));
+        }
       } finally {
         setRefreshing(false);
       }
