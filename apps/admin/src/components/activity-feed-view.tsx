@@ -91,7 +91,7 @@ export default function ActivityFeedView() {
   const fetchData = useCallback(async () => {
     try {
       const [auditRes, tasksRes] = await Promise.all([
-        api<{ logs: AuditLogEntry[] }>('/v1/audit/logs?limit=20'),
+        api<{ logs: AuditLogEntry[] }>('/v1/admin/audit-logs?limit=20'),
         api<{ tasks: TaskRecord[]; total: number }>('/v1/agentx/tasks?limit=20'),
       ]);
 
@@ -158,7 +158,7 @@ export default function ActivityFeedView() {
     void (async () => {
       try {
         const [auditRes, tasksRes] = await Promise.all([
-          api<{ logs: AuditLogEntry[] }>('/v1/audit/logs?limit=20'),
+          api<{ logs: AuditLogEntry[] }>('/v1/admin/audit-logs?limit=20'),
           api<{ tasks: TaskRecord[]; total: number }>('/v1/agentx/tasks?limit=20'),
         ]);
 
