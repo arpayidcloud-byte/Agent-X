@@ -17,6 +17,7 @@ import {
 import { generateFeedback, buildRevisionPrompt } from '@agent-xai/agent-feedback';
 import { maybeRequireAdmin, listUsers, register, deleteUser, updateUserRoles } from './auth.js';
 import { createHttpServer } from './ws-bridge.js';
+import { PromptTemplateRepository, getPrisma } from '@agent-xai/persistence';
 import { startParallelRun, getMultiAgentRun } from './multi-agent-runner.js';
 import {
   subscribeMultiAgent,
@@ -566,6 +567,82 @@ app.patch('/v1/admin/users/:id', maybeRequireAdmin, async (req, res) => {
       return;
     }
     res.json({ user });
+  } catch (e) {
+    res.status(500).json({ error: e instanceof Error ? e.message : String(e) });
+  }
+});
+
+// ─── Prompt Template Library ────
+app.get('/v1/prompt-templates', maybeRequireAdmin, async (_req, res) => {
+  try {
+    const prisma = getPrisma();
+    if (!prisma) {
+      res.status(503).json({ error: 'Database not ready' });
+      return;
+    }
+    const repo = new PromptTemplateRepository(prisma);
+    const templates = await repo.findAll();
+    res.json({ templates });
+  } catch (e) {
+    res.status(500).json({ error: e instanceof Error ? e.message : String(e) });
+  }
+});
+
+app.post('/v1/prompt-templates', maybeRequireAdmin, async (req, res) => {
+  try {
+    const { name, description, content, tags } = req.body ?? {};
+    if (!name || !content) {
+      res.status(400).json({ error: 'name and content are required' });
+      return;
+    }
+    const prisma = getPrisma();
+    if (!prisma) {
+      res.status(503).json({ error: 'Database not ready' });
+      return;
+    }
+    const repo = new PromptTemplateRepository(prisma);
+    const template = await repo.create({ name, description, content, tags: tags ?? [] });
+    res.status(201).json({ template });
+  } catch (e) {
+    res.status(500).json({ error: e instanceof Error ? e.message : String(e) });
+  }
+});
+
+app.put('/v1/prompt-templates/:id', maybeRequireAdmin, async (req, res) => {
+  try {
+    const { name, description, content, tags } = req.body ?? {};
+    const prisma = getPrisma();
+    if (!prisma) {
+      res.status(503).json({ error: 'Database not ready' });
+      return;
+    }
+    const repo = new PromptTemplateRepository(prisma);
+    const template = await repo.update(req.params.id as string, {
+      name,
+      description,
+      content,
+      tags,
+    });
+    res.json({ template });
+  } catch (e) {
+    res.status(500).json({ error: e instanceof Error ? e.message : String(e) });
+  }
+});
+
+app.delete('/v1/prompt-templates/:id', maybeRequireAdmin, async (req, res) => {
+  try {
+    const prisma = getPrisma();
+    if (!prisma) {
+      res.status(503).json({ error: 'Database not ready' });
+      return;
+    }
+    const repo = new PromptTemplateRepository(prisma);
+    const deleted = await repo.delete(req.params.id as string);
+    if (!deleted) {
+      res.status(404).json({ error: 'Template not found' });
+      return;
+    }
+    res.json({ ok: true });
   } catch (e) {
     res.status(500).json({ error: e instanceof Error ? e.message : String(e) });
   }
