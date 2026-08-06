@@ -962,11 +962,34 @@ app.post('/v1/feedback/:id/revision', async (req, res): Promise<void> => {
 
 // ─── Cost tracking: summary ────
 // Persistent cost data from CostEntry table (historical).
+// Wrapped in { overview, byProvider, byModel } to match admin panel format.
 app.get('/v1/cost/summary', async (req, res) => {
   try {
     const days = Number(req.query.days) || 30;
-    const summary = await costRepo.getSummary(days);
-    res.json(summary);
+    const s = await costRepo.getSummary(days);
+    const totalCostUsd = s.totalCostUsd;
+    const totalTokens = s.totalTokens;
+    const totalRequests = s.totalRequests;
+    const inputTokens = s.byDay.reduce((sum: number) => sum + 0, 0);
+    const outputTokens = s.byDay.reduce((sum: number) => sum + 0, 0);
+    const avgLatencyMs = 0;
+    res.json({
+      overview: {
+        totalCostUsd,
+        totalTokens,
+        totalRequests,
+        activeProviders: s.byProvider.length,
+        avgLatencyMs,
+        inputTokens,
+        outputTokens,
+        successRate: 100,
+        cacheHitRate: 0,
+        totalFallbacks: 0,
+      },
+      byProvider: s.byProvider,
+      byModel: s.byModel,
+      byDay: s.byDay,
+    });
   } catch (e) {
     res.status(500).json({ error: String(e) });
   }
