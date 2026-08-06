@@ -19,6 +19,7 @@ import {
   Users2,
   FileText,
   DollarSign,
+  Activity,
 } from 'lucide-react';
 import { isAuthed, clearToken, fetchMe, isAdminUser, type AuthUser } from '@/lib/api';
 
@@ -29,13 +30,13 @@ const NAV_ITEMS = [
   { href: '/members', label: 'Members', icon: Users2 },
   { href: '/templates', label: 'Templates', icon: FileText },
   { href: '/cost', label: 'Cost Tracking', icon: DollarSign },
+  { href: '/activity', label: 'Activity', icon: Activity },
   { href: '/providers', label: 'LLM Providers', icon: Cable },
   { href: '/groups', label: 'Combo Providers', icon: Layers },
   { href: '/analytics', label: 'Analytics', icon: BarChart3 },
   { href: '/audit', label: 'Audit Log', icon: History },
   { href: '/settings', label: 'Settings', icon: Settings },
 ];
-
 function Brand() {
   return (
     <Link href="/" className="flex items-center gap-2.5 px-5 py-5">
