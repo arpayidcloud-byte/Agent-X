@@ -206,3 +206,21 @@ model AgentFeedback {
   @@index([createdAt])
   @@index([grade, createdAt])
 }
+
+// Prompt template library — save, version, reuse prompts
+model PromptTemplate {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  content     String
+  tags        String[]
+  version     Int      @default(1)
+  usageCount  Int      @default(0)
+  createdBy   String?  // user id or 'system'
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([name])
+  @@index([tags])
+  @@index([createdAt])
+}
