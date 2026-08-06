@@ -4,7 +4,7 @@
  * Stores publishable agent templates that can be browsed, installed,
  * rated, and used by other users.
  */
-import type { PrismaClient } from '@prisma/client';
+import type { Prisma, PrismaClient } from '@prisma/client';
 import { getPrisma } from './client.js';
 
 export interface AgentTemplateRecord {
@@ -107,7 +107,7 @@ export class AgentTemplateRepository {
         ...(input.priceUsd !== undefined && { priceUsd: input.priceUsd }),
         ...(input.isPublished !== undefined && { isPublished: input.isPublished }),
         ...(input.isFeatured !== undefined && { isFeatured: input.isFeatured }),
-        ...(input.config !== undefined && { config: input.config as Record<string, unknown> }),
+        ...(input.config !== undefined && { config: input.config as Prisma.InputJsonValue }),
       },
     }) as Promise<AgentTemplateRecord>;
   }
@@ -130,19 +130,22 @@ export class AgentTemplateRepository {
       ];
     }
 
-    const orderBy: Record<string, string> = (() => {
-      switch (query.sortBy) {
-        case 'popular':
-          return { installCount: 'desc' as const };
-        case 'rating':
-          return { rating: 'desc' as const };
-        case 'price':
-          return { priceUsd: 'asc' as const };
-        case 'newest':
-        default:
-          return { createdAt: 'desc' as const };
-      }
-    })();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const orderBy: any = {};
+    switch (query.sortBy) {
+      case 'popular':
+        orderBy.installCount = 'desc';
+        break;
+      case 'rating':
+        orderBy.rating = 'desc';
+        break;
+      case 'price':
+        orderBy.priceUsd = 'asc';
+        break;
+      default:
+        orderBy.createdAt = 'desc';
+        break;
+    }
 
     return this.requireDb().agentTemplate.findMany({
       where,
