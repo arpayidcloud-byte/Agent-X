@@ -13,35 +13,35 @@ on:
 
 jobs:
   quality-gates:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
-      
+
       - uses: pnpm/action-setup@v2
         with:
           version: 11.13.0
-          
+
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
           cache: 'pnpm'
-          
+
       - name: Install dependencies
         run: pnpm install --no-frozen-lockfile --ignore-scripts
-        
+
       - name: Generate Prisma Client
         run: pnpm --filter @agent-xai/persistence db:generate
-        
+
       - name: Run Typecheck
         run: pnpm typecheck
-        
+
       - name: Run Linter
         run: pnpm lint
         continue-on-error: true
-        
+
       - name: Run Build
         run: pnpm build
-        
+
       - name: Run Tests
         run: pnpm test
         continue-on-error: true # Allow CI to pass even if some tests are missing currently
