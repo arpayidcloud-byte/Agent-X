@@ -1,12 +1,14 @@
 /**
  * ChatView — the main surface of the chat-first TUI.
  *
- * Message history (oldest clipped at top, newest pinned at bottom) + a
- * sticky input line. Streaming assistant text renders token-by-token with a
- * blinking cursor. Lines starting with `/` are routed to `onCommand`.
+ * Message history (newest pinned at bottom) + a sticky input line.
+ * - Prompt prefix changes `>` → `!` when the draft starts with `!` (shell mode,
+ *   Antigravity-style) — the app routes `!`-prefixed submits to a shell exec.
+ * - ↑/↓ on an EMPTY draft walks the input history.
+ * - Lines starting with `/` are routed to `onCommand`.
  */
 import React, { useState } from 'react';
-import { Box, Text } from 'ink';
+import { Box, Text, useInput } from 'ink';
 import TextInput from 'ink-text-input';
 import type { ChatMessage, ChatMeta } from './types.js';
 
@@ -15,6 +17,7 @@ interface ChatViewProps {
   streaming: boolean;
   streamText: string;
   streamMeta: ChatMeta | null;
+  history: string[];
   onSubmit: (text: string) => void;
   onCommand: (cmd: string) => void;
   disabledHint?: string;
@@ -52,23 +55,53 @@ export function ChatView({
   streaming,
   streamText,
   streamMeta,
+  history,
   onSubmit,
   onCommand,
   disabledHint,
 }: ChatViewProps): React.ReactNode {
   const [draft, setDraft] = useState('');
+  const [histIdx, setHistIdx] = useState(-1);
 
-  // Newest-first, so with column-reverse the latest message pins to the bottom
-  // and the oldest scrolls off the top.
+  // Newest-first, so with column-reverse the latest message pins to the bottom.
   const display: Array<{ role: 'user' | 'assistant'; content: string; live?: boolean }> = [];
   for (const m of messages) display.push(m);
   if (streaming || streamText) display.push({ role: 'assistant', content: streamText, live: true });
   display.reverse();
   const lastLive = display[0]?.live === true;
 
+  const shellMode = draft.startsWith('!');
+  const prefix = shellMode ? '!' : '>';
+
+  // ↑/↓ walk input history — only on an EMPTY draft (TextInput owns the arrows
+  // while there is text, so no conflict).
+  useInput(
+    (_input, key) => {
+      if (streaming) return;
+      if (draft !== '') return;
+      if (key.upArrow && history.length > 0) {
+        const next = Math.min(histIdx + 1, history.length - 1);
+        setHistIdx(next);
+        setDraft(history[history.length - 1 - next] ?? '');
+      } else if (key.downArrow) {
+        if (histIdx <= 0) {
+          setHistIdx(-1);
+          setDraft('');
+        } else {
+          const next = histIdx - 1;
+          setHistIdx(next);
+          setDraft(history[history.length - 1 - next] ?? '');
+        }
+      }
+    },
+    { isActive: !streaming },
+  );
+
   const handleSubmit = (value: string): void => {
     const text = value.trim();
     if (!text) return;
+    setDraft('');
+    setHistIdx(-1);
     if (text.startsWith('/')) {
       onCommand(text);
       return;
@@ -84,7 +117,7 @@ export function ChatView({
           <Box marginTop={1}>
             <Text dimColor>
               Selamat datang di AgentX. Ketik pesan untuk mulai — mis. "buatkan REST API user
-              management". /help untuk daftar perintah.
+              management". /help untuk daftar perintah. Awali dengan ! untuk shell.
             </Text>
           </Box>
         ) : null}
@@ -113,16 +146,25 @@ export function ChatView({
       </Box>
 
       {/* Input line */}
-      <Box paddingX={1} paddingTop={1} borderStyle="single" borderColor="gray">
-        <Text bold color="green">
-          {'> '}
+      <Box
+        paddingX={1}
+        paddingTop={1}
+        borderStyle="single"
+        borderColor={shellMode ? 'red' : 'gray'}
+      >
+        <Text bold color={shellMode ? 'red' : 'green'}>
+          {prefix}{' '}
         </Text>
         <TextInput
           value={draft}
           onChange={setDraft}
           onSubmit={handleSubmit}
           placeholder={
-            streaming ? '…sedang mengetik (tunggu selesai)' : 'pesan — /help untuk perintah'
+            streaming
+              ? '…sedang mengetik (tunggu selesai)'
+              : shellMode
+                ? 'perintah shell — mis. ls -la'
+                : 'pesan — /help · ! untuk shell'
           }
         />
       </Box>
