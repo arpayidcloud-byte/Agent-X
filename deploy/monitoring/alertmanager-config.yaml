@@ -1,0 +1,21 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: alertmanager-config
+  namespace: agentx
+data:
+  alertmanager.yml: |
+    route:
+      receiver: 'agentx-webhook'
+      group_by: ['alertname', 'severity']
+      group_wait: 30s
+      group_interval: 5m
+      repeat_interval: 4h
+    receivers:
+      - name: 'agentx-webhook'
+        webhook_configs:
+          # URL di-substitusi dari env ALERT_WEBHOOK_URL (secret agentx-alerting).
+          # Buat secret: kubectl create secret generic agentx-alerting -n agentx \
+          #   --from-literal=ALERT_WEBHOOK_URL='https://hooks.slack.com/services/...'
+          - url: '${ALERT_WEBHOOK_URL}'
+            send_resolved: true
