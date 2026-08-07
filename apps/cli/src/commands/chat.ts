@@ -6,126 +6,37 @@
  *   agentx chat "prompt"             → one-shot
  *   agentx chat --provider deepseek  → force provider
  *   agentx chat --model deepseek-v3  → force model
+ *
+ * Streaming logic lives in lib/chat-engine.ts (shared with the TUI).
  */
 import * as readline from 'node:readline';
-import { isCloudAuthed, cloudFetch, cloudSSE, configHome } from '../lib/cloud-api.js';
-import * as fs from 'node:fs';
-import * as path from 'node:path';
-
-interface ChatMessage {
-  role: 'user' | 'assistant';
-  content: string;
-}
-
-interface ChatStreamEvent {
-  type: 'start' | 'chunk' | 'complete' | 'error';
-  chatId: string;
-  text?: string;
-  provider?: string;
-  model?: string;
-  usage?: { inputTokens: number; outputTokens: number; totalTokens: number };
-  cost?: number;
-  latencyMs?: number;
-  error?: string;
-  at: string;
-}
-
-// ─── Session persistence ────
-function sessionsDir(): string {
-  const dir = path.join(configHome, 'sessions');
-  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-  return dir;
-}
-
-function saveSession(messages: ChatMessage[]): void {
-  const id = `chat-${Date.now()}`;
-  const file = path.join(sessionsDir(), `${id}.json`);
-  fs.writeFileSync(
-    file,
-    JSON.stringify({ id, messages, savedAt: new Date().toISOString() }, null, 2),
-  );
-}
+import { isCloudAuthed, cloudFetch } from '../lib/cloud-api.js';
+import {
+  streamChat,
+  saveChatSession,
+  type ChatMessage,
+  type ChatMeta,
+} from '../lib/chat-engine.js';
 
 // ─── Streaming render ────
-type ChatMeta = { provider?: string; model?: string; cost?: number; latencyMs?: number };
-
-async function streamChat(
+async function runStream(
   messages: ChatMessage[],
   options: { provider?: string; model?: string },
 ): Promise<ChatMeta> {
-  const res = await cloudFetch<{ chatId: string; status: string }>('/v1/agentx/chat/stream', {
-    method: 'POST',
-    body: { messages, provider: options.provider },
+  return streamChat(messages, options, {
+    onStart: (provider, model) => {
+      process.stderr.write(`\x1b[2m[${provider}/${model}]\x1b[0m `);
+    },
+    onChunk: (text) => {
+      process.stdout.write(text);
+    },
+    onComplete: (meta) => {
+      const tokens = meta.usage ? ` ${meta.usage.totalTokens} tokens` : '';
+      const cost = meta.cost != null ? ` $${meta.cost.toFixed(4)}` : '';
+      const ms = meta.latencyMs != null ? ` ${meta.latencyMs}ms` : '';
+      process.stderr.write(`\n\x1b[2m${tokens}${cost}${ms}\x1b[0m\n`);
+    },
   });
-
-  const { chatId } = res;
-  const sseRes = await cloudSSE(`/v1/agentx/chat/${chatId}/events`);
-
-  let responseText = '';
-  const meta: ChatMeta = {};
-  let completed = false;
-
-  const reader = sseRes.body!.getReader();
-  const decoder = new TextDecoder();
-  let buffer = '';
-
-  try {
-    for (;;) {
-      const { done, value } = await reader.read();
-      if (done || completed) break;
-      buffer += decoder.decode(value, { stream: true });
-
-      const lines = buffer.split('\n');
-      buffer = lines.pop() ?? '';
-
-      for (const line of lines) {
-        if (!line.startsWith('data: ')) continue;
-        const raw = line.slice(6).trim();
-        if (!raw) continue;
-
-        let event: ChatStreamEvent;
-        try {
-          event = JSON.parse(raw) as ChatStreamEvent;
-        } catch {
-          continue;
-        }
-
-        if (event.type === 'start') {
-          meta.provider = event.provider;
-          meta.model = event.model;
-          process.stderr.write(`\x1b[2m[${event.provider}/${event.model}]\x1b[0m `);
-        } else if (event.type === 'chunk' && event.text) {
-          responseText += event.text;
-          process.stdout.write(event.text);
-        } else if (event.type === 'complete') {
-          meta.cost = event.cost;
-          meta.latencyMs = event.latencyMs;
-          const tokens = event.usage ? ` ${event.usage.totalTokens} tokens` : '';
-          const cost = event.cost != null ? ` $${event.cost.toFixed(4)}` : '';
-          const ms = event.latencyMs != null ? ` ${event.latencyMs}ms` : '';
-          process.stderr.write(`\n\x1b[2m${tokens}${cost}${ms}\x1b[0m\n`);
-          completed = true;
-        } else if (event.type === 'error') {
-          completed = true;
-          throw new Error(event.error ?? 'Chat failed');
-        }
-      }
-      if (completed) break;
-    }
-  } finally {
-    try {
-      await reader.cancel();
-    } catch {
-      /* ignore */
-    }
-  }
-
-  if (!completed && !responseText) {
-    throw new Error('Chat stream ended without response');
-  }
-
-  messages.push({ role: 'assistant', content: responseText });
-  return meta;
 }
 
 // ─── Commands ────
@@ -156,8 +67,8 @@ export async function chat(args: string[]): Promise<void> {
     // One-shot mode
     const messages: ChatMessage[] = [{ role: 'user', content: initialPrompt }];
     try {
-      await streamChat(messages, { provider, model });
-      saveSession(messages);
+      await runStream(messages, { provider, model });
+      saveChatSession(messages);
     } catch (err) {
       throw new Error(`Chat failed: ${(err as Error).message}`);
     }
@@ -186,7 +97,7 @@ export async function chat(args: string[]): Promise<void> {
     }
 
     if (input === '/quit' || input === '/exit' || input === '/q') {
-      if (messages.length > 0) saveSession(messages);
+      if (messages.length > 0) saveChatSession(messages);
       process.stderr.write('\x1b[2mSession saved.\x1b[0m\n');
       rl.close();
       return;
@@ -207,11 +118,10 @@ export async function chat(args: string[]): Promise<void> {
 
     messages.push({ role: 'user', content: input });
 
-    // eslint-disable-next-line @typescript-eslint/no-misused-promises
     void (async () => {
       try {
         process.stderr.write('\n');
-        await streamChat(messages, { provider, model });
+        await runStream(messages, { provider, model });
         process.stderr.write('\n');
       } catch (err) {
         process.stderr.write(`\n\x1b[31mError: ${(err as Error).message}\x1b[0m\n`);
@@ -223,7 +133,7 @@ export async function chat(args: string[]): Promise<void> {
   });
 
   rl.on('close', () => {
-    if (messages.length > 0) saveSession(messages);
+    if (messages.length > 0) saveChatSession(messages);
     process.exit(0);
   });
 }

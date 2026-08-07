@@ -1,45 +1,45 @@
 /**
- * AgentX CLI TUI — Main Application Shell
+ * AgentX CLI TUI — Chat-first main shell.
  *
- * Tahap 1: Auth + Dashboard (PR #81)
- * Tahap 2: Task Management — list, detail, submit, SSE streaming
+ * Redesign (2026-08-07): chat is THE main surface (like Devin/OpenCode/Hermes).
+ * Panels (tasks/providers/cost/help/settings) are overlays toggled by slash
+ * commands or hotkeys — not tab views. Chrome is minimal: 1-line header +
+ * 1-line status bar; the rest belongs to the conversation.
  */
 import React, { useState, useCallback, useEffect } from 'react';
 import { Box, Text, useApp, useInput, render } from 'ink';
 import { AuthScreen } from './auth-screen.js';
-import { Dashboard } from './dashboard.js';
+import { ChatView } from './chat-view.js';
 import { StatusBar } from './status-bar.js';
-import { CommandBar } from './command-bar.js';
 import { TaskList } from './task-list.js';
 import { TaskDetail } from './task-detail.js';
 import { SubmitPanel } from './submit-panel.js';
 import { ProviderList } from './provider-list.js';
 import { CostView } from './cost-view.js';
-import { Banner } from './banner.js';
-import { NavBar } from './nav-bar.js';
 import { HelpPanel } from './help-panel.js';
 import {
   isCloudAuthed,
   fetchHealth,
-  fetchStats,
   fetchTasks,
   fetchProviders,
   fetchCost,
   loginApi,
 } from './api.js';
-import { saveCloudConfig } from '../lib/cloud-api.js';
+import { cloudFetch, saveCloudConfig } from '../lib/cloud-api.js';
+import { streamChat, saveChatSession } from '../lib/chat-engine.js';
 import type {
   HealthResponse,
-  StatsResponse,
   TaskItem,
   ProviderInfo,
   CostSummary,
-  PanelId,
+  OverlayId,
+  ChatMessage,
+  ChatMeta,
 } from './types.js';
 
-const VERSION = '2.0.0';
+const VERSION = '2.1.0';
 
-/** Sub-view within the tasks panel. */
+/** Sub-view within the tasks overlay. */
 type TaskSubView = 'list' | 'detail' | 'submit';
 
 function useInterval(fn: () => void, ms: number): void {
@@ -59,24 +59,27 @@ export default function AgentXTUI(): React.ReactNode {
   const [authError, setAuthError] = useState<string | null>(null);
   const [authLoading, setAuthLoading] = useState(false);
 
-  // ─── Panel state ────
-  const [activePanel, setActivePanel] = useState<PanelId>('dashboard');
+  // ─── Overlay state (chat-first: panels are overlays, not tabs) ────
+  const [overlay, setOverlay] = useState<OverlayId>('none');
 
-  // ─── Task sub-view state ────
+  // ─── Task overlay state ────
   const [taskSubView, setTaskSubView] = useState<TaskSubView>('list');
   const [selectedTaskIdx, setSelectedTaskIdx] = useState(0);
-  const [submitResult, setSubmitResult] = useState<{ taskId: string; message?: string } | null>(
-    null,
-  );
 
   // ─── Data state ────
   const [health, setHealth] = useState<HealthResponse | null>(null);
-  const [stats, setStats] = useState<StatsResponse | null>(null);
   const [tasks, setTasks] = useState<TaskItem[]>([]);
   const [providers, setProviders] = useState<ProviderInfo[]>([]);
   const [cost, setCost] = useState<CostSummary | null>(null);
   const [loading, setLoading] = useState(false);
   const [lastError, setLastError] = useState<string | null>(null);
+
+  // ─── Chat state ────
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [streaming, setStreaming] = useState(false);
+  const [streamText, setStreamText] = useState('');
+  const [streamMeta, setStreamMeta] = useState<ChatMeta | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
 
   // ─── Data fetch ────
   const refreshData = useCallback(async () => {
@@ -84,20 +87,13 @@ export default function AgentXTUI(): React.ReactNode {
     setLoading(true);
     setLastError(null);
     try {
-      const [h, s, t, p, c] = await Promise.all([
+      const [h, t, p, c] = await Promise.all([
         fetchHealth(),
-        fetchStats(),
         fetchTasks(20),
         fetchProviders(),
         fetchCost(),
       ]);
       setHealth(h);
-      setStats({
-        totalTasks: s.total,
-        activeTasks: s.active,
-        completedTasks: s.completed,
-        providerCount: p.length,
-      });
       setTasks(t);
       setProviders(p);
       setCost(c);
@@ -129,6 +125,7 @@ export default function AgentXTUI(): React.ReactNode {
       setAuthenticated(true);
       setEmail(user.email);
       setRoles(user.roles);
+      setNotice(`Login sukses — selamat datang, ${user.email}`);
     } catch (e) {
       const status = (e as Error & { status?: number }).status;
       setAuthError(
@@ -150,7 +147,139 @@ export default function AgentXTUI(): React.ReactNode {
     [handleLoginAsync],
   );
 
-  // ─── Task navigation ────
+  // ─── Chat send ────
+  const handleSend = useCallback(
+    (text: string) => {
+      if (streaming) return;
+      setLastError(null);
+      setNotice(null);
+      setMessages((prev) => [...prev, { role: 'user', content: text }]);
+      setStreaming(true);
+      setStreamText('');
+      setStreamMeta(null);
+
+      void (async () => {
+        try {
+          const history = [...messages, { role: 'user' as const, content: text }];
+          const meta = await streamChat(
+            history,
+            { provider: undefined },
+            {
+              onChunk: (chunk) => setStreamText((prev) => prev + chunk),
+              onComplete: (m) => setStreamMeta(m),
+            },
+          );
+          setMessages(history);
+          setStreaming(false);
+          setStreamText('');
+          saveChatSession(history);
+          if (meta.provider) {
+            setNotice(`⚡ ${meta.provider}${meta.model ? `/${meta.model}` : ''} selesai`);
+          }
+          void refreshData();
+        } catch (e) {
+          setStreaming(false);
+          setStreamText('');
+          // Roll back the failed user message
+          setMessages((prev) => prev.slice(0, -1));
+          setLastError(`Chat gagal: ${e instanceof Error ? e.message : String(e)}`);
+        }
+      })();
+    },
+    [messages, streaming, refreshData],
+  );
+
+  // ─── Slash commands (typed in the chat input) ────
+  const handleCommand = useCallback(
+    (raw: string) => {
+      const lower = raw.toLowerCase().trim();
+      const [cmd, ...rest] = lower.split(/\s+/);
+
+      if (cmd === '/help') {
+        setOverlay('help');
+        return;
+      }
+      if (cmd === '/tasks' || cmd === '/t') {
+        setTaskSubView('list');
+        setOverlay('tasks');
+        void refreshData();
+        return;
+      }
+      if (cmd === '/providers' || cmd === '/p') {
+        setOverlay('providers');
+        void refreshData();
+        return;
+      }
+      if (cmd === '/cost' || cmd === '/c') {
+        setOverlay('cost');
+        void refreshData();
+        return;
+      }
+      if (cmd === '/settings') {
+        setOverlay('settings');
+        return;
+      }
+      if (cmd === '/clear') {
+        setMessages([]);
+        setStreamMeta(null);
+        setNotice('Percakapan dibersihkan.');
+        return;
+      }
+      if (cmd === '/history') {
+        setNotice(
+          `Pesan: ${messages.length} (user ${messages.filter((m) => m.role === 'user').length}, agent ${messages.filter((m) => m.role === 'assistant').length})`,
+        );
+        return;
+      }
+      if (cmd === '/submit') {
+        const goal = rest.join(' ').replace(/^["']|["']$/g, '');
+        if (!goal) {
+          setNotice('Gunakan: /submit <goal>');
+          return;
+        }
+        setNotice(`Mengirim task: ${goal.slice(0, 60)}…`);
+        void (async () => {
+          try {
+            const taskId = `cli-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+            await cloudFetch('/v1/agentx/run', {
+              method: 'POST',
+              body: {
+                prompt: goal,
+                taskId,
+                description: goal.slice(0, 120),
+                complexity: 'medium',
+                type: 'reasoning',
+                budget: 'medium',
+              },
+            });
+            setNotice(`✓ Task terkirim: ${taskId}`);
+            void refreshData();
+          } catch (e) {
+            setLastError(`Submit gagal: ${e instanceof Error ? e.message : String(e)}`);
+          }
+        })();
+        return;
+      }
+      if (cmd === '/logout') {
+        saveCloudConfig({ apiToken: undefined });
+        setAuthenticated(false);
+        setEmail(undefined);
+        setRoles(undefined);
+        setMessages([]);
+        setOverlay('none');
+        return;
+      }
+      if (cmd === '/quit' || cmd === '/q' || cmd === '/exit') {
+        if (messages.length > 0) saveChatSession(messages);
+        exit();
+        return;
+      }
+      setNotice(`Perintah tidak dikenal: ${raw}. Ketik /help.`);
+    },
+    [messages, exit, refreshData],
+  );
+
+  // ─── Overlay navigation ────
   const navigateTask = useCallback(
     (direction: 'up' | 'down') => {
       if (tasks.length === 0) return;
@@ -162,27 +291,8 @@ export default function AgentXTUI(): React.ReactNode {
     [tasks.length],
   );
 
-  const openTaskDetail = useCallback(() => {
-    if (tasks.length > 0) {
-      setTaskSubView('detail');
-    }
-  }, [tasks.length]);
-
-  const openSubmitPanel = useCallback(() => {
-    setTaskSubView('submit');
-  }, []);
-
-  const handleTaskSubmit = useCallback(
-    (result: { taskId: string; message?: string }) => {
-      setSubmitResult(result);
-      // After submit, go back to list and refresh
-      setTaskSubView('list');
-      void refreshData();
-    },
-    [refreshData],
-  );
-
-  // ─── Keyboard ────
+  // Keyboard only matters when an overlay owns the screen (chat input has
+  // focus otherwise).
   useInput(
     useCallback(
       (_input, key) => {
@@ -190,109 +300,26 @@ export default function AgentXTUI(): React.ReactNode {
           if (key.escape) exit();
           return;
         }
-
-        // Panel navigation (1-5)
-        if (_input === '1') {
-          setActivePanel('dashboard');
-          setTaskSubView('list');
+        if (overlay === 'none') {
+          // Esc with no overlay = quit (Claude Code style)
+          if (key.escape) exit();
+          return;
         }
-        if (_input === '2') {
-          setActivePanel('tasks');
-          setTaskSubView('list');
-        }
-        if (_input === '3') {
-          setActivePanel('providers');
-        }
-        if (_input === '4') {
-          setActivePanel('cost');
-        }
-        if (_input === '5') {
-          setActivePanel('settings');
-        }
-
-        // Task-specific keys (only when on tasks panel)
-        if (activePanel === 'tasks' && taskSubView === 'list') {
+        if (overlay === 'tasks' && taskSubView === 'list') {
           if (key.upArrow) navigateTask('up');
           if (key.downArrow) navigateTask('down');
-          if (key.return) openTaskDetail();
-          if (_input === 's' || _input === 'S') openSubmitPanel();
+          if (key.return && tasks.length > 0) setTaskSubView('detail');
+          if (_input === 's' || _input === 'S') setTaskSubView('submit');
         }
-
-        // Detail view: Esc back
-        if (activePanel === 'tasks' && taskSubView === 'detail' && key.escape) {
+        if (overlay === 'tasks' && taskSubView === 'detail' && key.escape) {
           setTaskSubView('list');
+          return;
         }
-
-        // Submit view: handled inside SubmitPanel
-
-        // Global keys
         if (_input === 'r' || _input === 'R') void refreshData();
-        if (key.escape && activePanel !== 'tasks') exit();
-        if (_input === 'q' || _input === 'Q') exit();
+        if (key.escape) setOverlay('none');
       },
-      [
-        authenticated,
-        exit,
-        refreshData,
-        activePanel,
-        taskSubView,
-        navigateTask,
-        openTaskDetail,
-        openSubmitPanel,
-      ],
+      [authenticated, exit, overlay, taskSubView, navigateTask, tasks.length, refreshData],
     ),
-  );
-
-  // ─── Command handler ────
-  const handleCommand = useCallback(
-    (cmd: string) => {
-      const lower = cmd.toLowerCase().trim();
-
-      if (lower === 'exit' || lower === 'quit' || lower === 'q') {
-        exit();
-        return;
-      }
-      if (lower === 'refresh' || lower === 'r') {
-        void refreshData();
-        return;
-      }
-      if (lower === 'logout') {
-        saveCloudConfig({ apiToken: undefined });
-        setAuthenticated(false);
-        setEmail(undefined);
-        setRoles(undefined);
-        return;
-      }
-      if (lower === 'dashboard' || lower === 'd') {
-        setActivePanel('dashboard');
-        setTaskSubView('list');
-        return;
-      }
-      if (lower === 'tasks' || lower === 't') {
-        setActivePanel('tasks');
-        setTaskSubView('list');
-        return;
-      }
-      if (lower === 'providers' || lower === 'p') {
-        setActivePanel('providers');
-        return;
-      }
-      if (lower === 'cost' || lower === 'c') {
-        setActivePanel('cost');
-        return;
-      }
-      if (lower === 'submit') {
-        setActivePanel('tasks');
-        setTaskSubView('submit');
-        return;
-      }
-      if (lower === 'help') {
-        setActivePanel('help');
-        return;
-      }
-      setLastError(`Unknown command: ${cmd}. Type "help" for commands.`);
-    },
-    [exit, refreshData],
   );
 
   // ─── Render ────
@@ -300,103 +327,113 @@ export default function AgentXTUI(): React.ReactNode {
     return <AuthScreen onLogin={handleLogin} error={authError} loading={authLoading} />;
   }
 
+  const overlayOpen = overlay !== 'none';
+  const healthOk = health?.status === 'ok' || health?.status === 'healthy';
+
   return (
-    <Box flexDirection="column" padding={1}>
-      {/* ASCII Banner */}
-      <Banner />
+    <Box flexDirection="column" paddingX={1} paddingY={1}>
+      {/* Header — one line, minimal chrome */}
+      <Box justifyContent="space-between">
+        <Text bold color="cyan">
+          ◆ AgentX
+        </Text>
+        <Text dimColor>
+          {email ?? ''}
+          {healthOk ? '  ● api' : '  ○ api'}
+        </Text>
+      </Box>
+      <Box marginTop={1} marginBottom={1}>
+        <Text dimColor>{'─'.repeat(48)}</Text>
+      </Box>
 
-      {/* Navigation Bar */}
-      <NavBar activePanel={activePanel} onNavigate={setActivePanel} />
+      {/* Main surface: chat or overlay */}
+      <Box flexGrow={1} flexDirection="column">
+        {overlayOpen ? (
+          <Box flexDirection="column" padding={1} borderStyle="round" borderColor="cyan">
+            <Box justifyContent="space-between">
+              <Text bold color="cyanBright">
+                {overlay === 'tasks' && '◆ Tasks'}
+                {overlay === 'providers' && '◆ Providers'}
+                {overlay === 'cost' && '◆ Cost'}
+                {overlay === 'settings' && '◆ Settings'}
+                {overlay === 'help' && '◆ Help'}
+              </Text>
+              <Text dimColor>esc: kembali</Text>
+            </Box>
+            <Box marginTop={1}>
+              {overlay === 'tasks' && taskSubView === 'list' && (
+                <TaskList
+                  tasks={tasks}
+                  selectedId={tasks[selectedTaskIdx]?.id ?? null}
+                  loading={loading}
+                />
+              )}
+              {overlay === 'tasks' &&
+                taskSubView === 'detail' &&
+                tasks[selectedTaskIdx] != null && <TaskDetail task={tasks[selectedTaskIdx]!} />}
+              {overlay === 'tasks' && taskSubView === 'submit' && (
+                <SubmitPanel
+                  onSubmit={() => {
+                    setTaskSubView('list');
+                    void refreshData();
+                  }}
+                  onCancel={() => setTaskSubView('list')}
+                />
+              )}
+              {overlay === 'providers' && <ProviderList providers={providers} loading={loading} />}
+              {overlay === 'cost' && <CostView cost={cost} loading={loading} />}
+              {overlay === 'settings' && (
+                <Box flexDirection="column" gap={1}>
+                  <Text>
+                    Email: <Text bold>{email ?? 'unknown'}</Text>
+                  </Text>
+                  <Text>
+                    Roles: <Text bold>{roles?.join(', ') ?? 'unknown'}</Text>
+                  </Text>
+                  <Text>
+                    API: <Text dimColor>https://api.id-tech.cloud</Text>
+                  </Text>
+                  <Text dimColor>/logout untuk keluar akun · /quit untuk keluar TUI</Text>
+                </Box>
+              )}
+              {overlay === 'help' && <HelpPanel />}
+            </Box>
+          </Box>
+        ) : (
+          <ChatView
+            messages={messages}
+            streaming={streaming}
+            streamText={streamText}
+            streamMeta={streamMeta}
+            onSubmit={handleSend}
+            onCommand={handleCommand}
+          />
+        )}
+      </Box>
 
-      {/* Status Bar */}
-      <StatusBar
-        version={VERSION}
-        authenticated={authenticated}
-        email={email}
-        taskCount={stats?.totalTasks ?? tasks.length}
-        cost={`$${(cost?.totalCost ?? 0).toFixed(2)}`}
-        healthStatus={health?.status === 'ok' ? 'ok' : 'error'}
-      />
-
-      {/* Error Banner */}
-      {lastError && (
-        <Box marginTop={1} marginBottom={1}>
+      {/* Notice / error line */}
+      {notice && !overlayOpen && (
+        <Box paddingX={1} paddingTop={1}>
+          <Text color="green">✓ {notice}</Text>
+        </Box>
+      )}
+      {lastError && !overlayOpen && (
+        <Box paddingX={1} paddingTop={1}>
           <Text color="red">⚠ {lastError}</Text>
         </Box>
       )}
 
-      {/* Submit result toast */}
-      {submitResult && (
-        <Box marginTop={1} marginBottom={1}>
-          <Text color="green">✓ Task submitted: {submitResult.taskId}</Text>
-          {submitResult.message && <Text dimColor> — {submitResult.message.slice(0, 80)}</Text>}
-        </Box>
-      )}
-
-      {/* Active Panel */}
+      {/* Status bar — one line, bottom */}
       <Box marginTop={1}>
-        {activePanel === 'dashboard' && (
-          <Dashboard
-            health={health}
-            stats={stats}
-            recentTasks={tasks}
-            cost={cost}
-            providers={providers}
-            loading={loading}
-          />
-        )}
-
-        {activePanel === 'tasks' && taskSubView === 'list' && (
-          <TaskList
-            tasks={tasks}
-            selectedId={tasks[selectedTaskIdx]?.id ?? null}
-            loading={loading}
-          />
-        )}
-
-        {activePanel === 'tasks' && taskSubView === 'detail' && tasks[selectedTaskIdx] != null && (
-          <TaskDetail task={tasks[selectedTaskIdx]!} />
-        )}
-
-        {activePanel === 'tasks' && taskSubView === 'submit' && (
-          <SubmitPanel onSubmit={handleTaskSubmit} onCancel={() => setTaskSubView('list')} />
-        )}
-
-        {activePanel === 'providers' && <ProviderList providers={providers} loading={loading} />}
-
-        {activePanel === 'cost' && <CostView cost={cost} loading={loading} />}
-
-        {activePanel === 'help' && <HelpPanel />}
-
-        {activePanel === 'settings' && (
-          <Box flexDirection="column" padding={1}>
-            <Text bold color="cyanBright">
-              ◆ Settings
-            </Text>
-            <Box marginTop={1} flexDirection="column" gap={1}>
-              <Text>
-                Email: <Text bold>{email ?? 'unknown'}</Text>
-              </Text>
-              <Text>
-                Roles: <Text bold>{roles?.join(', ') ?? 'unknown'}</Text>
-              </Text>
-              <Text>
-                API: <Text dimColor>https://api.id-tech.cloud</Text>
-              </Text>
-            </Box>
-            <Box marginTop={1}>
-              <Text dimColor>[1] Dashboard [2] Tasks [3] Providers [4] Cost</Text>
-            </Box>
-          </Box>
-        )}
+        <StatusBar
+          version={VERSION}
+          email={email}
+          taskCount={tasks.length}
+          cost={cost?.totalCost ?? 0}
+          healthStatus={healthOk ? 'ok' : 'error'}
+          streaming={streaming}
+        />
       </Box>
-
-      {/* Command Bar (only on non-interactive panels) */}
-      {!(activePanel === 'tasks' && (taskSubView === 'detail' || taskSubView === 'submit')) && (
-        <Box marginTop={1}>
-          <CommandBar onSubmit={handleCommand} />
-        </Box>
-      )}
     </Box>
   );
 }
