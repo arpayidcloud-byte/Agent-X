@@ -19,23 +19,6 @@ export async function fetchHealth(): Promise<HealthResponse> {
   return res;
 }
 
-/** Fetch stats summary. */
-export async function fetchStats(): Promise<{
-  total: number;
-  active: number;
-  completed: number;
-  failed: number;
-}> {
-  try {
-    const res = await cloudFetch<{
-      stats: { total: number; active: number; completed: number; failed: number };
-    }>('/v1/stats');
-    return res.stats ?? { total: 0, active: 0, completed: 0, failed: 0 };
-  } catch {
-    return { total: 0, active: 0, completed: 0, failed: 0 };
-  }
-}
-
 /** Fetch recent tasks from cloud API. */
 export async function fetchTasks(limit = 20): Promise<TaskItem[]> {
   if (!isCloudAuthed()) return [];

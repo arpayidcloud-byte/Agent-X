@@ -1,17 +1,9 @@
-/** Shared types for TUI panels. */
+/** Shared types for the chat-first TUI. */
 
 export interface HealthResponse {
   status: string;
   version?: string;
   uptime?: number;
-}
-
-export interface StatsResponse {
-  totalTasks?: number;
-  activeTasks?: number;
-  completedTasks?: number;
-  totalCost?: number;
-  providerCount?: number;
 }
 
 export interface TaskItem {
@@ -42,19 +34,30 @@ export interface CostSummary {
   period?: string;
 }
 
-export type PanelId = 'dashboard' | 'tasks' | 'providers' | 'cost' | 'settings' | 'help';
+/** Chat-first design: the chat view is the main surface; everything else is an overlay. */
+export type OverlayId = 'none' | 'tasks' | 'providers' | 'cost' | 'settings' | 'help';
+
+export interface ChatMessage {
+  role: 'user' | 'assistant';
+  content: string;
+}
+
+export interface ChatMeta {
+  provider?: string;
+  model?: string;
+  cost?: number;
+  latencyMs?: number;
+}
 
 export interface AppState {
   authenticated: boolean;
   email?: string;
   roles?: string[];
-  activePanel: PanelId;
+  overlay: OverlayId;
   health: HealthResponse | null;
-  stats: StatsResponse | null;
   tasks: TaskItem[];
   providers: ProviderInfo[];
   cost: CostSummary | null;
   loading: boolean;
   error: string | null;
-  commandHistory: string[];
 }
