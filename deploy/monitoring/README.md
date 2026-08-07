@@ -39,14 +39,15 @@ docker save prom/prometheus:v2.55.1 prom/alertmanager:v0.27.0 | k3s ctr images i
 
 ## Webhook Notifikasi
 
-Alertmanager mengirim ke `${ALERT_WEBHOOK_URL}` (env substitution). Set secret dulu:
+Alertmanager mengirim ke URL webhook yang di-hardcode di `alertmanager-config.yaml` (placeholder). Ganti dengan webhook Slack/Telegram asli, lalu apply ulang:
 
 ```bash
-kubectl create secret generic agentx-alerting -n agentx \
-  --from-literal=ALERT_WEBHOOK_URL='https://hooks.slack.com/services/XXX/YYY/ZZZ'
+# Edit deploy/monitoring/alertmanager-config.yaml: ubah url ke webhook asli
+kubectl apply -f deploy/monitoring/alertmanager-config.yaml
+kubectl rollout restart deployment agentx-alertmanager -n agentx
 ```
 
-Tanpa secret, Alertmanager tetap jalan & menampilkan alert di UI-nya (9093), hanya delivery webhook yang tidak aktif.
+Tanpa webhook asli, Alertmanager tetap jalan & menampilkan alert di UI-nya (9093), hanya delivery webhook yang mengarah ke placeholder.
 
 ## Verifikasi
 

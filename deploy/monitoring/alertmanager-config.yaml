@@ -14,8 +14,9 @@ data:
     receivers:
       - name: 'agentx-webhook'
         webhook_configs:
-          # URL di-substitusi dari env ALERT_WEBHOOK_URL (secret agentx-alerting).
-          # Buat secret: kubectl create secret generic agentx-alerting -n agentx \
-          #   --from-literal=ALERT_WEBHOOK_URL='https://hooks.slack.com/services/...'
-          - url: '${ALERT_WEBHOOK_URL}'
+          # GANTI URL ini dengan webhook Slack/Telegram asli, lalu:
+          #   kubectl create configmap alertmanager-config -n agentx \
+          #     --from-file=deploy/monitoring/alertmanager-config.yaml --dry-run=client -o yaml | kubectl apply -f -
+          #   kubectl rollout restart deployment agentx-alertmanager -n agentx
+          - url: 'https://example.com/placeholder-webhook'
             send_resolved: true
