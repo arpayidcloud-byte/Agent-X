@@ -4,9 +4,9 @@
  * Usage:
  *   agentx login --email <email> --password <password> [--api <url>]
  *
- * Stores JWT token in .agentx/config.json for subsequent cloud commands.
+ * Stores JWT token in ~/.agentx/config.json for subsequent cloud commands.
  */
-import { saveCloudConfig, cloudFetch, getApiUrl } from '../lib/cloud-api.js';
+import { saveCloudConfig, getApiUrl, configHome, cloudFetch } from '../lib/cloud-api.js';
 
 interface LoginOptions {
   email?: string;
@@ -60,7 +60,7 @@ export async function login(args: string[]): Promise<void> {
 
     const roles = res.user.roles.join(', ');
     console.log(`✓ Authenticated as ${res.user.email} (${roles})`);
-    console.log(`  Token saved to .agentx/config.json`);
+    console.log(`  Token saved to ${configHome}/config.json`);
     console.log(`  API: ${api}`);
     console.log('');
     console.log('Cloud commands now available:');

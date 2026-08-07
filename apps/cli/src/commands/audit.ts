@@ -1,7 +1,8 @@
 import * as fs from 'fs';
 import * as path from 'path';
+import { configHome } from '../lib/cloud-api.js';
 
-const DATA_DIR = path.resolve(process.cwd(), '.agentx');
+const DATA_DIR = configHome;
 
 export async function audit(args: string[]): Promise<void> {
   const graphId = args[0];
