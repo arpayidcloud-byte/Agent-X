@@ -1,18 +1,31 @@
 {
   "name": "@agent-xai/cli",
+  "version": "0.1.0",
+  "description": "AgentX CLI — Cloud-first AI agent platform",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/arpayidcloud-byte/Agentx.git",
+    "url": "https://github.com/arpayidcloud-byte/Agent-X.git",
     "directory": "apps/cli"
   },
-  "version": "1.0.0",
   "type": "module",
   "bin": {
     "agentx": "./bin/agentx"
   },
+  "files": [
+    "dist",
+    "bin",
+    "README.md"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "engines": {
+    "node": ">=18"
+  },
   "scripts": {
     "build": "tsc --build",
+    "prepublishOnly": "pnpm run build",
     "typecheck": "tsc --noEmit",
     "test": "vitest run --passWithNoTests",
     "test:coverage": "vitest run --coverage --passWithNoTests",
@@ -24,13 +37,6 @@
     "vitest": "^3.2.6"
   },
   "dependencies": {
-    "@agent-xai/agent-platform": "workspace:*",
-    "@agent-xai/core-runtime": "workspace:*",
-    "@agent-xai/provider-sdk": "workspace:*",
-    "@agent-xai/runtime-adapters": "workspace:*",
-    "@agent-xai/runtime-production": "workspace:*",
-    "@agent-xai/tool-sdk": "workspace:*",
-    "@prisma/client": "^7.9.0",
     "commander": "^15.0.0",
     "ink": "^7.1.0",
     "ink-text-input": "^6.0.0",
