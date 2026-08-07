@@ -3,190 +3,120 @@ import { Box, Text } from 'ink';
 
 export function HelpPanel(): React.ReactNode {
   return (
-    <Box flexDirection="column" padding={1}>
-      <Box marginBottom={1}>
-        <Text bold color="cyanBright">
-          ◆ Help — Keyboard Shortcuts & Commands
-        </Text>
-      </Box>
-
+    <Box flexDirection="column">
       <Box flexDirection="column" gap={1}>
         <Text bold underline>
-          Navigation
+          Slash Commands (ketik di chat)
         </Text>
         <Text>
           {' '}
-          <Text bold color="cyan">
-            1-5
+          <Text bold color="green">
+            /help
           </Text>{' '}
-          Switch panels (Dashboard/Tasks/Providers/Cost/Settings)
+          Tampilkan bantuan ini
         </Text>
         <Text>
           {' '}
-          <Text bold color="cyan">
-            Tab
+          <Text bold color="green">
+            /tasks
           </Text>{' '}
-          Cycle panels forward
+          (atau /t) — daftar task (↑↓ pilih, Enter detail, S submit)
         </Text>
         <Text>
           {' '}
-          <Text bold color="cyan">
-            Shift+Tab
+          <Text bold color="green">
+            /providers
           </Text>{' '}
-          Cycle panels backward
+          (atau /p) — daftar LLM provider
+        </Text>
+        <Text>
+          {' '}
+          <Text bold color="green">
+            /cost
+          </Text>{' '}
+          (atau /c) — analisa biaya
+        </Text>
+        <Text>
+          {' '}
+          <Text bold color="green">
+            /submit &lt;goal&gt;
+          </Text>{' '}
+          Kirim task langsung dari chat
+        </Text>
+        <Text>
+          {' '}
+          <Text bold color="green">
+            /clear
+          </Text>{' '}
+          Bersihkan percakapan
+        </Text>
+        <Text>
+          {' '}
+          <Text bold color="green">
+            /history
+          </Text>{' '}
+          Info jumlah pesan sesi ini
+        </Text>
+        <Text>
+          {' '}
+          <Text bold color="green">
+            /settings
+          </Text>{' '}
+          Info akun (email, roles, API)
+        </Text>
+        <Text>
+          {' '}
+          <Text bold color="green">
+            /logout
+          </Text>{' '}
+          Keluar akun (kembali ke layar login)
+        </Text>
+        <Text>
+          {' '}
+          <Text bold color="green">
+            /quit
+          </Text>{' '}
+          (atau /q) — keluar TUI · Ctrl+C juga bisa
         </Text>
 
         <Text bold underline>
-          Task Panel
+          Hotkeys (saat overlay terbuka)
         </Text>
         <Text>
           {' '}
           <Text bold color="cyan">
             ↑/↓
           </Text>{' '}
-          Navigate task list
+          Navigasi daftar task
         </Text>
         <Text>
           {' '}
           <Text bold color="cyan">
             Enter
           </Text>{' '}
-          Open task detail
+          Buka detail task
         </Text>
         <Text>
           {' '}
           <Text bold color="cyan">
             S
           </Text>{' '}
-          Submit new task
-        </Text>
-        <Text>
-          {' '}
-          <Text bold color="cyan">
-            Esc
-          </Text>{' '}
-          Back to list / exit
-        </Text>
-
-        <Text bold underline>
-          Global
+          Submit task baru
         </Text>
         <Text>
           {' '}
           <Text bold color="cyan">
             R
           </Text>{' '}
-          Refresh all data
-        </Text>
-        <Text>
-          {' '}
-          <Text bold color="cyan">
-            Q
-          </Text>{' '}
-          Quit TUI
+          Refresh semua data
         </Text>
         <Text>
           {' '}
           <Text bold color="cyan">
             Esc
           </Text>{' '}
-          Quit (from dashboard)
+          Tutup overlay → kembali ke chat
         </Text>
-
-        <Text bold underline>
-          Commands (type in command bar)
-        </Text>
-        <Text>
-          {' '}
-          <Text bold color="green">
-            dashboard
-          </Text>{' '}
-          /{' '}
-          <Text bold color="green">
-            d
-          </Text>{' '}
-          Go to dashboard
-        </Text>
-        <Text>
-          {' '}
-          <Text bold color="green">
-            tasks
-          </Text>{' '}
-          /{' '}
-          <Text bold color="green">
-            t
-          </Text>{' '}
-          Go to task list
-        </Text>
-        <Text>
-          {' '}
-          <Text bold color="green">
-            providers
-          </Text>{' '}
-          /{' '}
-          <Text bold color="green">
-            p
-          </Text>{' '}
-          Go to provider list
-        </Text>
-        <Text>
-          {' '}
-          <Text bold color="green">
-            cost
-          </Text>{' '}
-          /{' '}
-          <Text bold color="green">
-            c
-          </Text>{' '}
-          Go to cost analysis
-        </Text>
-        <Text>
-          {' '}
-          <Text bold color="green">
-            submit
-          </Text>{' '}
-          Submit a new task
-        </Text>
-        <Text>
-          {' '}
-          <Text bold color="green">
-            refresh
-          </Text>{' '}
-          /{' '}
-          <Text bold color="green">
-            r
-          </Text>{' '}
-          Refresh data
-        </Text>
-        <Text>
-          {' '}
-          <Text bold color="green">
-            logout
-          </Text>{' '}
-          Sign out
-        </Text>
-        <Text>
-          {' '}
-          <Text bold color="green">
-            exit
-          </Text>{' '}
-          /{' '}
-          <Text bold color="green">
-            q
-          </Text>{' '}
-          Quit TUI
-        </Text>
-        <Text>
-          {' '}
-          <Text bold color="green">
-            help
-          </Text>{' '}
-          Show this help
-        </Text>
-      </Box>
-
-      <Box marginTop={1}>
-        <Text dimColor>[Esc] back to previous panel</Text>
       </Box>
     </Box>
   );
