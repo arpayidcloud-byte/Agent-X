@@ -13,6 +13,8 @@ import { CommandBar } from './command-bar.js';
 import { TaskList } from './task-list.js';
 import { TaskDetail } from './task-detail.js';
 import { SubmitPanel } from './submit-panel.js';
+import { ProviderList } from './provider-list.js';
+import { CostView } from './cost-view.js';
 import {
   isCloudAuthed,
   fetchHealth,
@@ -356,74 +358,9 @@ export default function AgentXTUI(): React.ReactNode {
           <SubmitPanel onSubmit={handleTaskSubmit} onCancel={() => setTaskSubView('list')} />
         )}
 
-        {activePanel === 'providers' && (
-          <Box flexDirection="column" padding={1}>
-            <Text bold color="cyanBright">
-              ◆ LLM Providers
-            </Text>
-            {providers.length === 0 ? (
-              <Text dimColor> No providers configured</Text>
-            ) : (
-              providers.map((p) => (
-                <Box key={p.id} flexDirection="row" gap={2}>
-                  <Text color={p.isActive ? 'green' : 'red'}>{p.isActive ? '●' : '○'}</Text>
-                  <Text bold>{p.displayName ?? p.name}</Text>
-                  <Text dimColor>({p.models.length} models)</Text>
-                </Box>
-              ))
-            )}
-            <Box marginTop={1}>
-              <Text dimColor>[1] Dashboard [2] Tasks [3] Providers [4] Cost</Text>
-            </Box>
-          </Box>
-        )}
+        {activePanel === 'providers' && <ProviderList providers={providers} loading={loading} />}
 
-        {activePanel === 'cost' && (
-          <Box flexDirection="column" padding={1}>
-            <Text bold color="cyanBright">
-              ◆ Cost Analysis
-            </Text>
-            <Box marginTop={1}>
-              <Text>Total: </Text>
-              <Text bold color="green">
-                ${(cost?.totalCost ?? 0).toFixed(4)}
-              </Text>
-            </Box>
-            {Object.entries(cost?.byProvider ?? {}).length > 0 && (
-              <Box flexDirection="column" marginTop={1}>
-                <Text bold underline>
-                  By Provider
-                </Text>
-                {Object.entries(cost?.byProvider ?? {}).map(([name, amount]) => (
-                  <Box key={name} flexDirection="row" gap={2}>
-                    <Text>{name.padEnd(20)}</Text>
-                    <Text bold color="green">
-                      ${amount.toFixed(4)}
-                    </Text>
-                  </Box>
-                ))}
-              </Box>
-            )}
-            {Object.entries(cost?.byModel ?? {}).length > 0 && (
-              <Box flexDirection="column" marginTop={1}>
-                <Text bold underline>
-                  By Model
-                </Text>
-                {Object.entries(cost?.byModel ?? {}).map(([name, amount]) => (
-                  <Box key={name} flexDirection="row" gap={2}>
-                    <Text>{name.padEnd(25)}</Text>
-                    <Text bold color="yellow">
-                      ${amount.toFixed(4)}
-                    </Text>
-                  </Box>
-                ))}
-              </Box>
-            )}
-            <Box marginTop={1}>
-              <Text dimColor>[1] Dashboard [2] Tasks [3] Providers [4] Cost</Text>
-            </Box>
-          </Box>
-        )}
+        {activePanel === 'cost' && <CostView cost={cost} loading={loading} />}
 
         {activePanel === 'settings' && (
           <Box flexDirection="column" padding={1}>
