@@ -6,9 +6,9 @@
  */
 import * as fs from 'fs';
 import * as path from 'path';
-import { isCloudAuthed, getApiUrl, loadCloudConfig } from '../lib/cloud-api.js';
+import { isCloudAuthed, getApiUrl, loadCloudConfig, configHome } from '../lib/cloud-api.js';
 
-const DATA_DIR = path.resolve(process.cwd(), '.agentx');
+const DATA_DIR = configHome;
 
 export async function watch(args: string[]): Promise<void> {
   const taskId = args[0];

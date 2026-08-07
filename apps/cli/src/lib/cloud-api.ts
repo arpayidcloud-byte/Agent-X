@@ -2,14 +2,17 @@
  * Cloud API client for AgentX CLI.
  *
  * Provides authenticated access to the AgentX API server.
- * When a cloud token is configured, commands route through the cloud API
- * instead of the local in-memory runtime.
+ * Config is stored in AGENTX_HOME (env) or ~/.agentx/ (default).
  */
 import * as fs from 'fs';
+import * as os from 'os';
 import * as path from 'path';
 
-const CONFIG_DIR = path.resolve(process.cwd(), '.agentx');
-const CONFIG_FILE = path.join(CONFIG_DIR, 'config.json');
+const AGENTX_HOME = process.env.AGENTX_HOME ?? path.join(os.homedir(), '.agentx');
+const CONFIG_FILE = path.join(AGENTX_HOME, 'config.json');
+
+/** Config directory — home-based (portable across machines). */
+export const configHome = AGENTX_HOME;
 
 export interface CloudConfig {
   apiToken?: string;
@@ -32,7 +35,7 @@ export function loadCloudConfig(): CloudConfig {
 }
 
 export function saveCloudConfig(patch: Partial<CloudConfig>): void {
-  if (!fs.existsSync(CONFIG_DIR)) fs.mkdirSync(CONFIG_DIR, { recursive: true });
+  if (!fs.existsSync(AGENTX_HOME)) fs.mkdirSync(AGENTX_HOME, { recursive: true });
   const existing = loadCloudConfig();
   const merged = { ...existing, ...patch };
   const raw: Record<string, unknown> = {};
