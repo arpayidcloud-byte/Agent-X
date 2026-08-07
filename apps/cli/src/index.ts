@@ -13,6 +13,7 @@ import { audit } from './commands/audit.js';
 import { watch } from './commands/watch.js';
 import { tui as tuiCommand } from './commands/tui.js';
 import { login } from './commands/login.js';
+import { chat, authWhoami, providersList } from './commands/chat.js';
 
 const require = createRequire(import.meta.url);
 const pkg = require('../package.json');
@@ -129,13 +130,55 @@ program
     }
   });
 
+program
+  .command('chat [prompt...]')
+  .description('Interactive streaming chat with AgentX cloud')
+  .option('--provider <name>', 'Force LLM provider')
+  .option('--model <name>', 'Force model')
+  .action(async (promptParts: string[], options: { provider?: string; model?: string }) => {
+    try {
+      const args = [...promptParts];
+      if (options.provider) args.push('--provider', options.provider);
+      if (options.model) args.push('--model', options.model);
+      await chat(args);
+    } catch (error) {
+      console.error(error instanceof Error ? error.message : String(error));
+      process.exit(1);
+    }
+  });
+
+program
+  .command('auth')
+  .description('Check authentication status')
+  .action(async () => {
+    try {
+      await authWhoami();
+    } catch (error) {
+      console.error(error instanceof Error ? error.message : String(error));
+      process.exit(1);
+    }
+  });
+
+program
+  .command('providers')
+  .description('List available LLM providers')
+  .action(async () => {
+    try {
+      await providersList();
+    } catch (error) {
+      console.error(error instanceof Error ? error.message : String(error));
+      process.exit(1);
+    }
+  });
+
 // ─── Shell Completions ────
 program
   .command('completions')
   .description('Install shell completions (bash/zsh/fish)')
   .argument('[shell]', 'Shell type: bash, zsh, or fish')
   .action((shell?: string) => {
-    const commands = 'submit status config cost audit watch tui login completions help';
+    const commands =
+      'submit status config cost audit watch tui login chat auth providers completions help';
 
     if (shell && (shell === 'bash' || shell === 'zsh' || shell === 'fish')) {
       if (shell === 'bash') {
