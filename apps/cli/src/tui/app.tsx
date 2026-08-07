@@ -15,6 +15,9 @@ import { TaskDetail } from './task-detail.js';
 import { SubmitPanel } from './submit-panel.js';
 import { ProviderList } from './provider-list.js';
 import { CostView } from './cost-view.js';
+import { Banner } from './banner.js';
+import { NavBar } from './nav-bar.js';
+import { HelpPanel } from './help-panel.js';
 import {
   isCloudAuthed,
   fetchHealth,
@@ -283,7 +286,10 @@ export default function AgentXTUI(): React.ReactNode {
         setTaskSubView('submit');
         return;
       }
-      if (lower === 'help') return;
+      if (lower === 'help') {
+        setActivePanel('help');
+        return;
+      }
       setLastError(`Unknown command: ${cmd}. Type "help" for commands.`);
     },
     [exit, refreshData],
@@ -296,13 +302,11 @@ export default function AgentXTUI(): React.ReactNode {
 
   return (
     <Box flexDirection="column" padding={1}>
-      {/* Header */}
-      <Box marginBottom={1}>
-        <Text bold color="cyanBright">
-          ⚡ AgentX
-        </Text>
-        <Text dimColor> — Enterprise AI Agent Platform</Text>
-      </Box>
+      {/* ASCII Banner */}
+      <Banner />
+
+      {/* Navigation Bar */}
+      <NavBar activePanel={activePanel} onNavigate={setActivePanel} />
 
       {/* Status Bar */}
       <StatusBar
@@ -361,6 +365,8 @@ export default function AgentXTUI(): React.ReactNode {
         {activePanel === 'providers' && <ProviderList providers={providers} loading={loading} />}
 
         {activePanel === 'cost' && <CostView cost={cost} loading={loading} />}
+
+        {activePanel === 'help' && <HelpPanel />}
 
         {activePanel === 'settings' && (
           <Box flexDirection="column" padding={1}>
