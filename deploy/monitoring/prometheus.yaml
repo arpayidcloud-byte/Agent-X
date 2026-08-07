@@ -35,6 +35,8 @@ spec:
           volumeMounts:
             - name: config
               mountPath: /etc/prometheus
+            - name: rules
+              mountPath: /etc/prometheus/rules
             - name: storage
               mountPath: /prometheus
           resources:
@@ -47,6 +49,15 @@ spec:
         - name: config
           configMap:
             name: prometheus-config
+            items:
+              - key: prometheus.yml
+                path: prometheus.yml
+        - name: rules
+          configMap:
+            name: prometheus-config
+            items:
+              - key: rules.yml
+                path: rules.yml
         - name: storage
           emptyDir: {}
 ---
