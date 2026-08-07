@@ -1,17 +1,16 @@
-// V9 CLI - Human Interface
+/**
+ * AgentX CLI — Cloud-first AI agent platform command line interface.
+ *
+ * Commands: submit, status, config, cost, audit, watch, tui, login, completions
+ */
 import { Command } from 'commander';
 import { createRequire } from 'module';
 import { submit } from './commands/submit.js';
-import { approve, reject } from './commands/approve.js';
 import { status } from './commands/status.js';
-import { demo } from './commands/demo.js';
 import { config } from './commands/config.js';
 import { cost } from './commands/cost.js';
 import { audit } from './commands/audit.js';
-import { plugin } from './commands/plugin.js';
 import { watch } from './commands/watch.js';
-import { dlq } from './commands/dlq.js';
-import { shutdown } from './commands/shutdown.js';
 import { tui as tuiCommand } from './commands/tui.js';
 import { login } from './commands/login.js';
 
@@ -19,12 +18,11 @@ const require = createRequire(import.meta.url);
 const pkg = require('../package.json');
 
 const program = new Command();
-
 program.name('agentx').description('AgentX CLI').version(pkg.version);
 
 program
   .command('submit <goal>')
-  .description('Submit a new task')
+  .description('Submit a task to the cloud')
   .option('--role <role>', 'Agent role (default: coder)')
   .action(async (goal: string, options: { role?: string }) => {
     try {
@@ -37,47 +35,11 @@ program
   });
 
 program
-  .command('approve <task-id>')
-  .description('Approve a pending task')
-  .action(async (taskId: string) => {
-    try {
-      await approve([taskId]);
-    } catch (error) {
-      console.error(error instanceof Error ? error.message : String(error));
-      process.exit(1);
-    }
-  });
-
-program
-  .command('reject <task-id>')
-  .description('Reject a pending task')
-  .action(async (taskId: string) => {
-    try {
-      await reject([taskId]);
-    } catch (error) {
-      console.error(error instanceof Error ? error.message : String(error));
-      process.exit(1);
-    }
-  });
-
-program
   .command('status [task-id]')
   .description('Check task status')
   .action(async (taskId?: string) => {
     try {
       await status(taskId ? [taskId] : []);
-    } catch (error) {
-      console.error(error instanceof Error ? error.message : String(error));
-      process.exit(1);
-    }
-  });
-
-program
-  .command('demo [goal...]')
-  .description('Run E2E demo (CLI → Runtime → Agent → LLM → Response)')
-  .action(async (goal: string[]) => {
-    try {
-      await demo(goal);
     } catch (error) {
       console.error(error instanceof Error ? error.message : String(error));
       process.exit(1);
@@ -125,47 +87,11 @@ program
   });
 
 program
-  .command('plugin')
-  .description('Manage plugins')
-  .action(async () => {
-    try {
-      await plugin([]);
-    } catch (error) {
-      console.error(error instanceof Error ? error.message : String(error));
-      process.exit(1);
-    }
-  });
-
-program
   .command('watch')
   .description('Watch for changes')
   .action(async () => {
     try {
       await watch([]);
-    } catch (error) {
-      console.error(error instanceof Error ? error.message : String(error));
-      process.exit(1);
-    }
-  });
-
-program
-  .command('dlq [action]')
-  .description('Manage Dead Letter Queue (list|clear|size)')
-  .action(async (action?: string) => {
-    try {
-      await dlq(action ? [action] : []);
-    } catch (error) {
-      console.error(error instanceof Error ? error.message : String(error));
-      process.exit(1);
-    }
-  });
-
-program
-  .command('shutdown [reason...]')
-  .description('Trigger graceful shutdown')
-  .action(async (reason: string[]) => {
-    try {
-      await shutdown(reason);
     } catch (error) {
       console.error(error instanceof Error ? error.message : String(error));
       process.exit(1);
@@ -209,24 +135,7 @@ program
   .description('Install shell completions (bash/zsh/fish)')
   .argument('[shell]', 'Shell type: bash, zsh, or fish')
   .action((shell?: string) => {
-    const shells = shell ? [shell] : ['bash', 'zsh', 'fish'];
-    const scripts: Record<string, string> = {
-      bash: `# Add to ~/.bashrc or ~/.bash_profile:
-eval "$(agentx completions bash)"
-
-# Or install directly:
-agentx completions bash > ~/.bash_completions/agentx
-echo 'source ~/.bash_completions/agentx' >> ~/.bashrc`,
-      zsh: `# Add to ~/.zshrc:
-eval "$(agentx completions zsh)"
-
-# Or install directly:
-agentx completions zsh > ~/.zsh/completions/_agentx
-echo 'fpath=(~/.zsh/completions $fpath)' >> ~/.zshrc
-echo 'autoload -Uz compinit && compinit' >> ~/.zshrc`,
-      fish: `# Add to ~/.config/fish/completions/:
-agentx completions fish > ~/.config/fish/completions/agentx.fish`,
-    };
+    const commands = 'submit status config cost audit watch tui login completions help';
 
     if (shell && (shell === 'bash' || shell === 'zsh' || shell === 'fish')) {
       if (shell === 'bash') {
@@ -235,7 +144,7 @@ agentx completions fish > ~/.config/fish/completions/agentx.fish`,
   COMPREPLY=()
   cur="\${COMP_WORDS[COMP_CWORD]}"
   prev="\${COMP_WORDS[COMP_CWORD-1]}"
-  commands="submit approve reject status demo config cost audit plugin watch dlq shutdown tui login completions help"
+  commands="${commands}"
 
   if [[ \${cur} == -* ]]; then
     COMPREPLY=( $(compgen -W "--help --version --email --password --api" -- \${cur}) )
@@ -250,26 +159,20 @@ complete -F _agentx_completions agentx`);
         console.log(`#compdef agentx
 
 _agentx() {
-  _arguments \
-    '1:command:(submit approve reject status demo config cost audit plugin watch dlq shutdown tui login completions help)' \
+  _arguments \\
+    '1:command:(${commands})' \\
     '*::arg:{ _files }'
 }
 
 _agentx "$@"`);
       } else if (shell === 'fish') {
         console.log(`complete -c agentx -f
-complete -c agentx -n '__fish_use_subcommand' -a 'submit' -d 'Submit a new task'
-complete -c agentx -n '__fish_use_subcommand' -a 'approve' -d 'Approve a pending task'
-complete -c agentx -n '__fish_use_subcommand' -a 'reject' -d 'Reject a pending task'
+complete -c agentx -n '__fish_use_subcommand' -a 'submit' -d 'Submit a task'
 complete -c agentx -n '__fish_use_subcommand' -a 'status' -d 'Check task status'
-complete -c agentx -n '__fish_use_subcommand' -a 'demo' -d 'Run E2E demo'
 complete -c agentx -n '__fish_use_subcommand' -a 'config' -d 'Manage configuration'
 complete -c agentx -n '__fish_use_subcommand' -a 'cost' -d 'Show cost analysis'
 complete -c agentx -n '__fish_use_subcommand' -a 'audit' -d 'Run security audit'
-complete -c agentx -n '__fish_use_subcommand' -a 'plugin' -d 'Manage plugins'
 complete -c agentx -n '__fish_use_subcommand' -a 'watch' -d 'Watch for changes'
-complete -c agentx -n '__fish_use_subcommand' -a 'dlq' -d 'Manage Dead Letter Queue'
-complete -c agentx -n '__fish_use_subcommand' -a 'shutdown' -d 'Trigger graceful shutdown'
 complete -c agentx -n '__fish_use_subcommand' -a 'tui' -d 'Launch interactive Terminal UI'
 complete -c agentx -n '__fish_use_subcommand' -a 'login' -d 'Authenticate with AgentX cloud'
 complete -c agentx -n '__fish_use_subcommand' -a 'completions' -d 'Install shell completions'
@@ -278,11 +181,14 @@ complete -c agentx -n '__fish_use_subcommand' -a 'help' -d 'Display help'`);
     } else {
       console.log('Usage: agentx completions [bash|zsh|fish]');
       console.log('');
-      for (const s of shells) {
-        console.log(`Install ${s} completions:`);
-        console.log(scripts[s]);
-        console.log('');
-      }
+      console.log('Install bash completions:');
+      console.log('  eval "$(agentx completions bash)"');
+      console.log('');
+      console.log('Install zsh completions:');
+      console.log('  eval "$(agentx completions zsh)"');
+      console.log('');
+      console.log('Install fish completions:');
+      console.log('  agentx completions fish > ~/.config/fish/completions/agentx.fish');
     }
   });
 
