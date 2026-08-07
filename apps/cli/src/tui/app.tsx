@@ -1,12 +1,8 @@
 /**
  * AgentX CLI TUI — Main Application Shell
  *
- * Tahap 1: Auth + Dashboard
- * - Login screen (interactive email/password via ink)
- * - Dashboard panel: health, stats, recent tasks, cost
- * - Status bar: version, health, email, tasks, cost
- * - Command bar with suggestions
- * - Keyboard: 1-5 switch panels, R refresh, S submit, Q quit
+ * Tahap 1: Auth + Dashboard (PR #81)
+ * Tahap 2: Task Management — list, detail, submit, SSE streaming
  */
 import React, { useState, useCallback, useEffect } from 'react';
 import { Box, Text, useApp, useInput, render } from 'ink';
@@ -14,9 +10,11 @@ import { AuthScreen } from './auth-screen.js';
 import { Dashboard } from './dashboard.js';
 import { StatusBar } from './status-bar.js';
 import { CommandBar } from './command-bar.js';
+import { TaskList } from './task-list.js';
+import { TaskDetail } from './task-detail.js';
+import { SubmitPanel } from './submit-panel.js';
 import {
   isCloudAuthed,
-  loadCloudConfig,
   fetchHealth,
   fetchStats,
   fetchTasks,
@@ -36,6 +34,9 @@ import type {
 
 const VERSION = '2.0.0';
 
+/** Sub-view within the tasks panel. */
+type TaskSubView = 'list' | 'detail' | 'submit';
+
 function useInterval(fn: () => void, ms: number): void {
   useEffect(() => {
     const id = setInterval(fn, ms);
@@ -48,16 +49,20 @@ export default function AgentXTUI(): React.ReactNode {
 
   // ─── Auth state ────
   const [authenticated, setAuthenticated] = useState<boolean>(() => isCloudAuthed());
-  const [email, setEmail] = useState<string | undefined>(() => {
-    const cfg = loadCloudConfig();
-    return cfg.apiToken ? undefined : undefined; // email comes from API after login
-  });
+  const [email, setEmail] = useState<string | undefined>();
   const [roles, setRoles] = useState<string[] | undefined>();
   const [authError, setAuthError] = useState<string | null>(null);
   const [authLoading, setAuthLoading] = useState(false);
 
   // ─── Panel state ────
   const [activePanel, setActivePanel] = useState<PanelId>('dashboard');
+
+  // ─── Task sub-view state ────
+  const [taskSubView, setTaskSubView] = useState<TaskSubView>('list');
+  const [selectedTaskIdx, setSelectedTaskIdx] = useState(0);
+  const [submitResult, setSubmitResult] = useState<{ taskId: string; message?: string } | null>(
+    null,
+  );
 
   // ─── Data state ────
   const [health, setHealth] = useState<HealthResponse | null>(null);
@@ -98,14 +103,11 @@ export default function AgentXTUI(): React.ReactNode {
     }
   }, []);
 
-  // Initial load + polling
+  // Initial load + polling (15s)
   useEffect(() => {
-    if (authenticated) {
-      void refreshData();
-    }
+    if (authenticated) void refreshData();
   }, [authenticated, refreshData]);
 
-  // Poll every 15s
   useInterval(
     useCallback(() => {
       if (authenticated) void refreshData();
@@ -119,19 +121,18 @@ export default function AgentXTUI(): React.ReactNode {
     setAuthError(null);
     try {
       const user = await loginApi(loginEmail, password);
-      // loginApi uses cloudFetch which stores token via saveCloudConfig internally
-      // but we need to verify — cloudFetch doesn't save the token, we need to do it here
-      // Actually loginApi returns user info but doesn't save token. Let me fix:
       setAuthenticated(true);
       setEmail(user.email);
       setRoles(user.roles);
     } catch (e) {
       const status = (e as Error & { status?: number }).status;
-      if (status === 401 || status === 403) {
-        setAuthError('Invalid email or password');
-      } else {
-        setAuthError(e instanceof Error ? e.message : String(e));
-      }
+      setAuthError(
+        status === 401 || status === 403
+          ? 'Invalid email or password'
+          : e instanceof Error
+            ? e.message
+            : String(e),
+      );
     } finally {
       setAuthLoading(false);
     }
@@ -144,30 +145,96 @@ export default function AgentXTUI(): React.ReactNode {
     [handleLoginAsync],
   );
 
+  // ─── Task navigation ────
+  const navigateTask = useCallback(
+    (direction: 'up' | 'down') => {
+      if (tasks.length === 0) return;
+      setSelectedTaskIdx((prev) => {
+        if (direction === 'up') return Math.max(0, prev - 1);
+        return Math.min(tasks.length - 1, prev + 1);
+      });
+    },
+    [tasks.length],
+  );
+
+  const openTaskDetail = useCallback(() => {
+    if (tasks.length > 0) {
+      setTaskSubView('detail');
+    }
+  }, [tasks.length]);
+
+  const openSubmitPanel = useCallback(() => {
+    setTaskSubView('submit');
+  }, []);
+
+  const handleTaskSubmit = useCallback(
+    (result: { taskId: string; message?: string }) => {
+      setSubmitResult(result);
+      // After submit, go back to list and refresh
+      setTaskSubView('list');
+      void refreshData();
+    },
+    [refreshData],
+  );
+
   // ─── Keyboard ────
   useInput(
     useCallback(
-      (input, key) => {
+      (_input, key) => {
         if (!authenticated) {
           if (key.escape) exit();
           return;
         }
 
-        // Navigation
-        if (input === '1') setActivePanel('dashboard');
-        if (input === '2') setActivePanel('tasks');
-        if (input === '3') setActivePanel('providers');
-        if (input === '4') setActivePanel('cost');
-        if (input === '5') setActivePanel('settings');
+        // Panel navigation (1-5)
+        if (_input === '1') {
+          setActivePanel('dashboard');
+          setTaskSubView('list');
+        }
+        if (_input === '2') {
+          setActivePanel('tasks');
+          setTaskSubView('list');
+        }
+        if (_input === '3') {
+          setActivePanel('providers');
+        }
+        if (_input === '4') {
+          setActivePanel('cost');
+        }
+        if (_input === '5') {
+          setActivePanel('settings');
+        }
 
-        // Actions
-        if (input === 'r' || input === 'R') void refreshData();
-        if (key.escape) exit();
+        // Task-specific keys (only when on tasks panel)
+        if (activePanel === 'tasks' && taskSubView === 'list') {
+          if (key.upArrow) navigateTask('up');
+          if (key.downArrow) navigateTask('down');
+          if (key.return) openTaskDetail();
+          if (_input === 's' || _input === 'S') openSubmitPanel();
+        }
 
-        // Quit
-        if (input === 'q' || input === 'Q') exit();
+        // Detail view: Esc back
+        if (activePanel === 'tasks' && taskSubView === 'detail' && key.escape) {
+          setTaskSubView('list');
+        }
+
+        // Submit view: handled inside SubmitPanel
+
+        // Global keys
+        if (_input === 'r' || _input === 'R') void refreshData();
+        if (key.escape && activePanel !== 'tasks') exit();
+        if (_input === 'q' || _input === 'Q') exit();
       },
-      [authenticated, exit, refreshData],
+      [
+        authenticated,
+        exit,
+        refreshData,
+        activePanel,
+        taskSubView,
+        navigateTask,
+        openTaskDetail,
+        openSubmitPanel,
+      ],
     ),
   );
 
@@ -176,10 +243,6 @@ export default function AgentXTUI(): React.ReactNode {
     (cmd: string) => {
       const lower = cmd.toLowerCase().trim();
 
-      if (lower === 'help') {
-        // TODO: show help panel
-        return;
-      }
       if (lower === 'exit' || lower === 'quit' || lower === 'q') {
         exit();
         return;
@@ -197,10 +260,12 @@ export default function AgentXTUI(): React.ReactNode {
       }
       if (lower === 'dashboard' || lower === 'd') {
         setActivePanel('dashboard');
+        setTaskSubView('list');
         return;
       }
       if (lower === 'tasks' || lower === 't') {
         setActivePanel('tasks');
+        setTaskSubView('list');
         return;
       }
       if (lower === 'providers' || lower === 'p') {
@@ -211,16 +276,13 @@ export default function AgentXTUI(): React.ReactNode {
         setActivePanel('cost');
         return;
       }
-      if (lower.startsWith('submit')) {
-        // TODO Tahap 2: submit flow
-        return;
-      }
-      if (lower.startsWith('status')) {
+      if (lower === 'submit') {
         setActivePanel('tasks');
+        setTaskSubView('submit');
         return;
       }
-
-      setLastError(`Unknown command: ${cmd}. Type "help" for available commands.`);
+      if (lower === 'help') return;
+      setLastError(`Unknown command: ${cmd}. Type "help" for commands.`);
     },
     [exit, refreshData],
   );
@@ -257,6 +319,14 @@ export default function AgentXTUI(): React.ReactNode {
         </Box>
       )}
 
+      {/* Submit result toast */}
+      {submitResult && (
+        <Box marginTop={1} marginBottom={1}>
+          <Text color="green">✓ Task submitted: {submitResult.taskId}</Text>
+          {submitResult.message && <Text dimColor> — {submitResult.message.slice(0, 80)}</Text>}
+        </Box>
+      )}
+
       {/* Active Panel */}
       <Box marginTop={1}>
         {activePanel === 'dashboard' && (
@@ -269,37 +339,23 @@ export default function AgentXTUI(): React.ReactNode {
             loading={loading}
           />
         )}
-        {activePanel === 'tasks' && (
-          <Box flexDirection="column" padding={1}>
-            <Text bold color="cyanBright">
-              ◆ Tasks
-            </Text>
-            {tasks.length === 0 ? (
-              <Text dimColor> No tasks — use "submit" to create one</Text>
-            ) : (
-              tasks.map((t) => (
-                <Box key={t.id} flexDirection="row" gap={1}>
-                  <Text dimColor>{t.id.slice(0, 14).padEnd(16)}</Text>
-                  <Text
-                    color={
-                      t.status === 'COMPLETED'
-                        ? 'green'
-                        : t.status === 'RUNNING'
-                          ? 'cyan'
-                          : 'yellow'
-                    }
-                  >
-                    {t.status.padEnd(12)}
-                  </Text>
-                  <Text>{(t.description ?? t.prompt ?? '').slice(0, 50)}</Text>
-                </Box>
-              ))
-            )}
-            <Box marginTop={1}>
-              <Text dimColor>[1] Dashboard [2] Tasks [3] Providers [4] Cost</Text>
-            </Box>
-          </Box>
+
+        {activePanel === 'tasks' && taskSubView === 'list' && (
+          <TaskList
+            tasks={tasks}
+            selectedId={tasks[selectedTaskIdx]?.id ?? null}
+            loading={loading}
+          />
         )}
+
+        {activePanel === 'tasks' && taskSubView === 'detail' && tasks[selectedTaskIdx] != null && (
+          <TaskDetail task={tasks[selectedTaskIdx]!} />
+        )}
+
+        {activePanel === 'tasks' && taskSubView === 'submit' && (
+          <SubmitPanel onSubmit={handleTaskSubmit} onCancel={() => setTaskSubView('list')} />
+        )}
+
         {activePanel === 'providers' && (
           <Box flexDirection="column" padding={1}>
             <Text bold color="cyanBright">
@@ -321,6 +377,7 @@ export default function AgentXTUI(): React.ReactNode {
             </Box>
           </Box>
         )}
+
         {activePanel === 'cost' && (
           <Box flexDirection="column" padding={1}>
             <Text bold color="cyanBright">
@@ -367,6 +424,7 @@ export default function AgentXTUI(): React.ReactNode {
             </Box>
           </Box>
         )}
+
         {activePanel === 'settings' && (
           <Box flexDirection="column" padding={1}>
             <Text bold color="cyanBright">
@@ -390,10 +448,12 @@ export default function AgentXTUI(): React.ReactNode {
         )}
       </Box>
 
-      {/* Command Bar */}
-      <Box marginTop={1}>
-        <CommandBar onSubmit={handleCommand} />
-      </Box>
+      {/* Command Bar (only on non-interactive panels) */}
+      {!(activePanel === 'tasks' && (taskSubView === 'detail' || taskSubView === 'submit')) && (
+        <Box marginTop={1}>
+          <CommandBar onSubmit={handleCommand} />
+        </Box>
+      )}
     </Box>
   );
 }
