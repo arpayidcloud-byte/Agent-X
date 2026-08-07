@@ -20,6 +20,7 @@ import { createHttpServer } from './ws-bridge.js';
 import { PromptTemplateRepository, getPrisma } from '@agent-xai/persistence';
 import { mountSwagger } from './swagger.js';
 import { registerAuditExportRoutes } from './audit-export.js';
+import { registerWorkflowRoutes } from './workflow-routes.js';
 import { startParallelRun, getMultiAgentRun } from './multi-agent-runner.js';
 import {
   subscribeMultiAgent,
@@ -88,6 +89,9 @@ mountSwagger(app);
 
 // ─── Audit log export ────
 registerAuditExportRoutes(app);
+
+// ─── Workflow builder API ────
+registerWorkflowRoutes(app);
 
 const PORT = process.env.PORT || 4000;
 
