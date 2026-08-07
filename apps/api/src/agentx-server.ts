@@ -21,6 +21,7 @@ import { PromptTemplateRepository, getPrisma } from '@agent-xai/persistence';
 import { mountSwagger } from './swagger.js';
 import { registerAuditExportRoutes } from './audit-export.js';
 import { registerWorkflowRoutes } from './workflow-routes.js';
+import { registerEvalRoutes } from './eval-routes.js';
 import { startParallelRun, getMultiAgentRun } from './multi-agent-runner.js';
 import {
   subscribeMultiAgent,
@@ -92,6 +93,7 @@ registerAuditExportRoutes(app);
 
 // ─── Workflow builder API ────
 registerWorkflowRoutes(app);
+registerEvalRoutes(app);
 
 const PORT = process.env.PORT || 4000;
 
