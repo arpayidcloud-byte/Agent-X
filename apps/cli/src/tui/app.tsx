@@ -1,15 +1,21 @@
 /**
- * AgentX CLI TUI — Chat-first main shell.
+ * AgentX CLI TUI — Chat-first main shell (Antigravity-inspired).
  *
- * Redesign (2026-08-07): chat is THE main surface (like Devin/OpenCode/Hermes).
- * Panels (tasks/providers/cost/help/settings) are overlays toggled by slash
- * commands or hotkeys — not tab views. Chrome is minimal: 1-line header +
- * 1-line status bar; the rest belongs to the conversation.
+ * Chat is THE main surface. Panels are overlays toggled by slash commands.
+ * Antigravity-style additions (2026-08-07):
+ *   - `!cmd` shell mode → ephemeral output modal (prefix changes > → !)
+ *   - /model provider picker (↑↓ Enter Esc)
+ *   - input history (↑/↓ on empty draft)
+ *   - /btw one-shot quick question, /context session summary
+ *   - resume hint on quit, truncated status line
  */
 import React, { useState, useCallback, useEffect } from 'react';
 import { Box, Text, useApp, useInput, render } from 'ink';
+import { execFile } from 'node:child_process';
 import { AuthScreen } from './auth-screen.js';
 import { ChatView } from './chat-view.js';
+import { ShellModal, type ShellResult } from './shell-modal.js';
+import { ModelPicker } from './model-picker.js';
 import { StatusBar } from './status-bar.js';
 import { TaskList } from './task-list.js';
 import { TaskDetail } from './task-detail.js';
@@ -37,7 +43,8 @@ import type {
   ChatMeta,
 } from './types.js';
 
-const VERSION = '2.1.0';
+const VERSION = '2.2.0';
+const SHELL_OUTPUT_CAP = 4000;
 
 /** Sub-view within the tasks overlay. */
 type TaskSubView = 'list' | 'detail' | 'submit';
@@ -47,6 +54,34 @@ function useInterval(fn: () => void, ms: number): void {
     const id = setInterval(fn, ms);
     return () => clearInterval(id);
   }, [fn, ms]);
+}
+
+/** Run a local shell command, capturing output + exit code (Antigravity ! mode). */
+function runShellCommand(command: string): Promise<ShellResult> {
+  return new Promise((resolve) => {
+    const start = Date.now();
+    execFile(
+      '/bin/sh',
+      ['-c', command],
+      { timeout: 15000, maxBuffer: 64 * 1024 },
+      (err, stdout, stderr) => {
+        const raw = (stdout + (stderr ? `\n${stderr}` : '')).trim();
+        const truncated = raw.length > SHELL_OUTPUT_CAP;
+        const exitCode = err
+          ? typeof (err as { code?: unknown }).code === 'number'
+            ? (err as { code: number }).code
+            : 1
+          : 0;
+        resolve({
+          command,
+          output: truncated ? raw.slice(-SHELL_OUTPUT_CAP) : raw,
+          exitCode,
+          durationMs: Date.now() - start,
+          truncated,
+        });
+      },
+    );
+  });
 }
 
 export default function AgentXTUI(): React.ReactNode {
@@ -59,8 +94,11 @@ export default function AgentXTUI(): React.ReactNode {
   const [authError, setAuthError] = useState<string | null>(null);
   const [authLoading, setAuthLoading] = useState(false);
 
-  // ─── Overlay state (chat-first: panels are overlays, not tabs) ────
+  // ─── Overlay state ────
   const [overlay, setOverlay] = useState<OverlayId>('none');
+  const [shellResult, setShellResult] = useState<ShellResult | null>(null);
+  const [modelPickerOpen, setModelPickerOpen] = useState(false);
+  const [selectedProvider, setSelectedProvider] = useState<string | null>(null);
 
   // ─── Task overlay state ────
   const [taskSubView, setTaskSubView] = useState<TaskSubView>('list');
@@ -80,6 +118,7 @@ export default function AgentXTUI(): React.ReactNode {
   const [streamText, setStreamText] = useState('');
   const [streamMeta, setStreamMeta] = useState<ChatMeta | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [inputHistory, setInputHistory] = useState<string[]>([]);
 
   // ─── Data fetch ────
   const refreshData = useCallback(async () => {
@@ -98,13 +137,21 @@ export default function AgentXTUI(): React.ReactNode {
       setProviders(p);
       setCost(c);
     } catch (e) {
+      const status = (e as Error & { status?: number }).status;
+      if (status === 401 || status === 403) {
+        // Session expired — back to the auth screen.
+        setAuthenticated(false);
+        setEmail(undefined);
+        setRoles(undefined);
+        setNotice('Sesi berakhir — login ulang.');
+        return;
+      }
       setLastError(e instanceof Error ? e.message : String(e));
     } finally {
       setLoading(false);
     }
   }, []);
 
-  // Initial load + polling (15s)
   useEffect(() => {
     if (authenticated) void refreshData();
   }, [authenticated, refreshData]);
@@ -151,6 +198,7 @@ export default function AgentXTUI(): React.ReactNode {
   const handleSend = useCallback(
     (text: string) => {
       if (streaming) return;
+      setInputHistory((prev) => [text, ...prev].slice(0, 30));
       setLastError(null);
       setNotice(null);
       setMessages((prev) => [...prev, { role: 'user', content: text }]);
@@ -163,7 +211,7 @@ export default function AgentXTUI(): React.ReactNode {
           const history = [...messages, { role: 'user' as const, content: text }];
           const meta = await streamChat(
             history,
-            { provider: undefined },
+            { provider: selectedProvider ?? undefined },
             {
               onChunk: (chunk) => setStreamText((prev) => prev + chunk),
               onComplete: (m) => setStreamMeta(m),
@@ -180,16 +228,41 @@ export default function AgentXTUI(): React.ReactNode {
         } catch (e) {
           setStreaming(false);
           setStreamText('');
-          // Roll back the failed user message
           setMessages((prev) => prev.slice(0, -1));
+          const status = (e as Error & { status?: number }).status;
+          if (status === 401 || status === 403) {
+            setAuthenticated(false);
+            setEmail(undefined);
+            setRoles(undefined);
+            setNotice('Sesi berakhir — login ulang.');
+            return;
+          }
           setLastError(`Chat gagal: ${e instanceof Error ? e.message : String(e)}`);
         }
       })();
     },
-    [messages, streaming, refreshData],
+    [messages, streaming, selectedProvider, refreshData],
   );
 
-  // ─── Slash commands (typed in the chat input) ────
+  // ─── Shell mode (`!cmd`) ────
+  const handleShell = useCallback((command: string) => {
+    setNotice(`Menjalankan: ${command}`);
+    void (async () => {
+      try {
+        const result = await runShellCommand(command);
+        setShellResult(result);
+      } catch (e) {
+        setShellResult({
+          command,
+          output: e instanceof Error ? e.message : String(e),
+          exitCode: 1,
+          durationMs: 0,
+        });
+      }
+    })();
+  }, []);
+
+  // ─── Slash commands ────
   const handleCommand = useCallback(
     (raw: string) => {
       const lower = raw.toLowerCase().trim();
@@ -217,6 +290,38 @@ export default function AgentXTUI(): React.ReactNode {
       }
       if (cmd === '/settings') {
         setOverlay('settings');
+        return;
+      }
+      if (cmd === '/model') {
+        setModelPickerOpen(true);
+        void refreshData();
+        return;
+      }
+      if (cmd === '/shell') {
+        const shellCmd = rest.join(' ').replace(/^["']|["']$/g, '');
+        if (!shellCmd) {
+          setNotice('Gunakan: /shell <perintah> — atau awali pesan dengan !');
+          return;
+        }
+        handleShell(shellCmd);
+        return;
+      }
+      if (cmd === '/btw') {
+        const btwText = rest.join(' ').replace(/^["']|["']$/g, '');
+        if (!btwText) {
+          setNotice('Gunakan: /btw <pertanyaan cepat>');
+          return;
+        }
+        handleSend(btwText);
+        return;
+      }
+      if (cmd === '/context') {
+        const userMsgs = messages.filter((m) => m.role === 'user').length;
+        const chars = messages.reduce((sum, m) => sum + m.content.length, 0);
+        const estTokens = Math.ceil(chars / 4);
+        setNotice(
+          `Konteks: ${messages.length} pesan (${userMsgs} user) · ${chars.toLocaleString()} chars · ~${estTokens.toLocaleString()} token · provider ${selectedProvider ?? 'auto'}`,
+        );
         return;
       }
       if (cmd === '/clear') {
@@ -271,12 +376,13 @@ export default function AgentXTUI(): React.ReactNode {
       }
       if (cmd === '/quit' || cmd === '/q' || cmd === '/exit') {
         if (messages.length > 0) saveChatSession(messages);
+        setNotice('Session tersimpan — jalankan "agentx tui" lagi untuk melanjutkan.');
         exit();
         return;
       }
       setNotice(`Perintah tidak dikenal: ${raw}. Ketik /help.`);
     },
-    [messages, exit, refreshData],
+    [messages, exit, refreshData, handleShell, handleSend, selectedProvider],
   );
 
   // ─── Overlay navigation ────
@@ -291,8 +397,7 @@ export default function AgentXTUI(): React.ReactNode {
     [tasks.length],
   );
 
-  // Keyboard only matters when an overlay owns the screen (chat input has
-  // focus otherwise).
+  // Global keyboard — active only when an overlay/modal owns the screen.
   useInput(
     useCallback(
       (_input, key) => {
@@ -300,8 +405,12 @@ export default function AgentXTUI(): React.ReactNode {
           if (key.escape) exit();
           return;
         }
+        // Shell modal: Enter or Esc closes
+        if (shellResult) {
+          if (key.return || key.escape) setShellResult(null);
+          return;
+        }
         if (overlay === 'none') {
-          // Esc with no overlay = quit (Claude Code style)
           if (key.escape) exit();
           return;
         }
@@ -318,7 +427,16 @@ export default function AgentXTUI(): React.ReactNode {
         if (_input === 'r' || _input === 'R') void refreshData();
         if (key.escape) setOverlay('none');
       },
-      [authenticated, exit, overlay, taskSubView, navigateTask, tasks.length, refreshData],
+      [
+        authenticated,
+        exit,
+        overlay,
+        taskSubView,
+        navigateTask,
+        tasks.length,
+        refreshData,
+        shellResult,
+      ],
     ),
   );
 
@@ -330,13 +448,37 @@ export default function AgentXTUI(): React.ReactNode {
   const overlayOpen = overlay !== 'none';
   const healthOk = health?.status === 'ok' || health?.status === 'healthy';
 
+  // Shell output modal takes the full screen (ephemeral, Antigravity-style).
+  if (shellResult) {
+    return <ShellModal result={shellResult} />;
+  }
+
+  // Model picker modal.
+  if (modelPickerOpen) {
+    return (
+      <ModelPicker
+        providers={providers}
+        current={selectedProvider}
+        onSelect={(name) => {
+          setSelectedProvider(name === 'auto' ? null : name);
+          setModelPickerOpen(false);
+          setNotice(`Provider: ${name === 'auto' ? 'auto (router)' : name}`);
+        }}
+        onClose={() => setModelPickerOpen(false)}
+      />
+    );
+  }
+
   return (
     <Box flexDirection="column" paddingX={1} paddingY={1}>
       {/* Header — one line, minimal chrome */}
       <Box justifyContent="space-between">
-        <Text bold color="cyan">
-          ◆ AgentX
-        </Text>
+        <Box flexDirection="row" gap={2}>
+          <Text bold color="cyan">
+            ◆ AgentX
+          </Text>
+          <Text color="magenta">⚡ {selectedProvider ?? 'auto'}</Text>
+        </Box>
         <Text dimColor>
           {email ?? ''}
           {healthOk ? '  ● api' : '  ○ api'}
@@ -391,9 +533,14 @@ export default function AgentXTUI(): React.ReactNode {
                     Roles: <Text bold>{roles?.join(', ') ?? 'unknown'}</Text>
                   </Text>
                   <Text>
+                    Provider: <Text bold>{selectedProvider ?? 'auto'}</Text>
+                  </Text>
+                  <Text>
                     API: <Text dimColor>https://api.id-tech.cloud</Text>
                   </Text>
-                  <Text dimColor>/logout untuk keluar akun · /quit untuk keluar TUI</Text>
+                  <Text dimColor>
+                    /model untuk ganti provider · /logout keluar akun · /quit keluar TUI
+                  </Text>
                 </Box>
               )}
               {overlay === 'help' && <HelpPanel />}
@@ -405,19 +552,26 @@ export default function AgentXTUI(): React.ReactNode {
             streaming={streaming}
             streamText={streamText}
             streamMeta={streamMeta}
-            onSubmit={handleSend}
+            history={inputHistory}
+            onSubmit={(text) => {
+              if (text.startsWith('!')) {
+                handleShell(text.slice(1).trim());
+              } else {
+                handleSend(text);
+              }
+            }}
             onCommand={handleCommand}
           />
         )}
       </Box>
 
       {/* Notice / error line */}
-      {notice && !overlayOpen && (
+      {notice && !overlayOpen && !shellResult && (
         <Box paddingX={1} paddingTop={1}>
           <Text color="green">✓ {notice}</Text>
         </Box>
       )}
-      {lastError && !overlayOpen && (
+      {lastError && !overlayOpen && !shellResult && (
         <Box paddingX={1} paddingTop={1}>
           <Text color="red">⚠ {lastError}</Text>
         </Box>
@@ -432,6 +586,7 @@ export default function AgentXTUI(): React.ReactNode {
           cost={cost?.totalCost ?? 0}
           healthStatus={healthOk ? 'ok' : 'error'}
           streaming={streaming}
+          provider={selectedProvider ?? 'auto'}
         />
       </Box>
     </Box>

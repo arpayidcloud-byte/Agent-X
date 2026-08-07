@@ -46,6 +46,38 @@ export function HelpPanel(): React.ReactNode {
         <Text>
           {' '}
           <Text bold color="green">
+            /model
+          </Text>{' '}
+          Pilih provider LLM (↑↓ Enter Esc)
+        </Text>
+        <Text>
+          {' '}
+          <Text bold color="green">
+            /shell &lt;perintah&gt;
+          </Text>{' '}
+          (atau awali pesan dengan{' '}
+          <Text bold color="red">
+            !
+          </Text>
+          ) — jalankan shell command, output di modal
+        </Text>
+        <Text>
+          {' '}
+          <Text bold color="green">
+            /btw &lt;pertanyaan&gt;
+          </Text>{' '}
+          Pertanyaan cepat one-shot
+        </Text>
+        <Text>
+          {' '}
+          <Text bold color="green">
+            /context
+          </Text>{' '}
+          Ringkasan konteks sesi (pesan, chars, token)
+        </Text>
+        <Text>
+          {' '}
+          <Text bold color="green">
             /clear
           </Text>{' '}
           Bersihkan percakapan

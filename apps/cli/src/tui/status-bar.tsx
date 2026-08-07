@@ -8,6 +8,7 @@ interface StatusBarProps {
   cost: number;
   healthStatus: string;
   streaming: boolean;
+  provider: string;
 }
 
 function formatCost(amount: number): string {
@@ -17,6 +18,11 @@ function formatCost(amount: number): string {
   return `$${amount.toFixed(2)}`;
 }
 
+/** Truncate with ellipsis on narrow terminals (Antigravity statusline behavior). */
+function truncate(s: string, max: number): string {
+  return s.length > max ? `${s.slice(0, max - 1)}…` : s;
+}
+
 export function StatusBar({
   version,
   email,
@@ -24,6 +30,7 @@ export function StatusBar({
   cost,
   healthStatus,
   streaming,
+  provider,
 }: StatusBarProps): React.ReactNode {
   const healthColor = healthStatus === 'ok' ? 'green' : 'red';
   return (
@@ -36,7 +43,8 @@ export function StatusBar({
         {streaming && <Text color="cyan">streaming…</Text>}
       </Box>
       <Box flexDirection="row" gap={2}>
-        {email ? <Text dimColor>{email}</Text> : null}
+        <Text dimColor>⚡{truncate(provider, 24)}</Text>
+        {email ? <Text dimColor>{truncate(email, 28)}</Text> : null}
         <Text dimColor>/help</Text>
       </Box>
     </Box>

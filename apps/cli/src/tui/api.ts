@@ -19,7 +19,7 @@ export async function fetchHealth(): Promise<HealthResponse> {
   return res;
 }
 
-/** Fetch recent tasks from cloud API. */
+/** Fetch recent tasks from cloud API. Throws on 401/403 (session expired). */
 export async function fetchTasks(limit = 20): Promise<TaskItem[]> {
   if (!isCloudAuthed()) return [];
   try {
@@ -27,29 +27,35 @@ export async function fetchTasks(limit = 20): Promise<TaskItem[]> {
       `/v1/agentx/tasks?limit=${limit}`,
     );
     return res.tasks ?? [];
-  } catch {
+  } catch (e) {
+    const status = (e as Error & { status?: number }).status;
+    if (status === 401 || status === 403) throw e;
     return [];
   }
 }
 
-/** Fetch active LLM providers. */
+/** Fetch active LLM providers. Throws on 401/403 (session expired). */
 export async function fetchProviders(): Promise<ProviderInfo[]> {
   if (!isCloudAuthed()) return [];
   try {
     const res = await cloudFetch<{ providers: ProviderInfo[] }>('/v1/admin/llm-providers');
     return res.providers ?? [];
-  } catch {
+  } catch (e) {
+    const status = (e as Error & { status?: number }).status;
+    if (status === 401 || status === 403) throw e;
     return [];
   }
 }
 
-/** Fetch cost summary. */
+/** Fetch cost summary. Throws on 401/403 (session expired). */
 export async function fetchCost(): Promise<CostSummary> {
   if (!isCloudAuthed()) return { totalCost: 0, byProvider: {}, byModel: {} };
   try {
     const res = await cloudFetch<CostSummary>('/v1/cost/summary');
     return res ?? { totalCost: 0, byProvider: {}, byModel: {} };
-  } catch {
+  } catch (e) {
+    const status = (e as Error & { status?: number }).status;
+    if (status === 401 || status === 403) throw e;
     return { totalCost: 0, byProvider: {}, byModel: {} };
   }
 }
