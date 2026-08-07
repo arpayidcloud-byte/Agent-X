@@ -42,7 +42,7 @@ export interface CostSummary {
   period?: string;
 }
 
-export type PanelId = 'dashboard' | 'tasks' | 'providers' | 'cost' | 'settings';
+export type PanelId = 'dashboard' | 'tasks' | 'providers' | 'cost' | 'settings' | 'help';
 
 export interface AppState {
   authenticated: boolean;
