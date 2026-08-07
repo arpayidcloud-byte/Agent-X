@@ -190,6 +190,26 @@ model QualityScore {
   @@index([provider, createdAt])
 }
 
+// A/B experiment for model comparison (Phase 8, #115)
+model EvalExperiment {
+  id        String   @id @default(cuid())
+  name      String
+  prompt    String
+  providerA String
+  modelA    String
+  providerB String
+  modelB    String
+  scoreA    Int
+  scoreB    Int
+  winner    String // 'A' | 'B' | 'tie'
+  gradeA    String
+  gradeB    String
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([winner])
+}
+
 model AgentFeedback {
   id                String   @id
   scoreId           String   @unique

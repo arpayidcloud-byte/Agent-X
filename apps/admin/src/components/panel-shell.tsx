@@ -22,6 +22,7 @@ import {
   Activity,
   Store,
   Workflow,
+  FlaskConical,
 } from 'lucide-react';
 import { isAuthed, clearToken, fetchMe, isAdminUser, type AuthUser } from '@/lib/api';
 
@@ -33,6 +34,7 @@ const NAV_ITEMS = [
   { href: '/templates', label: 'Templates', icon: FileText },
   { href: '/marketplace', label: 'Marketplace', icon: Store },
   { href: '/workflows', label: 'Workflows', icon: Workflow },
+  { href: '/eval', label: 'Evaluation', icon: FlaskConical },
   { href: '/cost', label: 'Cost Tracking', icon: DollarSign },
   { href: '/activity', label: 'Activity', icon: Activity },
   { href: '/providers', label: 'LLM Providers', icon: Cable },

@@ -1,6 +1,7 @@
 import type { Express, Request, Response } from 'express';
 import type { QualityBackend } from './quality-store.js';
 import { getQualityBackend } from './quality-store.js';
+import { EvalExperimentRepository } from '@agent-xai/persistence';
 
 /**
  * Evaluation benchmark suite — Phase 8 (#114).
@@ -201,6 +202,84 @@ export function registerEvalRoutes(app: Express): void {
         .sort((a, b) => b.avgOverall - a.avgOverall)
         .slice(0, limit);
       res.json({ leaderboard });
+    } catch (e) {
+      const err = e instanceof Error ? e.message : String(e);
+      res.status(500).json({ error: err });
+    }
+  });
+
+  // ─── A/B experiment: bandingkan 2 provider/model pada 1 prompt ────
+  app.post('/v1/eval/experiment', async (req: Request, res: Response): Promise<void> => {
+    try {
+      const { name, prompt, responseA, responseB, providerA, modelA, providerB, modelB } =
+        req.body ?? {};
+      if (
+        typeof prompt !== 'string' ||
+        typeof responseA !== 'string' ||
+        typeof responseB !== 'string'
+      ) {
+        res.status(400).json({
+          error: 'Missing or invalid field: prompt, responseA, responseB (strings)',
+        });
+        return;
+      }
+      const pa = typeof providerA === 'string' && providerA ? providerA : 'default';
+      const ma = typeof modelA === 'string' && modelA ? modelA : 'default';
+      const pb = typeof providerB === 'string' && providerB ? providerB : 'default';
+      const mb = typeof modelB === 'string' && modelB ? modelB : 'default';
+
+      const { QualityScorer } = await import('@agent-xai/quality-scoring');
+      const scorer = new QualityScorer();
+      const sa = await scorer.score({ prompt, response: responseA, provider: pa, model: ma });
+      const sb = await scorer.score({ prompt, response: responseB, provider: pb, model: mb });
+
+      const winner = sa.overall > sb.overall ? 'A' : sb.overall > sa.overall ? 'B' : 'tie';
+      const repo = new EvalExperimentRepository();
+      const row = await repo.create({
+        name: typeof name === 'string' && name ? name : `${pa}/${ma} vs ${pb}/${mb}`,
+        prompt,
+        providerA: pa,
+        modelA: ma,
+        providerB: pb,
+        modelB: mb,
+        scoreA: sa.overall,
+        scoreB: sb.overall,
+        winner,
+        gradeA: sa.grade,
+        gradeB: sb.grade,
+      });
+      res.status(201).json({
+        experiment: row,
+        winner,
+        detail: {
+          A: { provider: pa, model: ma, overall: sa.overall, grade: sa.grade },
+          B: { provider: pb, model: mb, overall: sb.overall, grade: sb.grade },
+        },
+      });
+    } catch (e) {
+      const err = e instanceof Error ? e.message : String(e);
+      res.status(500).json({ error: err });
+    }
+  });
+
+  // ─── Daftar A/B experiments ────
+  app.get('/v1/eval/experiments', async (_req: Request, res: Response): Promise<void> => {
+    try {
+      const repo = new EvalExperimentRepository();
+      const experiments = await repo.findAll(100);
+      res.json({ experiments, total: experiments.length });
+    } catch (e) {
+      const err = e instanceof Error ? e.message : String(e);
+      res.status(500).json({ error: err });
+    }
+  });
+
+  // ─── Win-rate summary ────
+  app.get('/v1/eval/winrates', async (_req: Request, res: Response): Promise<void> => {
+    try {
+      const repo = new EvalExperimentRepository();
+      const winRates = await repo.winRates();
+      res.json({ winRates });
     } catch (e) {
       const err = e instanceof Error ? e.message : String(e);
       res.status(500).json({ error: err });

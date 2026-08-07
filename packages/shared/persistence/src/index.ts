@@ -11,3 +11,4 @@ export * from './prompt-template-repository.js';
 export * from './cost-entry-repository.js';
 export * from './agent-template-repository.js';
 export * from './workflow-repository.js';
+export * from './eval-experiment-repository.js';
