@@ -55,26 +55,25 @@ async function streamChat(
 ): Promise<ChatMeta> {
   const res = await cloudFetch<{ chatId: string; status: string }>('/v1/agentx/chat/stream', {
     method: 'POST',
-    body: {
-      messages,
-      provider: options.provider,
-    },
+    body: { messages, provider: options.provider },
   });
 
   const { chatId } = res;
-  const { stream, close } = cloudSSE(`/v1/agentx/chat/${chatId}/events`);
+  const sseRes = await cloudSSE(`/v1/agentx/chat/${chatId}/events`);
 
   let responseText = '';
   const meta: ChatMeta = {};
+  let completed = false;
 
-  const reader = stream.getReader();
+  const reader = sseRes.body!.getReader();
+  const decoder = new TextDecoder();
   let buffer = '';
 
   try {
     for (;;) {
       const { done, value } = await reader.read();
-      if (done) break;
-      buffer += value;
+      if (done || completed) break;
+      buffer += decoder.decode(value, { stream: true });
 
       const lines = buffer.split('\n');
       buffer = lines.pop() ?? '';
@@ -84,45 +83,49 @@ async function streamChat(
         const raw = line.slice(6).trim();
         if (!raw) continue;
 
+        let event: ChatStreamEvent;
         try {
-          const event = JSON.parse(raw) as ChatStreamEvent;
-
-          if (event.type === 'start') {
-            meta.provider = event.provider;
-            meta.model = event.model;
-            process.stderr.write(`\x1b[2m[${event.provider}/${event.model}]\x1b[0m `);
-          } else if (event.type === 'chunk' && event.text) {
-            responseText += event.text;
-            process.stdout.write(event.text);
-          } else if (event.type === 'complete') {
-            meta.cost = event.cost;
-            meta.latencyMs = event.latencyMs;
-            const tokens = event.usage ? ` ${event.usage.totalTokens} tokens` : '';
-            const cost = event.cost != null ? ` $${event.cost.toFixed(4)}` : '';
-            const ms = event.latencyMs != null ? ` ${event.latencyMs}ms` : '';
-            process.stderr.write(`\n\x1b[2m${tokens}${cost}${ms}\x1b[0m\n`);
-            close();
-            messages.push({ role: 'assistant', content: responseText });
-            return meta;
-          } else if (event.type === 'error') {
-            close();
-            throw new Error(event.error ?? 'Chat failed');
-          }
+          event = JSON.parse(raw) as ChatStreamEvent;
         } catch {
-          // skip malformed events
+          continue;
+        }
+
+        if (event.type === 'start') {
+          meta.provider = event.provider;
+          meta.model = event.model;
+          process.stderr.write(`\x1b[2m[${event.provider}/${event.model}]\x1b[0m `);
+        } else if (event.type === 'chunk' && event.text) {
+          responseText += event.text;
+          process.stdout.write(event.text);
+        } else if (event.type === 'complete') {
+          meta.cost = event.cost;
+          meta.latencyMs = event.latencyMs;
+          const tokens = event.usage ? ` ${event.usage.totalTokens} tokens` : '';
+          const cost = event.cost != null ? ` $${event.cost.toFixed(4)}` : '';
+          const ms = event.latencyMs != null ? ` ${event.latencyMs}ms` : '';
+          process.stderr.write(`\n\x1b[2m${tokens}${cost}${ms}\x1b[0m\n`);
+          completed = true;
+        } else if (event.type === 'error') {
+          completed = true;
+          throw new Error(event.error ?? 'Chat failed');
         }
       }
+      if (completed) break;
     }
-    close();
-    if (responseText) {
-      messages.push({ role: 'assistant', content: responseText });
-      return meta;
+  } finally {
+    try {
+      await reader.cancel();
+    } catch {
+      /* ignore */
     }
-    throw new Error('Chat stream ended without response');
-  } catch (err) {
-    close();
-    throw err;
   }
+
+  if (!completed && !responseText) {
+    throw new Error('Chat stream ended without response');
+  }
+
+  messages.push({ role: 'assistant', content: responseText });
+  return meta;
 }
 
 // ─── Commands ────
@@ -212,12 +215,11 @@ export async function chat(args: string[]): Promise<void> {
         process.stderr.write('\n');
       } catch (err) {
         process.stderr.write(`\n\x1b[31mError: ${(err as Error).message}\x1b[0m\n`);
-        // Remove the failed user message + any partial assistant response
+        // Remove the failed user message
         messages.pop();
       }
-
       rl.prompt();
-    })(); // eslint-disable-line @typescript-eslint/no-misused-promises
+    })();
   });
 
   rl.on('close', () => {
@@ -235,7 +237,6 @@ export async function authWhoami(): Promise<void> {
     await cloudFetch('/v1/agentx/stats');
     process.stderr.write('Authenticated ✓ (token valid)\n');
   } catch {
-    // If stats endpoint fails, still show we're authed since token is valid
     process.stderr.write('Authenticated ✓ (token saved)\n');
   }
 }

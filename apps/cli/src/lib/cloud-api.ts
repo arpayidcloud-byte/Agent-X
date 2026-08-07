@@ -103,46 +103,11 @@ export async function cloudFetch<T = unknown>(
  * Start an SSE connection and yield parsed events.
  * Returns an async iterator of parsed JSON events.
  */
-export function cloudSSE(ssePath: string): { stream: ReadableStream<string>; close: () => void } {
+export function cloudSSE(ssePath: string): Promise<Response> {
   const apiBase = getApiUrl();
   const cfg = loadCloudConfig();
   const url = `${apiBase}${ssePath}`;
   const headers: Record<string, string> = {};
   if (cfg.apiToken) headers.Authorization = `Bearer ${cfg.apiToken}`;
-
-  const controller = new AbortController();
-
-  return {
-    stream: new ReadableStream<string>({
-      async start(controller) {
-        try {
-          const res = await fetch(url, { headers });
-          if (!res.ok || !res.body) {
-            controller.close();
-            return;
-          }
-          const reader = res.body.getReader();
-          const decoder = new TextDecoder();
-          let buffer = '';
-
-          for (;;) {
-            const { done, value } = await reader.read();
-            if (done) break;
-            buffer += decoder.decode(value, { stream: true });
-            const lines = buffer.split('\n');
-            buffer = lines.pop() ?? '';
-            for (const line of lines) {
-              if (line.startsWith('data: ')) {
-                controller.enqueue(line.slice(6));
-              }
-            }
-          }
-          controller.close();
-        } catch {
-          controller.close();
-        }
-      },
-    }),
-    close: () => controller.abort(),
-  };
+  return fetch(url, { headers });
 }
