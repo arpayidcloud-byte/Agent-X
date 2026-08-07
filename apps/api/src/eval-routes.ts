@@ -285,6 +285,40 @@ export function registerEvalRoutes(app: Express): void {
       res.status(500).json({ error: err });
     }
   });
+
+  // ─── Quality gates status (#117) ────
+  app.get('/v1/eval/gates', async (_req: Request, res: Response): Promise<void> => {
+    try {
+      const threshold = Number(process.env.QUALITY_GATE_THRESHOLD ?? 70);
+      const backend: QualityBackend = await getQualityBackend();
+      const scores = await backend.findAll(200);
+      const below = scores.filter((s) => s.overall < threshold);
+      const above = scores.filter((s) => s.overall >= threshold);
+      const avgOverall =
+        scores.length > 0
+          ? Number((scores.reduce((acc, s) => acc + s.overall, 0) / scores.length).toFixed(1))
+          : 0;
+      const { getFeedbackBackend } = await import('./feedback-store.js');
+      const fbBackend = await getFeedbackBackend();
+      const feedback = await fbBackend.findAll(200);
+      res.json({
+        gate: {
+          threshold,
+          configurableVia: 'QUALITY_GATE_THRESHOLD',
+          totalScores: scores.length,
+          belowThreshold: below.length,
+          aboveThreshold: above.length,
+          avgOverall,
+          autoFeedbackGenerated: feedback.length,
+          passingRate:
+            scores.length > 0 ? Number(((above.length / scores.length) * 100).toFixed(1)) : 0,
+        },
+      });
+    } catch (e) {
+      const err = e instanceof Error ? e.message : String(e);
+      res.status(500).json({ error: err });
+    }
+  });
 }
 
 function summarize(results: BenchmarkResult[]): BenchmarkSummary[] {

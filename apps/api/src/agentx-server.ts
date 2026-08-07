@@ -321,7 +321,9 @@ app.post('/v1/agentx/run/stream', async (req, res): Promise<void> => {
             });
             // Agent feedback loop: low-scoring outputs get actionable feedback
             // (weak dimensions + revision prompt) so the next run can improve.
-            if (scored.overall < 70) {
+            // Gate threshold configurable via QUALITY_GATE_THRESHOLD (#117).
+            const gateThreshold = Number(process.env.QUALITY_GATE_THRESHOLD ?? 70);
+            if (scored.overall < gateThreshold) {
               const feedback = generateFeedback(scored);
               const fbBackend = await getFeedbackBackend();
               await fbBackend.create({
