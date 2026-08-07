@@ -58,6 +58,17 @@ interface WinRateRow {
   ties: number;
 }
 
+interface GateStatus {
+  threshold: number;
+  configurableVia: string;
+  totalScores: number;
+  belowThreshold: number;
+  aboveThreshold: number;
+  avgOverall: number;
+  autoFeedbackGenerated: number;
+  passingRate: number;
+}
+
 function gradeBadge(grade: string): string {
   const g = grade.toLowerCase();
   if (g === 'excellent' || g === 'good') return 'bg-emerald-500/15 text-emerald-400';
@@ -75,6 +86,7 @@ export default function EvalView() {
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [experiments, setExperiments] = useState<ExperimentRow[]>([]);
   const [winRates, setWinRates] = useState<WinRateRow[]>([]);
+  const [gate, setGate] = useState<GateStatus | null>(null);
   const [loading, setLoading] = useState<boolean>(() => true);
   const [error, setError] = useState<string | null>(null);
 
@@ -83,14 +95,16 @@ export default function EvalView() {
     setError(null);
     void (async () => {
       try {
-        const [lb, ex, wr] = await Promise.all([
+        const [lb, ex, wr, gt] = await Promise.all([
           apiFetch('/v1/eval/leaderboard'),
           apiFetch('/v1/eval/experiments'),
           apiFetch('/v1/eval/winrates'),
+          apiFetch('/v1/eval/gates'),
         ]);
         setLeaderboard((lb as { leaderboard: LeaderboardEntry[] }).leaderboard ?? []);
         setExperiments((ex as { experiments: ExperimentRow[] }).experiments ?? []);
         setWinRates((wr as { winRates: WinRateRow[] }).winRates ?? []);
+        setGate((gt as { gate: GateStatus }).gate ?? null);
       } catch (e) {
         setError(e instanceof Error ? e.message : String(e));
       } finally {
@@ -103,15 +117,17 @@ export default function EvalView() {
     let cancelled = false;
     void (async () => {
       try {
-        const [lb, ex, wr] = await Promise.all([
+        const [lb, ex, wr, gt] = await Promise.all([
           apiFetch('/v1/eval/leaderboard'),
           apiFetch('/v1/eval/experiments'),
           apiFetch('/v1/eval/winrates'),
+          apiFetch('/v1/eval/gates'),
         ]);
         if (!cancelled) {
           setLeaderboard((lb as { leaderboard: LeaderboardEntry[] }).leaderboard ?? []);
           setExperiments((ex as { experiments: ExperimentRow[] }).experiments ?? []);
           setWinRates((wr as { winRates: WinRateRow[] }).winRates ?? []);
+          setGate((gt as { gate: GateStatus }).gate ?? null);
         }
       } catch (e) {
         if (!cancelled) setError(e instanceof Error ? e.message : String(e));
@@ -194,6 +210,49 @@ export default function EvalView() {
               <div className="mt-1 text-xs text-slate-500">provider/model unik</div>
             </div>
           </div>
+
+          {/* Quality gate */}
+          {gate && (
+            <div className="glass-card rounded-xl border border-white/[0.06] bg-surface-2/60 p-5">
+              <div className="flex flex-wrap items-center justify-between gap-4">
+                <div>
+                  <h2 className="text-sm font-medium text-slate-300">Quality Gate</h2>
+                  <p className="mt-1 text-xs text-slate-500">
+                    Threshold {gate.threshold} ({gate.configurableVia}) — auto-feedback untuk skor
+                    di bawah ambang
+                  </p>
+                </div>
+                <div className="flex items-center gap-6">
+                  <div className="text-center">
+                    <div
+                      className={`text-2xl font-semibold ${
+                        gate.passingRate >= 70 ? 'text-emerald-400' : 'text-amber-400'
+                      }`}
+                    >
+                      {gate.passingRate}%
+                    </div>
+                    <div className="text-xs text-slate-500">passing rate</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-2xl font-semibold text-slate-100">{gate.avgOverall}</div>
+                    <div className="text-xs text-slate-500">avg score</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-2xl font-semibold text-slate-100">
+                      {gate.belowThreshold}
+                    </div>
+                    <div className="text-xs text-slate-500">below threshold</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-2xl font-semibold text-slate-100">
+                      {gate.autoFeedbackGenerated}
+                    </div>
+                    <div className="text-xs text-slate-500">auto-feedback</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Leaderboard */}
           <div className="glass-card rounded-xl border border-white/[0.06] bg-surface-2/60 p-5">
