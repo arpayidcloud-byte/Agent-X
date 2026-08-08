@@ -11,7 +11,7 @@ import React, { useState } from 'react';
 import { Box, Text, useInput } from 'ink';
 import TextInput from 'ink-text-input';
 import type { ChatMessage, ChatMeta } from './types.js';
-import { c } from './theme.js';
+import { c, palette } from './theme.js';
 
 interface ChatViewProps {
   messages: ChatMessage[];
@@ -125,14 +125,14 @@ export function ChatView({
         {display.map((m, idx) =>
           m.role === 'user' ? (
             <Box key={`u-${messages.length - idx}`} marginBottom={1} marginTop={1}>
-              <Text bold color={c('cyanBright')}>
+              <Text bold color={c(palette.accentBright)}>
                 you ▸{' '}
               </Text>
               <Text>{m.content}</Text>
             </Box>
           ) : (
             <Box key={`a-${messages.length - idx}`} marginBottom={1} flexDirection="column">
-              <Text bold color={c('magenta')}>
+              <Text bold color={c(palette.brand)}>
                 agent ✦{' '}
               </Text>
               <Text>

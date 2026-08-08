@@ -24,7 +24,8 @@ import { ProviderList } from './provider-list.js';
 import { CostView } from './cost-view.js';
 import { HelpPanel } from './help-panel.js';
 import { LogTail } from './log-tail.js';
-import { c } from './theme.js';
+import { BootScreen } from './boot-screen.js';
+import { c, palette } from './theme.js';
 import {
   isCloudAuthed,
   fetchHealth,
@@ -90,6 +91,7 @@ export default function AgentXTUI(): React.ReactNode {
   const { exit } = useApp();
 
   // ─── Auth state ────
+  const [booting, setBooting] = useState(true);
   const [authenticated, setAuthenticated] = useState<boolean>(() => isCloudAuthed());
   const [email, setEmail] = useState<string | undefined>();
   const [roles, setRoles] = useState<string[] | undefined>();
@@ -456,12 +458,18 @@ export default function AgentXTUI(): React.ReactNode {
   );
 
   // ─── Render ────
+  const healthOk = health?.status === 'ok' || health?.status === 'healthy';
+
+  // "Command Deck" splash — logo gradient + connecting spinner → ✓ connected.
+  if (booting) {
+    return <BootScreen version={VERSION} connected={healthOk} onDone={() => setBooting(false)} />;
+  }
+
   if (!authenticated) {
     return <AuthScreen onLogin={handleLogin} error={authError} loading={authLoading} />;
   }
 
   const overlayOpen = overlay !== 'none';
-  const healthOk = health?.status === 'ok' || health?.status === 'healthy';
 
   // Shell output modal takes the full screen (ephemeral, Antigravity-style).
   if (shellResult) {
@@ -491,17 +499,21 @@ export default function AgentXTUI(): React.ReactNode {
 
   return (
     <Box flexDirection="column" paddingX={1} paddingY={1}>
-      {/* Header — one line, minimal chrome */}
+      {/* Header — one line, minimal chrome, neon accents */}
       <Box justifyContent="space-between">
         <Box flexDirection="row" gap={2}>
-          <Text bold color={c('cyan')}>
-            ◆ AgentX
+          <Text bold color={c(palette.accent)}>
+            ▓▓ AGENT·X
           </Text>
-          <Text color={c('magenta')}>⚡ {selectedProvider ?? 'auto'}</Text>
+          <Text color={c(palette.brand)}>⚡ {selectedProvider ?? 'auto'}</Text>
         </Box>
         <Text dimColor>
           {email ?? ''}
-          {healthOk ? '  ● api' : '  ○ api'}
+          {healthOk ? (
+            <Text color={c(palette.ok)}> ● api</Text>
+          ) : (
+            <Text color={c(palette.danger)}> ○ api</Text>
+          )}
         </Text>
       </Box>
       <Box marginTop={1} marginBottom={1}>

@@ -1,41 +1,12 @@
 import React from 'react';
 import { Box, Text } from 'ink';
 import type { TaskItem } from './types.js';
+import { c, palette, statusColor, statusBadge } from './theme.js';
 
 interface TaskListProps {
   tasks: TaskItem[];
   selectedId: string | null;
   loading: boolean;
-}
-
-function statusColor(status: string): string {
-  switch (status.toUpperCase()) {
-    case 'COMPLETED':
-      return 'green';
-    case 'RUNNING':
-      return 'cyan';
-    case 'PENDING':
-      return 'yellow';
-    case 'FAILED':
-      return 'red';
-    default:
-      return 'white';
-  }
-}
-
-function statusIcon(status: string): string {
-  switch (status.toUpperCase()) {
-    case 'COMPLETED':
-      return '✓';
-    case 'RUNNING':
-      return '●';
-    case 'PENDING':
-      return '○';
-    case 'FAILED':
-      return '✗';
-    default:
-      return '?';
-  }
 }
 
 function timeAgo(dateStr: string): string {
@@ -52,7 +23,7 @@ export function TaskList({ tasks, selectedId, loading }: TaskListProps): React.R
   return (
     <Box flexDirection="column" padding={1}>
       <Box marginBottom={1}>
-        <Text bold color="cyanBright">
+        <Text bold color={c(palette.accent)}>
           ◆ Tasks
         </Text>
         <Text dimColor> ({tasks.length})</Text>
@@ -93,7 +64,7 @@ export function TaskList({ tasks, selectedId, loading }: TaskListProps): React.R
             >
               <Text color={isSelected ? 'white' : 'dimColor'}>{isSelected ? '▸' : ' '}</Text>
               <Text color={statusColor(t.status)} bold={isSelected}>
-                {statusIcon(t.status)} {t.id.slice(0, 12).padEnd(13)}
+                {statusBadge(t.status)} {t.id.slice(0, 12).padEnd(13)}
               </Text>
               <Text color={statusColor(t.status)} bold={isSelected}>
                 {t.status.padEnd(12)}
