@@ -1,6 +1,7 @@
 import React from 'react';
 import { Box, Text } from 'ink';
-import { c } from './theme.js';
+import { c, palette } from './theme.js';
+import { Spinner } from './spinner.js';
 
 interface StatusBarProps {
   version: string;
@@ -35,7 +36,7 @@ export function StatusBar({
   provider,
   reconnecting = false,
 }: StatusBarProps): React.ReactNode {
-  const healthColor = healthStatus === 'ok' ? 'green' : 'red';
+  const healthColor = healthStatus === 'ok' ? palette.ok : palette.danger;
   return (
     <Box justifyContent="space-between">
       <Box flexDirection="row" gap={2}>
@@ -43,8 +44,16 @@ export function StatusBar({
         <Text color={c(healthColor)}>{healthStatus === 'ok' ? '●' : '○'} api</Text>
         <Text dimColor>tasks:{taskCount}</Text>
         <Text dimColor>cost:{formatCost(cost)}</Text>
-        {reconnecting && <Text color={c('yellow')}>reconnecting…</Text>}
-        {streaming && <Text color={c('cyan')}>streaming…</Text>}
+        {reconnecting && (
+          <Text color={c(palette.warn)}>
+            <Spinner /> reconnecting…
+          </Text>
+        )}
+        {streaming && (
+          <Text color={c(palette.brand)}>
+            <Spinner color={palette.brand} /> streaming…
+          </Text>
+        )}
       </Box>
       <Box flexDirection="row" gap={2}>
         <Text dimColor>⚡{truncate(provider, 24)}</Text>

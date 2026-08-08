@@ -9,7 +9,8 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Box, Text, useInput } from 'ink';
 import { cloudSSE } from '../lib/cloud-api.js';
-import { c } from './theme.js';
+import { c, palette } from './theme.js';
+import { Spinner } from './spinner.js';
 
 export interface TaskLogEvent {
   type: string;
@@ -35,10 +36,19 @@ function formatTime(iso: string): string {
   return Number.isNaN(d.getTime()) ? iso : d.toLocaleTimeString('en-GB', { hour12: false });
 }
 
-function eventColor(ev: TaskLogEvent): string | undefined {
-  if (ev.type === 'complete') return ev.status === 'success' ? 'green' : 'red';
-  if (ev.type === 'error') return 'red';
-  return 'cyan';
+function eventColor(ev: TaskLogEvent): string {
+  if (ev.type === 'complete') return ev.status === 'success' ? palette.ok : palette.danger;
+  if (ev.type === 'error') return palette.danger;
+  if (ev.type === 'generating') return palette.warn;
+  return palette.accent;
+}
+
+/** Badge glyph per event — readable even in monochrome terminals. */
+function eventBadge(ev: TaskLogEvent): string {
+  if (ev.type === 'complete') return ev.status === 'success' ? '●' : '✕';
+  if (ev.type === 'error') return '✕';
+  if (ev.type === 'generating') return '▸';
+  return '◔';
 }
 
 function eventText(ev: TaskLogEvent): string {
@@ -142,12 +152,22 @@ export function LogTail({ taskId, onClose }: LogTailProps): React.ReactNode {
   return (
     <Box flexDirection="column" padding={1} borderStyle="round" borderColor={c('cyan')}>
       <Box justifyContent="space-between">
-        <Text bold color={c('cyanBright')}>
+        <Text bold color={c(palette.accent)}>
           ◈ Logs · {taskId}
         </Text>
         <Text dimColor>
-          {connecting ? 'menghubungkan…' : reconnecting ? 'reconnecting…' : 'live'} · r: ulang ·
-          esc: tutup
+          {connecting ? (
+            <Text color={c(palette.warn)}>
+              <Spinner /> menghubungkan…
+            </Text>
+          ) : reconnecting ? (
+            <Text color={c(palette.warn)}>
+              <Spinner /> reconnecting…
+            </Text>
+          ) : (
+            <Text color={c(palette.ok)}>● live</Text>
+          )}{' '}
+          · r: ulang · esc: tutup
         </Text>
       </Box>
       {connError && (
@@ -162,7 +182,10 @@ export function LogTail({ taskId, onClose }: LogTailProps): React.ReactNode {
         {display.map((ev, idx) => (
           <Box key={`${ev.at}-${idx}`} flexDirection="row">
             <Text dimColor>{formatTime(ev.at)}</Text>
-            <Text color={c(eventColor(ev))}> [{ev.type}]</Text>
+            <Text color={c(eventColor(ev))}>
+              {' '}
+              {eventBadge(ev)} [{ev.type}]
+            </Text>
             <Text> {eventText(ev)}</Text>
           </Box>
         ))}
