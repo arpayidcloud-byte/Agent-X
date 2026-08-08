@@ -2,6 +2,8 @@ import React from 'react';
 import { Box, Text } from 'ink';
 import { c, palette } from './theme.js';
 import { Spinner } from './spinner.js';
+import { Sparkline } from './sparkline.js';
+import { usePulse } from './use-pulse.js';
 
 interface StatusBarProps {
   version: string;
@@ -12,6 +14,8 @@ interface StatusBarProps {
   streaming: boolean;
   provider: string;
   reconnecting?: boolean;
+  /** Task-count series across polls — activity sparkline. */
+  activity?: number[];
 }
 
 function formatCost(amount: number): string {
@@ -35,13 +39,16 @@ export function StatusBar({
   streaming,
   provider,
   reconnecting = false,
+  activity = [],
 }: StatusBarProps): React.ReactNode {
   const healthColor = healthStatus === 'ok' ? palette.ok : palette.danger;
+  const pulse = usePulse(streaming);
   return (
     <Box justifyContent="space-between">
       <Box flexDirection="row" gap={2}>
         <Text dimColor>v{version}</Text>
         <Text color={c(healthColor)}>{healthStatus === 'ok' ? '●' : '○'} api</Text>
+        <Sparkline data={activity} color={palette.accent} />
         <Text dimColor>tasks:{taskCount}</Text>
         <Text dimColor>cost:{formatCost(cost)}</Text>
         {reconnecting && (
@@ -50,7 +57,7 @@ export function StatusBar({
           </Text>
         )}
         {streaming && (
-          <Text color={c(palette.brand)}>
+          <Text color={c(palette.brand)} dimColor={!pulse}>
             <Spinner color={palette.brand} /> streaming…
           </Text>
         )}

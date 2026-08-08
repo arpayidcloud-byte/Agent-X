@@ -2,6 +2,8 @@ import React from 'react';
 import { Box, Text } from 'ink';
 import type { TaskItem } from './types.js';
 import { c, palette, statusColor, statusBadge } from './theme.js';
+import { AgentAvatar } from './agent-avatar.js';
+import { usePulse } from './use-pulse.js';
 
 interface TaskListProps {
   tasks: TaskItem[];
@@ -20,6 +22,8 @@ function timeAgo(dateStr: string): string {
 }
 
 export function TaskList({ tasks, selectedId, loading }: TaskListProps): React.ReactNode {
+  const running = tasks.some((t) => t.status === 'running');
+  const pulse = usePulse(running);
   return (
     <Box flexDirection="column" padding={1}>
       <Box marginBottom={1}>
@@ -28,10 +32,19 @@ export function TaskList({ tasks, selectedId, loading }: TaskListProps): React.R
         </Text>
         <Text dimColor> ({tasks.length})</Text>
         {loading && <Text dimColor> refreshing...</Text>}
+        {running && (
+          <Text color={c(palette.warn)} dimColor={!pulse}>
+            {' '}
+            ▸ {tasks.filter((t) => t.status === 'running').length} running
+          </Text>
+        )}
       </Box>
 
       {/* Header */}
       <Box flexDirection="row" gap={1}>
+        <Text bold dimColor>
+          {'AGENT'.padEnd(8)}
+        </Text>
         <Text bold dimColor>
           {'  ID'.padEnd(16)}
         </Text>
@@ -48,7 +61,7 @@ export function TaskList({ tasks, selectedId, loading }: TaskListProps): React.R
           TIME
         </Text>
       </Box>
-      <Text dimColor>{'─'.repeat(90)}</Text>
+      <Text dimColor>{'─'.repeat(100)}</Text>
 
       {tasks.length === 0 ? (
         <Text dimColor> No tasks yet — type "submit" to create one</Text>
@@ -63,6 +76,7 @@ export function TaskList({ tasks, selectedId, loading }: TaskListProps): React.R
               backgroundColor={isSelected ? 'blue' : undefined}
             >
               <Text color={isSelected ? 'white' : 'dimColor'}>{isSelected ? '▸' : ' '}</Text>
+              <AgentAvatar name={t.model ?? t.provider} dim={!isSelected} />
               <Text color={statusColor(t.status)} bold={isSelected}>
                 {statusBadge(t.status)} {t.id.slice(0, 12).padEnd(13)}
               </Text>

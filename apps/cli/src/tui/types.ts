@@ -35,7 +35,14 @@ export interface CostSummary {
 }
 
 /** Chat-first design: the chat view is the main surface; everything else is an overlay. */
-export type OverlayId = 'none' | 'tasks' | 'providers' | 'cost' | 'settings' | 'help';
+export type OverlayId =
+  'none' | 'tasks' | 'providers' | 'cost' | 'settings' | 'help' | 'router' | 'health';
+
+export interface Toast {
+  id: number;
+  text: string;
+  kind: 'ok' | 'error' | 'info';
+}
 
 export interface ChatMessage {
   role: 'user' | 'assistant';

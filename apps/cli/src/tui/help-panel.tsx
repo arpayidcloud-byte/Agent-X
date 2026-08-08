@@ -39,6 +39,20 @@ export function HelpPanel(): React.ReactNode {
         <Text>
           {' '}
           <Text bold color="green">
+            /router
+          </Text>{' '}
+          (atau /m) — peta routing task → model
+        </Text>
+        <Text>
+          {' '}
+          <Text bold color="green">
+            /health
+          </Text>{' '}
+          (atau /h) — status layanan (API + provider)
+        </Text>
+        <Text>
+          {' '}
+          <Text bold color="green">
             /submit &lt;goal&gt;
           </Text>{' '}
           Kirim task langsung dari chat
