@@ -444,6 +444,19 @@ export const openApiSpec: OpenAPIV3.Document = {
         },
       },
     },
+    '/v1/agentx/deck': {
+      get: {
+        tags: ['Agent'],
+        summary: 'Command Deck aggregate — system, agents, task, logs, stats',
+        responses: {
+          200: {
+            description:
+              'Deck payload: system (cpu/mem), agents (multi-agent runs), task (latest, with progress/tokens), logs (recent events), stats (totals)',
+          },
+          500: { description: 'Server error' },
+        },
+      },
+    },
     '/v1/agentx/tasks/{id}/events': {
       get: {
         tags: ['Agent'],

@@ -41,6 +41,16 @@ export function getMultiAgentRun(runId: string): MultiAgentRun | undefined {
   return runs.get(runId);
 }
 
+/** Active (in-progress) runs — feeds the CLI Command Deck AGENTS panel. */
+export function getActiveRuns(): MultiAgentRun[] {
+  return [...runs.values()].filter((r) => r.status === 'running');
+}
+
+/** Most recent runs (any status) — lets the deck show recent agent activity. */
+export function getRecentRuns(limit = 3): MultiAgentRun[] {
+  return [...runs.values()].sort((a, b) => (a.startedAt < b.startedAt ? 1 : -1)).slice(0, limit);
+}
+
 const PHASE_PROMPTS: Record<string, (description: string, ctx: Record<string, unknown>) => string> =
   {
     architect: (d) =>

@@ -27,6 +27,7 @@ import { LogTail } from './log-tail.js';
 import { BootScreen } from './boot-screen.js';
 import { RouterView } from './router-view.js';
 import { HealthView } from './health-view.js';
+import { DeckView } from './deck-view.js';
 import { c, palette } from './theme.js';
 import {
   isCloudAuthed,
@@ -326,6 +327,10 @@ export default function AgentXTUI(): React.ReactNode {
         void refreshData();
         return;
       }
+      if (cmd === '/deck' || cmd === '/d') {
+        setOverlay('deck');
+        return;
+      }
       if (cmd === '/cost' || cmd === '/c') {
         setOverlay('cost');
         void refreshData();
@@ -566,6 +571,7 @@ export default function AgentXTUI(): React.ReactNode {
                 {overlay === 'help' && '◆ Help'}
                 {overlay === 'router' && '◆ Router'}
                 {overlay === 'health' && '◆ Health'}
+                {overlay === 'deck' && '◆ Command Deck'}
               </Text>
               <Text dimColor>esc: kembali</Text>
             </Box>
@@ -593,6 +599,7 @@ export default function AgentXTUI(): React.ReactNode {
               {overlay === 'cost' && <CostView cost={cost} loading={loading} />}
               {overlay === 'router' && <RouterView providers={providers} loading={loading} />}
               {overlay === 'health' && <HealthView health={health} loading={loading} />}
+              {overlay === 'deck' && <DeckView />}
               {overlay === 'settings' && (
                 <Box flexDirection="column" gap={1}>
                   <Text>

@@ -9,13 +9,19 @@ import {
   saveCloudConfig,
   getApiUrl,
 } from '../lib/cloud-api.js';
-import type { HealthResponse, TaskItem, ProviderInfo, CostSummary } from './types.js';
+import type { HealthResponse, TaskItem, ProviderInfo, CostSummary, DeckData } from './types.js';
 
 export { isCloudAuthed, loadCloudConfig, getApiUrl };
 
 /** Check API health. */
 export async function fetchHealth(): Promise<HealthResponse> {
   const res = await cloudFetch<HealthResponse>('/health');
+  return res;
+}
+
+/** Fetch the Command Deck aggregate (system/agents/task/logs/stats) in one poll. */
+export async function fetchDeck(): Promise<DeckData> {
+  const res = await cloudFetch<DeckData>('/v1/agentx/deck');
   return res;
 }
 

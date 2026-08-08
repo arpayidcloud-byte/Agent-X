@@ -53,6 +53,13 @@ export function HelpPanel(): React.ReactNode {
         <Text>
           {' '}
           <Text bold color="green">
+            /deck
+          </Text>{' '}
+          (atau /d) — Command Deck 3-panel (AGENTS · TASK · LOGS + cpu/mem)
+        </Text>
+        <Text>
+          {' '}
+          <Text bold color="green">
             /submit &lt;goal&gt;
           </Text>{' '}
           Kirim task langsung dari chat

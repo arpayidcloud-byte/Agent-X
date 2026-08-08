@@ -34,6 +34,7 @@ import { registerOAuthRoutes } from './oauth-routes.js';
 import { registerAdminLlmRoutes } from './admin-llm-routes.js';
 import { registerCliRoutes } from './cli-routes.js';
 import { registerProviderGroupRoutes } from './provider-group-routes.js';
+import { registerDeckRoutes } from './deck.js';
 import { syncProvidersFromDb } from './llm-providers.js';
 import {
   publishEvent,
@@ -109,6 +110,13 @@ export interface TaskRecord {
   error?: string;
   createdAt: string;
   completedAt?: string;
+  /** Command Deck: stage-based progress 0-100 (accepted=10, generating=50, complete=100). */
+  progress?: number;
+  /** Command Deck: real token usage from the router response. */
+  tokensIn?: number;
+  tokensOut?: number;
+  /** Command Deck: files touched by the run (0 until the engine reports changes). */
+  files?: { modified: number; created: number };
 }
 
 export const taskStore = new Map<string, TaskRecord>();
@@ -129,6 +137,7 @@ export const router = new LLMRouter();
 registerAdminLlmRoutes(app, router);
 registerCliRoutes(app);
 registerProviderGroupRoutes(app);
+registerDeckRoutes(app);
 void syncProvidersFromDb(router).then((n) => {
   if (n > 0) logger.info(`Registered ${n} admin-managed LLM provider(s) from DB`);
 });
@@ -268,6 +277,7 @@ app.post('/v1/agentx/run/stream', async (req, res): Promise<void> => {
       description: request.description,
       status: 'pending',
       createdAt: startedAt,
+      progress: 10,
     });
 
     publishEvent({ type: 'accepted', taskId: request.taskId, at: startedAt });
@@ -277,11 +287,14 @@ app.post('/v1/agentx/run/stream', async (req, res): Promise<void> => {
     void (async () => {
       try {
         await delay(STAGE_DELAY_MS);
+        const genAt = new Date().toISOString();
         publishEvent({
           type: 'generating',
           taskId: request.taskId,
-          at: new Date().toISOString(),
+          at: genAt,
         });
+        const store = taskStore.get(request.taskId);
+        if (store) store.progress = 50;
         const response = await executeRoute(router, request, prompt);
         const task = taskStore.get(request.taskId);
         if (task) {
@@ -290,6 +303,10 @@ app.post('/v1/agentx/run/stream', async (req, res): Promise<void> => {
           task.provider = response.provider;
           task.model = response.model;
           task.response = response.message;
+          task.progress = 100;
+          task.tokensIn = response.usage?.inputTokens ?? 0;
+          task.tokensOut = response.usage?.outputTokens ?? 0;
+          task.files = { modified: 0, created: 0 };
         }
         // Auto-score successful task outputs (quality scoring — Phase 2).
         void (async () => {
