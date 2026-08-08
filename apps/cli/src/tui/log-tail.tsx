@@ -8,6 +8,7 @@
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Box, Text, useInput } from 'ink';
+import TextInput from 'ink-text-input';
 import { cloudSSE } from '../lib/cloud-api.js';
 import { c, palette } from './theme.js';
 import { Spinner } from './spinner.js';
@@ -66,11 +67,25 @@ function eventText(ev: TaskLogEvent): string {
   }
 }
 
+type LevelFilter = 'all' | 'error' | 'warn' | 'info';
+
+const LEVEL_ORDER: LevelFilter[] = ['all', 'error', 'warn', 'info'];
+
+function levelOf(ev: TaskLogEvent): LevelFilter {
+  if (ev.type === 'error') return 'error';
+  if (ev.type === 'complete' && ev.status !== 'success') return 'error';
+  if (ev.type === 'generating') return 'warn';
+  return 'info';
+}
+
 export function LogTail({ taskId, onClose }: LogTailProps): React.ReactNode {
   const [logs, setLogs] = useState<TaskLogEvent[]>([]);
   const [connecting, setConnecting] = useState(true);
   const [reconnecting, setReconnecting] = useState(false);
   const [connError, setConnError] = useState<string | null>(null);
+  const [levelFilter, setLevelFilter] = useState<LevelFilter>('all');
+  const [searchMode, setSearchMode] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
   const aborter = useRef<AbortController | null>(null);
   const attempts = useRef(0);
 
@@ -139,15 +154,36 @@ export function LogTail({ taskId, onClose }: LogTailProps): React.ReactNode {
     return () => aborter.current?.abort();
   }, [connect]);
 
-  useInput((_input, key) => {
+  useInput((input, key) => {
+    if (searchMode) {
+      // Search input owns the keyboard while open.
+      if (key.escape) setSearchMode(false);
+      return;
+    }
     if (key.escape) {
       onClose();
       return;
     }
-    if (_input === 'r' || _input === 'R') connect(true);
+    if (input === 'f' || input === 'F') {
+      const next = LEVEL_ORDER[(LEVEL_ORDER.indexOf(levelFilter) + 1) % LEVEL_ORDER.length];
+      setLevelFilter(next ?? 'all');
+      return;
+    }
+    if (input === '/') {
+      setSearchQuery('');
+      setSearchMode(true);
+      return;
+    }
+    if (input === 'r' || input === 'R') connect(true);
   });
 
-  const display = [...logs].reverse();
+  const filtered = [...logs].reverse().filter((ev) => {
+    if (levelFilter !== 'all' && levelOf(ev) !== levelFilter) return false;
+    if (searchQuery && !JSON.stringify(ev).toLowerCase().includes(searchQuery.toLowerCase()))
+      return false;
+    return true;
+  });
+  const display = filtered;
 
   return (
     <Box flexDirection="column" padding={1} borderStyle="round" borderColor={c('cyan')}>
@@ -167,7 +203,7 @@ export function LogTail({ taskId, onClose }: LogTailProps): React.ReactNode {
           ) : (
             <Text color={c(palette.ok)}>● live</Text>
           )}{' '}
-          · r: ulang · esc: tutup
+          · <Text color={c(palette.accent)}>f:{levelFilter}</Text> · / cari · r: ulang · esc: tutup
         </Text>
       </Box>
       {connError && (
@@ -175,9 +211,26 @@ export function LogTail({ taskId, onClose }: LogTailProps): React.ReactNode {
           <Text color={c('red')}>⚠ {connError}</Text>
         </Box>
       )}
-      <Box flexDirection="column-reverse" overflowY="hidden" height={18} marginTop={1}>
+      {searchMode ? (
+        <Box marginTop={1} flexDirection="row" gap={1}>
+          <Text color={c(palette.warn)}>/</Text>
+          <TextInput
+            value={searchQuery}
+            onChange={setSearchQuery}
+            onSubmit={() => setSearchMode(false)}
+          />
+          <Text dimColor>enter: terapkan · esc: batal</Text>
+        </Box>
+      ) : null}
+      <Box flexDirection="column-reverse" overflowY="hidden" height={16} marginTop={1}>
         {display.length === 0 && (
-          <Text dimColor>{connecting ? 'menunggu event…' : '(belum ada event)'}</Text>
+          <Text dimColor>
+            {connecting
+              ? 'menunggu event…'
+              : levelFilter !== 'all' || searchQuery
+                ? '(tidak ada event cocok)'
+                : '(belum ada event)'}
+          </Text>
         )}
         {display.map((ev, idx) => (
           <Box key={`${ev.at}-${idx}`} flexDirection="row">

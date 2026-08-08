@@ -47,6 +47,9 @@ export function statusColor(status: string): string {
     case 'complete':
     case 'completed':
     case 'idle':
+    case 'healthy':
+    case 'ok':
+    case 'active':
       return palette.ok;
     case 'running':
     case 'pending':
@@ -68,6 +71,9 @@ export function statusBadge(status: string): string {
     case 'complete':
     case 'completed':
     case 'idle':
+    case 'healthy':
+    case 'ok':
+    case 'active':
       return '●';
     case 'running':
       return '▸';

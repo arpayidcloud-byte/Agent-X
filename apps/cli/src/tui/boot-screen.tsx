@@ -32,15 +32,19 @@ interface BootScreenProps {
 
 export function BootScreen({ version, connected, onDone }: BootScreenProps): React.ReactNode {
   const [ready, setReady] = useState(false);
+  const [lines, setLines] = useState(0);
   const doneRef = useRef(onDone);
   doneRef.current = onDone;
 
-  // Handshake grace: show the connecting spinner briefly even when already
-  // connected, then flip to ✓ and auto-proceed.
+  // Fade-in per line (~80ms/line, Command Deck v2 §1) then handshake state.
   useEffect(() => {
+    const lineTimer = setInterval(() => {
+      setLines((n) => (n >= LOGO.length ? n : n + 1));
+    }, 80);
     const t1 = setTimeout(() => setReady(true), connected ? 600 : 1200);
     const t2 = setTimeout(() => doneRef.current(), connected ? 1500 : 2200);
     return () => {
+      clearInterval(lineTimer);
       clearTimeout(t1);
       clearTimeout(t2);
     };
@@ -52,25 +56,29 @@ export function BootScreen({ version, connected, onDone }: BootScreenProps): Rea
 
   return (
     <Box flexDirection="column" alignItems="center" paddingY={2}>
-      {LOGO.map((line, i) => (
+      {LOGO.slice(0, lines).map((line, i) => (
         <Text key={i} bold color={c(LOGO_COLORS[i % LOGO_COLORS.length])}>
           {line}
         </Text>
       ))}
-      <Text dimColor>{TAGLINE}</Text>
-      <Text dimColor>{'─'.repeat(46)}</Text>
-      <Box marginTop={1}>
-        {ready ? (
-          <Text color={c(palette.ok)}>✓ connected</Text>
-        ) : (
-          <Text color={c(palette.warn)}>
-            <Spinner /> v{version} · api: connecting…
-          </Text>
-        )}
-      </Box>
-      <Box marginTop={1}>
-        <Text dimColor>esc: lewati</Text>
-      </Box>
+      {lines >= LOGO.length && (
+        <>
+          <Text dimColor>{TAGLINE}</Text>
+          <Text dimColor>{'─'.repeat(46)}</Text>
+          <Box marginTop={1}>
+            {ready ? (
+              <Text color={c(palette.ok)}>✓ connected</Text>
+            ) : (
+              <Text color={c(palette.warn)}>
+                <Spinner /> v{version} · api: connecting…
+              </Text>
+            )}
+          </Box>
+          <Box marginTop={1}>
+            <Text dimColor>esc: lewati</Text>
+          </Box>
+        </>
+      )}
     </Box>
   );
 }

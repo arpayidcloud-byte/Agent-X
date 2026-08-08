@@ -9,7 +9,7 @@
  *   - /btw one-shot quick question, /context session summary
  *   - resume hint on quit, truncated status line
  */
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { Box, Text, useApp, useInput, render } from 'ink';
 import { execFile } from 'node:child_process';
 import { AuthScreen } from './auth-screen.js';
@@ -25,6 +25,8 @@ import { CostView } from './cost-view.js';
 import { HelpPanel } from './help-panel.js';
 import { LogTail } from './log-tail.js';
 import { BootScreen } from './boot-screen.js';
+import { RouterView } from './router-view.js';
+import { HealthView } from './health-view.js';
 import { c, palette } from './theme.js';
 import {
   isCloudAuthed,
@@ -44,6 +46,7 @@ import type {
   OverlayId,
   ChatMessage,
   ChatMeta,
+  Toast,
 } from './types.js';
 
 const VERSION = '2.2.0';
@@ -125,6 +128,20 @@ export default function AgentXTUI(): React.ReactNode {
   const [chatReconnecting, setChatReconnecting] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [inputHistory, setInputHistory] = useState<string[]>([]);
+  const [toasts, setToasts] = useState<Toast[]>([]);
+  const toastId = useRef(0);
+  // Task-count series across polls — feeds the status-bar activity sparkline.
+  const [taskHistory, setTaskHistory] = useState<number[]>([]);
+
+  // ─── Toast notifications (auto-dismiss ~4s, Command Deck v2 §5) ────
+  const pushToast = useCallback((text: string, kind: Toast['kind'] = 'info') => {
+    toastId.current += 1;
+    const id = toastId.current;
+    setToasts((prev) => [...prev.slice(-2), { id, text, kind }]);
+    setTimeout(() => {
+      setToasts((prev) => prev.filter((t) => t.id !== id));
+    }, 4000);
+  }, []);
 
   // ─── Data fetch ────
   const refreshData = useCallback(async () => {
@@ -142,6 +159,7 @@ export default function AgentXTUI(): React.ReactNode {
       setTasks(t);
       setProviders(p);
       setCost(c);
+      setTaskHistory((prev) => [...prev.slice(-19), t.length]);
     } catch (e) {
       const status = (e as Error & { status?: number }).status;
       if (status === 401 || status === 403) {
@@ -233,6 +251,10 @@ export default function AgentXTUI(): React.ReactNode {
           saveChatSession(history);
           if (meta.provider) {
             setNotice(`⚡ ${meta.provider}${meta.model ? `/${meta.model}` : ''} selesai`);
+            pushToast(
+              `✓ selesai · ${meta.provider}${meta.model ? `/${meta.model}` : ''}${meta.cost != null ? ` · $${Number(meta.cost).toFixed(4)}` : ''}${meta.latencyMs != null ? ` · ${Math.round(meta.latencyMs)}ms` : ''}`,
+              'ok',
+            );
           }
           void refreshData();
         } catch (e) {
@@ -248,10 +270,11 @@ export default function AgentXTUI(): React.ReactNode {
             return;
           }
           setLastError(`Chat gagal: ${e instanceof Error ? e.message : String(e)}`);
+          pushToast(`✕ chat gagal · ${e instanceof Error ? e.message : String(e)}`, 'error');
         }
       })();
     },
-    [messages, streaming, selectedProvider, refreshData],
+    [messages, streaming, selectedProvider, refreshData, pushToast],
   );
 
   // ─── Shell mode (`!cmd`) ────
@@ -290,6 +313,16 @@ export default function AgentXTUI(): React.ReactNode {
       }
       if (cmd === '/providers' || cmd === '/p') {
         setOverlay('providers');
+        void refreshData();
+        return;
+      }
+      if (cmd === '/router' || cmd === '/m') {
+        setOverlay('router');
+        void refreshData();
+        return;
+      }
+      if (cmd === '/health' || cmd === '/h') {
+        setOverlay('health');
         void refreshData();
         return;
       }
@@ -531,6 +564,8 @@ export default function AgentXTUI(): React.ReactNode {
                 {overlay === 'cost' && '◆ Cost'}
                 {overlay === 'settings' && '◆ Settings'}
                 {overlay === 'help' && '◆ Help'}
+                {overlay === 'router' && '◆ Router'}
+                {overlay === 'health' && '◆ Health'}
               </Text>
               <Text dimColor>esc: kembali</Text>
             </Box>
@@ -556,6 +591,8 @@ export default function AgentXTUI(): React.ReactNode {
               )}
               {overlay === 'providers' && <ProviderList providers={providers} loading={loading} />}
               {overlay === 'cost' && <CostView cost={cost} loading={loading} />}
+              {overlay === 'router' && <RouterView providers={providers} loading={loading} />}
+              {overlay === 'health' && <HealthView health={health} loading={loading} />}
               {overlay === 'settings' && (
                 <Box flexDirection="column" gap={1}>
                   <Text>
@@ -597,6 +634,23 @@ export default function AgentXTUI(): React.ReactNode {
         )}
       </Box>
 
+      {/* Toast notifications — right-aligned above the input (Command Deck v2 §5) */}
+      {toasts.length > 0 && !overlayOpen && !shellResult && (
+        <Box justifyContent="flex-end" paddingX={1} paddingTop={1}>
+          {toasts.map((t) => (
+            <Text
+              key={t.id}
+              color={c(
+                t.kind === 'ok' ? palette.ok : t.kind === 'error' ? palette.danger : palette.accent,
+              )}
+            >
+              {' '}
+              {t.text}
+            </Text>
+          ))}
+        </Box>
+      )}
+
       {/* Notice / error line */}
       {notice && !overlayOpen && !shellResult && (
         <Box paddingX={1} paddingTop={1}>
@@ -620,6 +674,7 @@ export default function AgentXTUI(): React.ReactNode {
           streaming={streaming}
           reconnecting={chatReconnecting}
           provider={selectedProvider ?? 'auto'}
+          activity={taskHistory}
         />
       </Box>
     </Box>
