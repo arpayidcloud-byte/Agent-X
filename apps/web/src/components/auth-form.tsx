@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { Loader2 } from 'lucide-react';
 import { loginAccount, registerAccount, setToken } from '../lib/api';
 
@@ -85,6 +86,16 @@ export default function AuthForm({ onAuthed }: AuthFormProps) {
           {loading ? 'Please wait…' : mode === 'login' ? 'Login' : 'Register'}
         </button>
       </form>
+      {mode === 'login' && (
+        <p className="mt-3 text-center text-xs">
+          <Link
+            href="/forgot-password"
+            className="font-medium text-accent-300 hover:text-accent-200"
+          >
+            Forgot password?
+          </Link>
+        </p>
+      )}
     </div>
   );
 }

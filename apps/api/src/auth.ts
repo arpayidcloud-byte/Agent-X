@@ -45,6 +45,9 @@ export const AUTH_ENABLED = process.env.AUTH_ENABLED === 'true';
 // ─── User storage (memory fallback, Prisma when DB reachable) ────
 const userStore = new Map<string, UserRecord>();
 const refreshTokens = new Map<string, { userId: string; expiresAt: Date }>();
+// One-time password reset tokens (30 min TTL), like refreshTokens.
+const passwordResetTokens = new Map<string, { userId: string; expiresAt: Date }>();
+const PASSWORD_RESET_TTL_MS = 30 * 60 * 1000; // 30 minutes
 
 interface UserBackend {
   create(record: {
@@ -248,6 +251,92 @@ export async function changePassword(
   const passwordHash = await bcrypt.hash(newPassword, 10);
   await backend.updatePassword(user.id, passwordHash);
   logger.info('Password changed', { email: user.email });
+}
+
+/**
+ * True when the account has a local password (vs. OAuth-only accounts that
+ * were created with an empty hash).
+ */
+export function hasPassword(user: { passwordHash: string }): boolean {
+  return user.passwordHash !== '';
+}
+
+/** Fetch a user by id with passwordHash included (auth internals only). */
+export async function getUserById(userId: string): Promise<UserRecord | undefined> {
+  const backend = await getUserBackend();
+  return backend.findById(userId);
+}
+
+/**
+ * Set a first password for an account that has none (OAuth-created users).
+ * Refuses when a password already exists — those must use changePassword.
+ */
+export async function setPassword(userId: string, newPassword: string): Promise<void> {
+  if (!newPassword || typeof newPassword !== 'string' || newPassword.length < 8) {
+    throw new AuthError('Invalid field: newPassword (min 8 chars)', 400);
+  }
+  const backend = await getUserBackend();
+  const user = await backend.findById(userId);
+  if (!user) {
+    throw new AuthError('User not found', 401);
+  }
+  if (hasPassword(user)) {
+    throw new AuthError('Account already has a password — use change-password instead', 409);
+  }
+  const passwordHash = await bcrypt.hash(newPassword, 10);
+  await backend.updatePassword(user.id, passwordHash);
+  logger.info('Password set (OAuth account)', { email: user.email });
+}
+
+/**
+ * Issue a one-time password reset token for an account, or null when the
+ * email is unknown — the endpoint always answers 200 to avoid enumeration.
+ */
+export async function createPasswordResetToken(email: string): Promise<string | null> {
+  const backend = await getUserBackend();
+  const user = await backend.findByEmail(email.trim().toLowerCase());
+  if (!user) return null;
+  const token = uuidv4();
+  passwordResetTokens.set(token, {
+    userId: user.id,
+    expiresAt: new Date(Date.now() + PASSWORD_RESET_TTL_MS),
+  });
+  logger.info('Password reset token issued', { email: user.email });
+  return token;
+}
+
+/**
+ * Consume a reset token and set a new password. One-time use: the token is
+ * deleted regardless of whether the password update succeeds.
+ */
+export async function resetPasswordWithToken(token: string, newPassword: string): Promise<void> {
+  if (!token || typeof token !== 'string') {
+    throw new AuthError('Missing field: token', 400);
+  }
+  if (!newPassword || typeof newPassword !== 'string' || newPassword.length < 8) {
+    throw new AuthError('Invalid field: newPassword (min 8 chars)', 400);
+  }
+  const entry = passwordResetTokens.get(token);
+  if (!entry) {
+    throw new AuthError('Invalid or expired reset token', 400);
+  }
+  passwordResetTokens.delete(token);
+  if (Date.now() > entry.expiresAt.getTime()) {
+    throw new AuthError('Invalid or expired reset token', 400);
+  }
+  const backend = await getUserBackend();
+  const user = await backend.findById(entry.userId);
+  if (!user) {
+    throw new AuthError('User not found', 401);
+  }
+  const passwordHash = await bcrypt.hash(newPassword, 10);
+  await backend.updatePassword(user.id, passwordHash);
+  logger.info('Password reset', { email: user.email });
+}
+
+/** Test hygiene: drop outstanding reset tokens. */
+export function clearPasswordResetTokens(): void {
+  passwordResetTokens.clear();
 }
 
 /** Delete a user by ID. Returns true if deleted. */

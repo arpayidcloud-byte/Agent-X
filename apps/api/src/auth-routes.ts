@@ -1,7 +1,20 @@
 import type { Express, Request, Response } from 'express';
-import { register, login, refresh, requireAuth, changePassword, AuthError } from './auth.js';
+import {
+  register,
+  login,
+  refresh,
+  requireAuth,
+  changePassword,
+  setPassword,
+  createPasswordResetToken,
+  resetPasswordWithToken,
+  getUserById,
+  hasPassword,
+  AuthError,
+} from './auth.js';
 import type { AuthenticatedRequest } from './auth.js';
 import { verifyTurnstile } from './turnstile.js';
+import { sendMail } from './mailer.js';
 
 export function registerAuthRoutes(app: Express): void {
   // ─── Register ────
@@ -69,8 +82,18 @@ export function registerAuthRoutes(app: Express): void {
   });
 
   // ─── Me ────
-  app.get('/v1/auth/me', requireAuth, (req: AuthenticatedRequest, res: Response) => {
-    res.json({ user: { id: req.auth?.sub, email: req.auth?.email, roles: req.auth?.roles } });
+  app.get('/v1/auth/me', requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+    const user = await getUserById(req.auth?.sub ?? '');
+    res.json({
+      user: {
+        id: req.auth?.sub,
+        email: req.auth?.email,
+        roles: req.auth?.roles,
+        // Whether the account has a local password (false for OAuth-only
+        // accounts) — lets the UI show "Set password" vs "Change password".
+        hasPassword: user ? hasPassword(user) : true,
+      },
+    });
   });
 
   // ─── Change password ────
@@ -88,4 +111,66 @@ export function registerAuthRoutes(app: Express): void {
       }
     },
   );
+
+  // ─── Set first password (OAuth accounts) ────
+  // For users created via Google/GitHub (no local password): sets one without
+  // requiring a current password. Refuses once a password exists.
+  app.post(
+    '/v1/auth/set-password',
+    requireAuth,
+    async (req: AuthenticatedRequest, res: Response) => {
+      try {
+        const { newPassword } = req.body ?? {};
+        await setPassword(req.auth?.sub ?? '', newPassword);
+        res.json({ ok: true });
+      } catch (e) {
+        const err = e instanceof AuthError ? e : new AuthError(String(e), 500);
+        res.status(err.status).json({ error: err.message });
+      }
+    },
+  );
+
+  // ─── Forgot password ────
+  // Always answers 200 (even for unknown emails) so the endpoint cannot be
+  // used to enumerate registered accounts. Email is only sent when the
+  // account exists.
+  app.post('/v1/auth/forgot-password', async (req: Request, res: Response): Promise<void> => {
+    try {
+      const { email } = req.body ?? {};
+      if (!email || typeof email !== 'string') {
+        res.status(400).json({ error: 'Missing field: email' });
+        return;
+      }
+      const token = await createPasswordResetToken(email);
+      if (token) {
+        const webUrl = process.env.OAUTH_WEB_URL ?? 'http://localhost:30500';
+        const resetUrl = `${webUrl}/reset-password?token=${encodeURIComponent(token)}`;
+        const text =
+          `Someone requested a password reset for your AgentX account.\n\n` +
+          `Reset your password here (valid for 30 minutes):\n${resetUrl}\n\n` +
+          `If this wasn't you, ignore this email.`;
+        await sendMail({
+          to: email.trim().toLowerCase(),
+          subject: 'Reset your AgentX password',
+          text,
+        });
+      }
+      res.json({ ok: true });
+    } catch (e) {
+      const err = e instanceof AuthError ? e : new AuthError(String(e), 500);
+      res.status(err.status).json({ error: err.message });
+    }
+  });
+
+  // ─── Reset password (token from email) ────
+  app.post('/v1/auth/reset-password', async (req: Request, res: Response): Promise<void> => {
+    try {
+      const { token, newPassword } = req.body ?? {};
+      await resetPasswordWithToken(token, newPassword);
+      res.json({ ok: true });
+    } catch (e) {
+      const err = e instanceof AuthError ? e : new AuthError(String(e), 500);
+      res.status(err.status).json({ error: err.message });
+    }
+  });
 }
