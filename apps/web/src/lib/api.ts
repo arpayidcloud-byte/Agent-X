@@ -519,6 +519,8 @@ export interface AuthUser {
   email: string;
   roles: string[];
   createdAt: string;
+  /** False for OAuth-only accounts (no local password yet). */
+  hasPassword?: boolean;
 }
 
 export interface AuthTokens {
@@ -567,6 +569,31 @@ export async function changePassword(
     { method: 'POST', body: JSON.stringify({ currentPassword, newPassword }) },
     true,
   );
+}
+
+/** Set a first password on an OAuth-only account (no current password needed). */
+export async function setPassword(newPassword: string): Promise<{ ok: boolean }> {
+  return authJson<{ ok: boolean }>(
+    '/v1/auth/set-password',
+    { method: 'POST', body: JSON.stringify({ newPassword }) },
+    true,
+  );
+}
+
+/** Request a password reset email. Always succeeds (no account enumeration). */
+export async function forgotPassword(email: string): Promise<{ ok: boolean }> {
+  return authJson<{ ok: boolean }>('/v1/auth/forgot-password', {
+    method: 'POST',
+    body: JSON.stringify({ email }),
+  });
+}
+
+/** Reset the password with the one-time token from the email. */
+export async function resetPassword(token: string, newPassword: string): Promise<{ ok: boolean }> {
+  return authJson<{ ok: boolean }>('/v1/auth/reset-password', {
+    method: 'POST',
+    body: JSON.stringify({ token, newPassword }),
+  });
 }
 
 export interface TeamMember {

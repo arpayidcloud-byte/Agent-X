@@ -9,6 +9,7 @@ import {
   setToken,
   clearToken,
   changePassword,
+  setPassword,
   isAuthed,
   type AuthUser,
 } from '@/lib/api';
@@ -94,6 +95,26 @@ export default function SettingsView() {
     }
   }
 
+  /** OAuth-only accounts (no password yet): set the first one. */
+  async function handleSetPassword(e: React.FormEvent) {
+    e.preventDefault();
+    setPwErr(null);
+    setPwMsg(null);
+    if (next !== confirm) {
+      setPwErr('New password and confirmation do not match');
+      return;
+    }
+    try {
+      await setPassword(next);
+      setPwMsg('Password set. You can now also log in with email and password.');
+      setNext('');
+      setConfirm('');
+      setUser((u) => (u ? { ...u, hasPassword: true } : u));
+    } catch (err) {
+      setPwErr(err instanceof Error ? err.message : String(err));
+    }
+  }
+
   if (!authed) {
     return (
       <Card className="mx-auto max-w-md rounded-2xl p-6 sm:p-8">
@@ -123,6 +144,14 @@ export default function SettingsView() {
             Sign in
           </Button>
         </form>
+        <p className="mt-3 text-center text-xs">
+          <Link
+            href="/forgot-password"
+            className="font-medium text-accent-300 hover:text-accent-200"
+          >
+            Forgot password?
+          </Link>
+        </p>
         <div className="mt-4">
           <SocialAuthButtons />
         </div>
@@ -187,9 +216,14 @@ export default function SettingsView() {
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="flex items-center gap-2">
-            <KeyRound className="h-4 w-4 text-accent-400" aria-hidden /> Change password
+            <KeyRound className="h-4 w-4 text-accent-400" aria-hidden />
+            {user?.hasPassword === false ? 'Set password' : 'Change password'}
           </CardTitle>
-          <CardDescription>Update your account password</CardDescription>
+          <CardDescription>
+            {user?.hasPassword === false
+              ? 'Your account was created with Google/GitHub — set a password to also log in with email.'
+              : 'Update your account password'}
+          </CardDescription>
         </CardHeader>
         <CardContent>
           {pwMsg && (
@@ -202,33 +236,58 @@ export default function SettingsView() {
               <p className="text-xs text-rose-300">⚠ {pwErr}</p>
             </div>
           )}
-          <form onSubmit={(e) => void handleChangePassword(e)} className="space-y-3">
-            <Input
-              type="password"
-              required
-              placeholder="Current password"
-              value={current}
-              onChange={(e) => setCurrent(e.target.value)}
-            />
-            <Input
-              type="password"
-              required
-              placeholder="New password (min 8 chars)"
-              value={next}
-              onChange={(e) => setNext(e.target.value)}
-            />
-            <Input
-              type="password"
-              required
-              placeholder="Confirm new password"
-              value={confirm}
-              onChange={(e) => setConfirm(e.target.value)}
-            />
-            <Button type="submit" className="w-full">
-              <Shield className="h-4 w-4" strokeWidth={2} aria-hidden />
-              Update password
-            </Button>
-          </form>
+          {user?.hasPassword === false ? (
+            <form onSubmit={(e) => void handleSetPassword(e)} className="space-y-3">
+              <Input
+                type="password"
+                required
+                minLength={8}
+                placeholder="New password (min 8 chars)"
+                value={next}
+                onChange={(e) => setNext(e.target.value)}
+              />
+              <Input
+                type="password"
+                required
+                minLength={8}
+                placeholder="Confirm new password"
+                value={confirm}
+                onChange={(e) => setConfirm(e.target.value)}
+              />
+              <Button type="submit" className="w-full">
+                <Shield className="h-4 w-4" strokeWidth={2} aria-hidden />
+                Set password
+              </Button>
+            </form>
+          ) : (
+            <form onSubmit={(e) => void handleChangePassword(e)} className="space-y-3">
+              <Input
+                type="password"
+                required
+                placeholder="Current password"
+                value={current}
+                onChange={(e) => setCurrent(e.target.value)}
+              />
+              <Input
+                type="password"
+                required
+                placeholder="New password (min 8 chars)"
+                value={next}
+                onChange={(e) => setNext(e.target.value)}
+              />
+              <Input
+                type="password"
+                required
+                placeholder="Confirm new password"
+                value={confirm}
+                onChange={(e) => setConfirm(e.target.value)}
+              />
+              <Button type="submit" className="w-full">
+                <Shield className="h-4 w-4" strokeWidth={2} aria-hidden />
+                Update password
+              </Button>
+            </form>
+          )}
         </CardContent>
       </Card>
     </div>

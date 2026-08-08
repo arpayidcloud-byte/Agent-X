@@ -244,6 +244,89 @@ export const openApiSpec: OpenAPIV3.Document = {
         },
       },
     },
+    '/v1/auth/set-password': {
+      post: {
+        tags: ['Auth'],
+        summary: 'Set first password (OAuth-only accounts)',
+        description:
+          'For accounts created via Google/GitHub that have no local password. ' +
+          'Refuses with 409 once a password already exists (use change-password then).',
+        security: [{ BearerAuth: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['newPassword'],
+                properties: {
+                  newPassword: { type: 'string', minLength: 8 },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          200: { description: 'Password set' },
+          400: { $ref: '#/components/responses/Error' },
+          401: { $ref: '#/components/responses/Error' },
+          409: { $ref: '#/components/responses/Error' },
+        },
+      },
+    },
+    '/v1/auth/forgot-password': {
+      post: {
+        tags: ['Auth'],
+        summary: 'Request a password reset email',
+        description:
+          'Always answers 200 for existing and unknown emails alike (no account ' +
+          'enumeration). When the account exists an email with a one-time reset ' +
+          'link (valid 30 minutes) is sent.',
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['email'],
+                properties: {
+                  email: { type: 'string', format: 'email' },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          200: { description: 'Accepted (email sent when the account exists)' },
+          400: { $ref: '#/components/responses/Error' },
+        },
+      },
+    },
+    '/v1/auth/reset-password': {
+      post: {
+        tags: ['Auth'],
+        summary: 'Reset password with a one-time token',
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['token', 'newPassword'],
+                properties: {
+                  token: { type: 'string', description: 'One-time token from the reset email' },
+                  newPassword: { type: 'string', minLength: 8 },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          200: { description: 'Password reset' },
+          400: { $ref: '#/components/responses/Error' },
+        },
+      },
+    },
     '/v1/agentx/run': {
       post: {
         tags: ['Agent'],
