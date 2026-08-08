@@ -10,8 +10,10 @@
 import React, { useState } from 'react';
 import { Box, Text, useInput } from 'ink';
 import TextInput from 'ink-text-input';
-import type { ChatMessage, ChatMeta } from './types.js';
-import { c, palette } from './theme.js';
+import type { ChatMessage, ChatMeta, TaskItem } from './types.js';
+import { c } from './theme.js';
+import { WarpBlock } from './warp-block.js';
+import { WarpTaskCard } from './warp-task-card.js';
 
 interface ChatViewProps {
   messages: ChatMessage[];
@@ -21,6 +23,8 @@ interface ChatViewProps {
   history: string[];
   onSubmit: (text: string) => void;
   onCommand: (cmd: string) => void;
+  /** Latest running tasks to show inline after the last user message. */
+  tasks?: TaskItem[];
   disabledHint?: string;
 }
 
@@ -59,6 +63,7 @@ export function ChatView({
   history,
   onSubmit,
   onCommand,
+  tasks,
   disabledHint,
 }: ChatViewProps): React.ReactNode {
   const [draft, setDraft] = useState('');
@@ -112,35 +117,57 @@ export function ChatView({
 
   return (
     <Box flexDirection="column" flexGrow={1}>
-      {/* Message area — newest pinned at the bottom */}
+      {/* Message area — Warp blocks (newest at bottom) */}
       <Box flexDirection="column-reverse" flexGrow={1} overflowY="hidden" paddingX={1}>
         {display.length === 0 && !streaming ? (
           <Box marginTop={1}>
             <Text dimColor>
-              Selamat datang di AgentX. Ketik pesan untuk mulai — mis. "buatkan REST API user
-              management". /help untuk daftar perintah. Awali dengan ! untuk shell.
+              Selamat datang di Agent-X Platform. Ketik pesan untuk mulai — mis. "buatkan REST API
+              user management". /help untuk daftar perintah. Awali dengan ! untuk shell.
             </Text>
           </Box>
         ) : null}
+        {/* Inline task card — latest running task right after the last user block */}
+        {tasks &&
+          tasks
+            .filter((t) => t.status === 'running' || t.status === 'pending')
+            .slice(0, 1)
+            .map((t) => (
+              <Box key={`card-${t.id}`} marginBottom={1}>
+                <WarpTaskCard
+                  id={t.id}
+                  description={(t.description ?? t.prompt ?? '').slice(0, 72)}
+                  progress={null}
+                  status={t.status}
+                  fileHint={t.prompt ? t.prompt.slice(0, 48) : null}
+                  agents={[]}
+                  providerHint={t.provider ?? null}
+                />
+              </Box>
+            ))}
         {display.map((m, idx) =>
           m.role === 'user' ? (
-            <Box key={`u-${messages.length - idx}`} marginBottom={1} marginTop={1}>
-              <Text bold color={c(palette.accentBright)}>
-                you ▸{' '}
-              </Text>
+            <WarpBlock
+              key={`u-${messages.length - idx}`}
+              title={m.content.slice(0, 48) || 'pesan'}
+              stamp="now"
+              status="done"
+            >
               <Text>{m.content}</Text>
-            </Box>
+            </WarpBlock>
           ) : (
-            <Box key={`a-${messages.length - idx}`} marginBottom={1} flexDirection="column">
-              <Text bold color={c(palette.brand)}>
-                agent ✦{' '}
-              </Text>
+            <WarpBlock
+              key={`a-${messages.length - idx}`}
+              title="agent"
+              stamp={m.live ? 'live' : 'done'}
+              status={m.live ? 'run' : 'done'}
+            >
               <Text>
                 {renderRich(m.content)}
                 {m.live && !streaming ? <Text color={c('green')}>▊</Text> : null}
               </Text>
               {m.live && streaming ? <Text dimColor>…</Text> : null}
-            </Box>
+            </WarpBlock>
           ),
         )}
         {!streaming && streamMeta && lastLive ? <MetaLine meta={streamMeta} /> : null}

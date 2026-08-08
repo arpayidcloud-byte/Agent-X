@@ -16,7 +16,8 @@ import { AuthScreen } from './auth-screen.js';
 import { ChatView } from './chat-view.js';
 import { ShellModal, type ShellResult } from './shell-modal.js';
 import { ModelPicker } from './model-picker.js';
-import { StatusBar } from './status-bar.js';
+import { FlowHeader } from './flow-header.js';
+import { FlowFooter } from './flow-footer.js';
 import { TaskList } from './task-list.js';
 import { TaskDetail } from './task-detail.js';
 import { SubmitPanel } from './submit-panel.js';
@@ -538,26 +539,8 @@ export default function AgentXTUI(): React.ReactNode {
 
   return (
     <Box flexDirection="column" paddingX={1} paddingY={1}>
-      {/* Header — one line, minimal chrome, neon accents */}
-      <Box justifyContent="space-between">
-        <Box flexDirection="row" gap={2}>
-          <Text bold color={c(palette.accent)}>
-            ▓▓ AGENT·X
-          </Text>
-          <Text color={c(palette.brand)}>⚡ {selectedProvider ?? 'auto'}</Text>
-        </Box>
-        <Text dimColor>
-          {email ?? ''}
-          {healthOk ? (
-            <Text color={c(palette.ok)}> ● api</Text>
-          ) : (
-            <Text color={c(palette.danger)}> ○ api</Text>
-          )}
-        </Text>
-      </Box>
-      <Box marginTop={1} marginBottom={1}>
-        <Text dimColor>{'─'.repeat(48)}</Text>
-      </Box>
+      {/* Header — Agent-X Platform, no provider */}
+      <FlowHeader email={email} healthOk={healthOk} />
 
       {/* Main surface: chat or overlay */}
       <Box flexGrow={1} flexDirection="column">
@@ -630,6 +613,7 @@ export default function AgentXTUI(): React.ReactNode {
             streamText={streamText}
             streamMeta={streamMeta}
             history={inputHistory}
+            tasks={tasks}
             onSubmit={(text) => {
               if (text.startsWith('!')) {
                 handleShell(text.slice(1).trim());
@@ -671,18 +655,13 @@ export default function AgentXTUI(): React.ReactNode {
         </Box>
       )}
 
-      {/* Status bar — one line, bottom */}
+      {/* Status bar — Flow footer (ambient, no provider) */}
       <Box marginTop={1}>
-        <StatusBar
-          version={VERSION}
-          email={email}
-          taskCount={tasks.length}
-          cost={cost?.totalCost ?? 0}
-          healthStatus={healthOk ? 'ok' : 'error'}
-          streaming={streaming}
-          reconnecting={chatReconnecting}
-          provider={selectedProvider ?? 'auto'}
+        <FlowFooter
+          running={tasks.filter((t) => t.status === 'running' || t.status === 'pending').length}
+          total={tasks.length}
           activity={taskHistory}
+          hint={streaming || chatReconnecting ? 'streaming…' : ' / commands · q quit'}
         />
       </Box>
     </Box>
