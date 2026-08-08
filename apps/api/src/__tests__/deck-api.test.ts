@@ -103,4 +103,19 @@ describe('Command Deck API (Web Pro)', () => {
       expect(typeof log.message).toBe('string');
     }
   });
+
+  it('GET /v1/agentx/providers is public (no auth) and returns safe provider info', async () => {
+    const res = await fetch(`${baseUrl}/v1/agentx/providers`);
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { providers: Array<Record<string, unknown>> };
+    expect(Array.isArray(body.providers)).toBe(true);
+    for (const p of body.providers) {
+      expect(typeof p.name).toBe('string');
+      expect(typeof p.isActive).toBe('boolean');
+      expect(Array.isArray(p.models)).toBe(true);
+      // Secret-free contract: no apiKey/baseUrl may leak through the public view.
+      expect('apiKey' in p).toBe(false);
+      expect('baseUrl' in p).toBe(false);
+    }
+  });
 });

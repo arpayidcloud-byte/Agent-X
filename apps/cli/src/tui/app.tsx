@@ -163,8 +163,9 @@ export default function AgentXTUI(): React.ReactNode {
       setTaskHistory((prev) => [...prev.slice(-19), t.length]);
     } catch (e) {
       const status = (e as Error & { status?: number }).status;
-      if (status === 401 || status === 403) {
-        // Session expired — back to the auth screen.
+      if (status === 401) {
+        // Session expired — back to the auth screen. (403 = role-based denial,
+        // NOT a dead session — logging out on 403 bounces non-admin users.)
         setAuthenticated(false);
         setEmail(undefined);
         setRoles(undefined);
@@ -263,7 +264,7 @@ export default function AgentXTUI(): React.ReactNode {
           setStreamText('');
           setMessages((prev) => prev.slice(0, -1));
           const status = (e as Error & { status?: number }).status;
-          if (status === 401 || status === 403) {
+          if (status === 401) {
             setAuthenticated(false);
             setEmail(undefined);
             setRoles(undefined);

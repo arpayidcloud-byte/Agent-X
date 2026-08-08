@@ -444,6 +444,15 @@ export const openApiSpec: OpenAPIV3.Document = {
         },
       },
     },
+    '/v1/agentx/providers': {
+      get: {
+        tags: ['Agent'],
+        summary: 'Public provider list (name, models, active) — no admin required',
+        responses: {
+          200: { description: 'Provider list without secrets' },
+        },
+      },
+    },
     '/v1/agentx/deck': {
       get: {
         tags: ['Agent'],

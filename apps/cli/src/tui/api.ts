@@ -40,11 +40,12 @@ export async function fetchTasks(limit = 20): Promise<TaskItem[]> {
   }
 }
 
-/** Fetch active LLM providers. Throws on 401/403 (session expired). */
+/** Fetch active LLM providers (public endpoint — admin-only /v1/admin/llm-providers
+ * would 403 for non-admin roles and bounce the TUI back to login). */
 export async function fetchProviders(): Promise<ProviderInfo[]> {
   if (!isCloudAuthed()) return [];
   try {
-    const res = await cloudFetch<{ providers: ProviderInfo[] }>('/v1/admin/llm-providers');
+    const res = await cloudFetch<{ providers: ProviderInfo[] }>('/v1/agentx/providers');
     return res.providers ?? [];
   } catch (e) {
     const status = (e as Error & { status?: number }).status;
