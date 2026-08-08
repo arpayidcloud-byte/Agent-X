@@ -100,14 +100,17 @@ export async function cloudFetch<T = unknown>(
 }
 
 /**
- * Start an SSE connection and yield parsed events.
- * Returns an async iterator of parsed JSON events.
+ * Start an SSE connection.
+ * Returns a Promise<Response> — the consumer reads response.body.getReader().
+ * Accepts extra fetch init (e.g. { signal }) for abort/reconnect control.
  */
-export function cloudSSE(ssePath: string): Promise<Response> {
+export function cloudSSE(ssePath: string, init: RequestInit = {}): Promise<Response> {
   const apiBase = getApiUrl();
   const cfg = loadCloudConfig();
   const url = `${apiBase}${ssePath}`;
-  const headers: Record<string, string> = {};
+  const headers: Record<string, string> = {
+    ...((init.headers as Record<string, string> | undefined) ?? {}),
+  };
   if (cfg.apiToken) headers.Authorization = `Bearer ${cfg.apiToken}`;
-  return fetch(url, { headers });
+  return fetch(url, { ...init, headers });
 }

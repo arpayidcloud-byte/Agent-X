@@ -23,6 +23,8 @@ import { SubmitPanel } from './submit-panel.js';
 import { ProviderList } from './provider-list.js';
 import { CostView } from './cost-view.js';
 import { HelpPanel } from './help-panel.js';
+import { LogTail } from './log-tail.js';
+import { c } from './theme.js';
 import {
   isCloudAuthed,
   fetchHealth,
@@ -99,6 +101,7 @@ export default function AgentXTUI(): React.ReactNode {
   const [shellResult, setShellResult] = useState<ShellResult | null>(null);
   const [modelPickerOpen, setModelPickerOpen] = useState(false);
   const [selectedProvider, setSelectedProvider] = useState<string | null>(null);
+  const [logTaskId, setLogTaskId] = useState<string | null>(null);
 
   // ─── Task overlay state ────
   const [taskSubView, setTaskSubView] = useState<TaskSubView>('list');
@@ -117,6 +120,7 @@ export default function AgentXTUI(): React.ReactNode {
   const [streaming, setStreaming] = useState(false);
   const [streamText, setStreamText] = useState('');
   const [streamMeta, setStreamMeta] = useState<ChatMeta | null>(null);
+  const [chatReconnecting, setChatReconnecting] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [inputHistory, setInputHistory] = useState<string[]>([]);
 
@@ -213,8 +217,12 @@ export default function AgentXTUI(): React.ReactNode {
             history,
             { provider: selectedProvider ?? undefined },
             {
-              onChunk: (chunk) => setStreamText((prev) => prev + chunk),
+              onChunk: (chunk) => {
+                setChatReconnecting(false);
+                setStreamText((prev) => prev + chunk);
+              },
               onComplete: (m) => setStreamMeta(m),
+              onReconnect: () => setChatReconnecting(true),
             },
           );
           setMessages(history);
@@ -365,6 +373,16 @@ export default function AgentXTUI(): React.ReactNode {
         })();
         return;
       }
+      if (cmd === '/logs' || cmd === '/l') {
+        const rawId = rest.join(' ').replace(/^["']|["']$/g, '');
+        const targetId = rawId || tasks[0]?.id;
+        if (!targetId) {
+          setNotice('Tidak ada task. Gunakan: /logs <taskId>');
+          return;
+        }
+        setLogTaskId(targetId);
+        return;
+      }
       if (cmd === '/logout') {
         saveCloudConfig({ apiToken: undefined });
         setAuthenticated(false);
@@ -405,11 +423,8 @@ export default function AgentXTUI(): React.ReactNode {
           if (key.escape) exit();
           return;
         }
-        // Shell modal: Enter or Esc closes
-        if (shellResult) {
-          if (key.return || key.escape) setShellResult(null);
-          return;
-        }
+        // Full-screen overlays own the keyboard.
+        if (shellResult || logTaskId || modelPickerOpen) return;
         if (overlay === 'none') {
           if (key.escape) exit();
           return;
@@ -450,7 +465,12 @@ export default function AgentXTUI(): React.ReactNode {
 
   // Shell output modal takes the full screen (ephemeral, Antigravity-style).
   if (shellResult) {
-    return <ShellModal result={shellResult} />;
+    return <ShellModal result={shellResult} onClose={() => setShellResult(null)} />;
+  }
+
+  // Live task log tail (SSE).
+  if (logTaskId) {
+    return <LogTail taskId={logTaskId} onClose={() => setLogTaskId(null)} />;
   }
 
   // Model picker modal.
@@ -474,10 +494,10 @@ export default function AgentXTUI(): React.ReactNode {
       {/* Header — one line, minimal chrome */}
       <Box justifyContent="space-between">
         <Box flexDirection="row" gap={2}>
-          <Text bold color="cyan">
+          <Text bold color={c('cyan')}>
             ◆ AgentX
           </Text>
-          <Text color="magenta">⚡ {selectedProvider ?? 'auto'}</Text>
+          <Text color={c('magenta')}>⚡ {selectedProvider ?? 'auto'}</Text>
         </Box>
         <Text dimColor>
           {email ?? ''}
@@ -568,12 +588,12 @@ export default function AgentXTUI(): React.ReactNode {
       {/* Notice / error line */}
       {notice && !overlayOpen && !shellResult && (
         <Box paddingX={1} paddingTop={1}>
-          <Text color="green">✓ {notice}</Text>
+          <Text color={c('green')}>✓ {notice}</Text>
         </Box>
       )}
       {lastError && !overlayOpen && !shellResult && (
         <Box paddingX={1} paddingTop={1}>
-          <Text color="red">⚠ {lastError}</Text>
+          <Text color={c('red')}>⚠ {lastError}</Text>
         </Box>
       )}
 
@@ -586,6 +606,7 @@ export default function AgentXTUI(): React.ReactNode {
           cost={cost?.totalCost ?? 0}
           healthStatus={healthOk ? 'ok' : 'error'}
           streaming={streaming}
+          reconnecting={chatReconnecting}
           provider={selectedProvider ?? 'auto'}
         />
       </Box>

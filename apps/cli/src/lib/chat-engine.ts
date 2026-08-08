@@ -40,6 +40,8 @@ export interface ChatStreamHandlers {
   onStart?: (provider: string | undefined, model: string | undefined) => void;
   onChunk?: (text: string) => void;
   onComplete?: (meta: ChatMeta) => void;
+  /** Fired when the SSE connection drops and a reconnect attempt starts. */
+  onReconnect?: () => void;
 }
 
 // ─── Session persistence ────
@@ -63,6 +65,11 @@ export function saveChatSession(messages: ChatMessage[]): void {
  * Send the message history and stream the assistant reply.
  * On success the assistant message is appended to `messages`.
  * Returns response metadata (provider/model/cost/latency).
+ *
+ * Resilience: if the SSE connection drops before `complete`, reconnects to
+ * GET /v1/agentx/chat/:id/events (server replays buffered history, then live)
+ * with exponential backoff (2s/4s/8s, max 3 attempts). Replayed chunks are
+ * deduped by count so the rendered text never duplicates.
  */
 export async function streamChat(
   messages: ChatMessage[],
@@ -75,69 +82,89 @@ export async function streamChat(
   });
 
   const { chatId } = res;
-  const sseRes = await cloudSSE(`/v1/agentx/chat/${chatId}/events`);
-
+  const MAX_RECONNECTS = 3;
   let responseText = '';
-  const meta: ChatMeta = {};
-  let completed = false;
+  let renderedChunks = 0;
 
-  const reader = sseRes.body!.getReader();
-  const decoder = new TextDecoder();
-  let buffer = '';
+  for (let attempt = 0; ; attempt += 1) {
+    const meta: ChatMeta = {};
+    let completed = false;
+    let skipReplay = attempt === 0 ? 0 : renderedChunks;
 
-  try {
-    for (;;) {
-      const { done, value } = await reader.read();
-      if (done || completed) break;
-      buffer += decoder.decode(value, { stream: true });
+    const sseRes = await cloudSSE(`/v1/agentx/chat/${chatId}/events`);
+    const reader = sseRes.body!.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
 
-      const lines = buffer.split('\n');
-      buffer = lines.pop() ?? '';
-
-      for (const line of lines) {
-        if (!line.startsWith('data: ')) continue;
-        const raw = line.slice(6).trim();
-        if (!raw) continue;
-
-        let event: ChatStreamEvent;
-        try {
-          event = JSON.parse(raw) as ChatStreamEvent;
-        } catch {
-          continue;
-        }
-
-        if (event.type === 'start') {
-          meta.provider = event.provider;
-          meta.model = event.model;
-          handlers.onStart?.(event.provider, event.model);
-        } else if (event.type === 'chunk' && event.text) {
-          responseText += event.text;
-          handlers.onChunk?.(event.text);
-        } else if (event.type === 'complete') {
-          meta.cost = event.cost;
-          meta.latencyMs = event.latencyMs;
-          meta.usage = event.usage;
-          completed = true;
-          handlers.onComplete?.(meta);
-        } else if (event.type === 'error') {
-          completed = true;
-          throw new Error(event.error ?? 'Chat failed');
-        }
-      }
-      if (completed) break;
-    }
-  } finally {
     try {
-      await reader.cancel();
-    } catch {
-      /* ignore */
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done || completed) break;
+        buffer += decoder.decode(value, { stream: true });
+
+        const lines = buffer.split('\n');
+        buffer = lines.pop() ?? '';
+
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue;
+          const raw = line.slice(6).trim();
+          if (!raw) continue;
+
+          let event: ChatStreamEvent;
+          try {
+            event = JSON.parse(raw) as ChatStreamEvent;
+          } catch {
+            continue;
+          }
+
+          if (event.type === 'start') {
+            meta.provider = event.provider;
+            meta.model = event.model;
+            handlers.onStart?.(event.provider, event.model);
+          } else if (event.type === 'chunk' && event.text) {
+            if (skipReplay > 0) {
+              skipReplay -= 1;
+              continue;
+            }
+            responseText += event.text;
+            renderedChunks += 1;
+            handlers.onChunk?.(event.text);
+          } else if (event.type === 'complete') {
+            meta.cost = event.cost;
+            meta.latencyMs = event.latencyMs;
+            meta.usage = event.usage;
+            completed = true;
+            handlers.onComplete?.(meta);
+          } else if (event.type === 'error') {
+            completed = true;
+            throw new Error(event.error ?? 'Chat failed');
+          }
+        }
+        if (completed) break;
+      }
+    } finally {
+      try {
+        await reader.cancel();
+      } catch {
+        /* ignore */
+      }
     }
-  }
 
-  if (!completed && !responseText) {
-    throw new Error('Chat stream ended without response');
-  }
+    if (completed) {
+      messages.push({ role: 'assistant', content: responseText });
+      return meta;
+    }
 
-  messages.push({ role: 'assistant', content: responseText });
-  return meta;
+    // Connection dropped before completion → reconnect with backoff.
+    if (attempt >= MAX_RECONNECTS) {
+      throw new Error(
+        `Koneksi chat terputus setelah ${MAX_RECONNECTS + 1} percobaan — ${
+          responseText ? 'jawaban sebagian' : 'tanpa respons'
+        }`,
+      );
+    }
+    handlers.onReconnect?.();
+    const delayMs = Math.min(2000 * 2 ** attempt, 8000);
+    await new Promise((resolve) => setTimeout(resolve, delayMs));
+  }
 }

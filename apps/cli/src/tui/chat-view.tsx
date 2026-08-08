@@ -11,6 +11,7 @@ import React, { useState } from 'react';
 import { Box, Text, useInput } from 'ink';
 import TextInput from 'ink-text-input';
 import type { ChatMessage, ChatMeta } from './types.js';
+import { c } from './theme.js';
 
 interface ChatViewProps {
   messages: ChatMessage[];
@@ -124,19 +125,19 @@ export function ChatView({
         {display.map((m, idx) =>
           m.role === 'user' ? (
             <Box key={`u-${messages.length - idx}`} marginBottom={1} marginTop={1}>
-              <Text bold color="cyanBright">
+              <Text bold color={c('cyanBright')}>
                 you ▸{' '}
               </Text>
               <Text>{m.content}</Text>
             </Box>
           ) : (
             <Box key={`a-${messages.length - idx}`} marginBottom={1} flexDirection="column">
-              <Text bold color="magenta">
+              <Text bold color={c('magenta')}>
                 agent ✦{' '}
               </Text>
               <Text>
                 {renderRich(m.content)}
-                {m.live && !streaming ? <Text color="green">▊</Text> : null}
+                {m.live && !streaming ? <Text color={c('green')}>▊</Text> : null}
               </Text>
               {m.live && streaming ? <Text dimColor>…</Text> : null}
             </Box>
@@ -150,9 +151,9 @@ export function ChatView({
         paddingX={1}
         paddingTop={1}
         borderStyle="single"
-        borderColor={shellMode ? 'red' : 'gray'}
+        borderColor={c(shellMode ? 'red' : 'gray')}
       >
-        <Text bold color={shellMode ? 'red' : 'green'}>
+        <Text bold color={c(shellMode ? 'red' : 'green')}>
           {prefix}{' '}
         </Text>
         <TextInput

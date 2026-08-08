@@ -46,6 +46,13 @@ export function HelpPanel(): React.ReactNode {
         <Text>
           {' '}
           <Text bold color="green">
+            /logs [taskId]
+          </Text>{' '}
+          Live tail event task (SSE, auto-reconnect)
+        </Text>
+        <Text>
+          {' '}
+          <Text bold color="green">
             /model
           </Text>{' '}
           Pilih provider LLM (↑↓ Enter Esc)

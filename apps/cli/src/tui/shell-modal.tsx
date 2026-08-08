@@ -5,7 +5,7 @@
  * command, exit status, and captured output. Esc / Enter closes it.
  */
 import React from 'react';
-import { Box, Text } from 'ink';
+import { Box, Text, useInput } from 'ink';
 
 export interface ShellResult {
   command: string;
@@ -17,10 +17,16 @@ export interface ShellResult {
 
 interface ShellModalProps {
   result: ShellResult;
+  onClose: () => void;
 }
 
-export function ShellModal({ result }: ShellModalProps): React.ReactNode {
+export function ShellModal({ result, onClose }: ShellModalProps): React.ReactNode {
   const ok = result.exitCode === 0;
+
+  useInput((_input, key) => {
+    if (key.return || key.escape) onClose();
+  });
+
   return (
     <Box flexDirection="column" padding={1} borderStyle="round" borderColor={ok ? 'cyan' : 'red'}>
       <Box justifyContent="space-between">
