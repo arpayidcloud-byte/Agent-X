@@ -11,7 +11,7 @@ import React, { useState } from 'react';
 import { Box, Text, useInput } from 'ink';
 import TextInput from 'ink-text-input';
 import type { ChatMessage, ChatMeta, TaskItem } from './types.js';
-import { c } from './theme.js';
+import { c, palette } from './theme.js';
 import { WarpBlock } from './warp-block.js';
 import { WarpTaskCard } from './warp-task-card.js';
 
@@ -173,12 +173,12 @@ export function ChatView({
         {!streaming && streamMeta && lastLive ? <MetaLine meta={streamMeta} /> : null}
       </Box>
 
-      {/* Input line */}
+      {/* Input line — Warp style: rounded + ⌘K palette hint */}
       <Box
         paddingX={1}
         paddingTop={1}
-        borderStyle="single"
-        borderColor={c(shellMode ? 'red' : 'gray')}
+        borderStyle="round"
+        borderColor={c(shellMode ? 'red' : palette.borderPassive)}
       >
         <Text bold color={c(shellMode ? 'red' : 'green')}>
           {prefix}{' '}
@@ -192,7 +192,7 @@ export function ChatView({
               ? '…sedang mengetik (tunggu selesai)'
               : shellMode
                 ? 'perintah shell — mis. ls -la'
-                : 'pesan — /help · ! untuk shell'
+                : 'ketik perintah atau tanya AI…                             ⌘K palette'
           }
         />
       </Box>
