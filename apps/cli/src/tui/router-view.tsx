@@ -2,7 +2,7 @@
  * RouterView — visual task-type → model routing map (Command Deck v2 §6).
  *
  * Renders a simple box diagram: TASK TYPES → [auto router] → active providers
- * with their models. Data comes from the real /v1/admin/llm-providers fetch.
+ * with their models. Data comes from the real /v1/agentx/providers fetch.
  */
 import React from 'react';
 import { Box, Text } from 'ink';

@@ -159,7 +159,7 @@ export async function providersList(): Promise<void> {
   try {
     const res = await cloudFetch<{
       providers: Array<{ id: string; name: string; healthy: boolean; models?: string[] }>;
-    }>('/v1/admin/llm-providers');
+    }>('/v1/agentx/providers');
 
     if (res.providers.length === 0) {
       console.log('No providers configured.');
@@ -178,7 +178,7 @@ export async function providersList(): Promise<void> {
   } catch (err) {
     const status = (err as Error & { status?: number }).status;
     if (status === 403) {
-      throw new Error('Admin access required to list providers.');
+      throw new Error('Forbidden — check your account role.');
     }
     throw new Error(`Failed to list providers: ${(err as Error).message}`);
   }

@@ -14,6 +14,7 @@
 import os from 'node:os';
 import type { Express } from 'express';
 import { llmMetrics } from '@agent-xai/observability';
+import { listProviders } from './llm-provider-store.js';
 import { taskStore } from './agentx-server.js';
 import { getTaskEventHistory, type TaskStreamEvent } from './task-stream.js';
 import { getMultiAgentEventHistory, type MultiAgentStreamEvent } from './multi-agent-stream.js';
@@ -155,6 +156,26 @@ function agentsFromRuns(): DeckAgent[] {
 }
 
 export function registerDeckRoutes(app: Express): void {
+  // Public provider list (no admin required) — active providers + model ids.
+  // The CLI TUI / ModelPicker / RouterView need this; /v1/admin/llm-providers
+  // stays admin-only (full config incl. baseUrl/masked keys).
+  app.get('/v1/agentx/providers', async (_req, res) => {
+    try {
+      const rows = await listProviders();
+      res.json({
+        providers: rows.map((r) => ({
+          id: r.name,
+          name: r.name,
+          isActive: r.enabled,
+          healthy: r.enabled,
+          models: (r.models ?? []).map((m) => m.id),
+        })),
+      });
+    } catch (e) {
+      res.status(500).json({ error: e instanceof Error ? e.message : String(e) });
+    }
+  });
+
   app.get('/v1/agentx/deck', async (_req, res) => {
     try {
       // Most recent task (any status) — the TASK panel focus.
