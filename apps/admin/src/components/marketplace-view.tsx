@@ -12,6 +12,7 @@ import {
   Star,
   Download,
   Search,
+  Sparkles,
 } from 'lucide-react';
 
 interface AgentTemplate {
@@ -219,18 +220,19 @@ export default function MarketplaceView() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-lg font-semibold text-slate-100">Marketplace</h1>
-          <p className="mt-1 text-sm text-slate-500">
+          <div className="flex items-center gap-2"><span className="flex h-7 w-7 items-center justify-center rounded-xl bg-accent-500/10 ring-1 ring-accent-500/20"><Store className="h-3.5 w-3.5 text-accent-300" strokeWidth={1.8} /></span><h1 className="text-xl font-bold tracking-tight text-white">Marketplace</h1></div>
+          <p className="mt-1.5 text-sm leading-relaxed text-slate-400">
             {templates.length} agent template{templates.length !== 1 ? 's' : ''} · Browse, create,
             manage
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex items-center gap-2">
+          <span className="hidden items-center gap-1.5 rounded-full border border-white/[0.06] bg-surface-2/60 px-3 py-1.5 text-xs text-slate-500 sm:flex"><Sparkles className="h-3 w-3 text-accent-300" /> Obsidian Warp</span>
           <button
             type="button"
             onClick={() => void load()}
             disabled={loading}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-white/[0.06] bg-surface-2/60 px-3 py-1.5 text-xs text-slate-400 transition-colors hover:border-white/[0.1] hover:text-slate-200 disabled:opacity-50"
+            className="inline-flex items-center gap-1.5 rounded-xl border border-white/[0.06] bg-surface-2/60 px-3 py-1.5 text-xs font-medium text-slate-300 transition-colors hover:bg-surface-3 hover:text-white disabled:opacity-50"
           >
             <RefreshCw className={`h-3 w-3 ${loading ? 'animate-spin' : ''}`} />
             Refresh
@@ -242,7 +244,7 @@ export default function MarketplaceView() {
               setForm(EMPTY_FORM);
               setShowForm(true);
             }}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-accent-500 px-3 py-1.5 text-xs font-medium text-white transition-all hover:bg-accent-400"
+            className="inline-flex items-center gap-1.5 rounded-xl bg-accent-500 px-3.5 py-1.5 text-xs font-semibold text-white shadow-[0_2px_10px_rgba(79,70,229,0.35)] transition-colors hover:bg-accent-400"
           >
             <Plus className="h-3 w-3" />
             New Template
@@ -261,7 +263,7 @@ export default function MarketplaceView() {
       {showForm && (
         <form
           onSubmit={(e) => void handleSubmit(e)}
-          className="glass-card rounded-xl p-5 space-y-4"
+          className="glass-card rounded-2xl p-5 space-y-4 ring-1 ring-white/[0.04]"
         >
           <div className="flex items-center justify-between">
             <h3 className="text-sm font-semibold text-slate-200">
@@ -417,7 +419,7 @@ export default function MarketplaceView() {
 
       {/* Empty */}
       {!loading && filtered.length === 0 && (
-        <div className="glass-card rounded-xl p-8 text-center">
+        <div className="glass-card rounded-2xl p-8 text-center ring-1 ring-white/[0.04]">
           <Store className="mx-auto h-8 w-8 text-slate-600" />
           <p className="mt-3 text-sm text-slate-500">
             {templates.length === 0
@@ -433,12 +435,12 @@ export default function MarketplaceView() {
           {filtered.map((t) => (
             <div
               key={t.id}
-              className="glass-card rounded-xl p-4 transition-all hover:border-white/[0.08]"
+              className="glass-card group relative overflow-hidden rounded-2xl p-4 transition-all hover:border-white/[0.08]"
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
-                    <h3 className="text-sm font-semibold text-slate-200">{t.name}</h3>
+                    <h3 className="text-sm font-semibold tracking-tight text-white">{t.name}</h3>
                     {t.isPublished ? (
                       <span className="rounded bg-emerald-500/15 px-1.5 py-0.5 text-[10px] text-emerald-400">
                         Live
