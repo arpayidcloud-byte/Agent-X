@@ -46,11 +46,11 @@ const NAV_ITEMS = [
 function Brand() {
   return (
     <Link href="/" className="flex items-center gap-2.5 px-5 py-5">
-      <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-accent-400 to-secondary-500 text-slate-950 shadow-soft">
+      <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-gradient-to-br from-accent-500 to-secondary-500 text-white shadow-[0_0_20px_-5px_rgba(99,102,241,0.45)]">
         <ShieldCheck className="h-4.5 w-4.5" strokeWidth={2} aria-hidden />
       </span>
-      <span className="text-[15px] font-semibold tracking-tight text-slate-100">
-        AgentX<span className="text-accent-400"> Panel</span>
+      <span className="text-[15px] font-semibold tracking-tight text-white">
+        AgentX<span className="text-accent-300"> Panel</span>
       </span>
     </Link>
   );
@@ -58,7 +58,7 @@ function Brand() {
 
 function NavLinks({ pathname, onNavigate }: { pathname: string; onNavigate?: () => void }) {
   return (
-    <nav className="flex flex-col gap-0.5 px-2">
+    <nav className="flex flex-col gap-1 px-2">
       {NAV_ITEMS.map((item) => {
         const active = item.href === '/' ? pathname === '/' : pathname.startsWith(item.href);
         const Icon = item.icon;
@@ -68,14 +68,14 @@ function NavLinks({ pathname, onNavigate }: { pathname: string; onNavigate?: () 
             href={item.href}
             onClick={onNavigate}
             aria-current={active ? 'page' : undefined}
-            className={`flex items-center gap-3 rounded-lg px-3 py-2 text-[13px] font-medium transition-colors ${
+            className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-[13px] font-medium transition-all duration-150 ${
               active
-                ? 'bg-surface-2 text-white'
-                : 'text-slate-400 hover:bg-surface-2/60 hover:text-slate-200'
+                ? 'bg-surface-2 text-white shadow-sm'
+                : 'text-slate-400 hover:bg-white/[0.03] hover:text-slate-200'
             }`}
           >
             <Icon
-              className={`h-4 w-4 shrink-0 ${active ? 'text-accent-400' : 'text-slate-500'}`}
+              className={`h-4 w-4 shrink-0 ${active ? 'text-accent-300' : 'text-slate-500'}`}
               strokeWidth={1.8}
               aria-hidden
             />
@@ -90,16 +90,16 @@ function NavLinks({ pathname, onNavigate }: { pathname: string; onNavigate?: () 
 function UserFooter({ user, onLogout }: { user: AuthUser | null; onLogout: () => void }) {
   if (!user) {
     return (
-      <div className="mt-auto border-t border-surface-3 px-5 py-4 text-xs text-slate-500">
+      <div className="mt-auto border-t border-white/[0.04] px-5 py-4 text-xs text-slate-500">
         Signed out
       </div>
     );
   }
   return (
-    <div className="mt-auto border-t border-surface-3 px-5 py-4">
+    <div className="mt-auto border-t border-white/[0.04] px-5 py-4">
       <div className="flex items-center justify-between gap-2">
         <div className="min-w-0">
-          <p className="truncate text-xs font-medium text-slate-300">{user.email}</p>
+          <p className="truncate text-xs font-medium text-slate-200">{user.email}</p>
           <p className="text-[11px] text-slate-500">
             {isAdminUser(user) ? 'Administrator' : 'No admin access'}
           </p>
@@ -108,7 +108,7 @@ function UserFooter({ user, onLogout }: { user: AuthUser | null; onLogout: () =>
           type="button"
           onClick={onLogout}
           aria-label="Sign out"
-          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-slate-400 transition-colors hover:bg-surface-2 hover:text-slate-200"
+          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-slate-500 transition-colors hover:bg-surface-2 hover:text-slate-200"
         >
           <LogOut className="h-3.5 w-3.5" strokeWidth={1.8} aria-hidden />
         </button>
@@ -176,11 +176,11 @@ export default function PanelShell({ children }: { children: React.ReactNode }) 
         <main className="min-h-screen">{children}</main>
       ) : (
         <>
-          <aside className="fixed inset-y-0 left-0 z-40 hidden w-60 border-r border-surface-3 bg-surface-1/70 backdrop-blur lg:flex lg:flex-col">
+          <aside className="fixed inset-y-0 left-0 z-40 hidden w-60 border-r border-white/[0.04] bg-surface-1/80 backdrop-blur-xl lg:flex lg:flex-col">
             {sidebar}
           </aside>
 
-          <header className="fixed inset-x-0 top-0 z-40 flex h-13 items-center gap-3 border-b border-surface-3 bg-surface-0/80 px-3 backdrop-blur lg:hidden">
+          <header className="fixed inset-x-0 top-0 z-40 flex h-13 items-center gap-3 border-b border-white/[0.04] bg-surface-0/80 px-3 backdrop-blur-xl lg:hidden">
             <button
               type="button"
               aria-label="Open navigation"
@@ -189,8 +189,8 @@ export default function PanelShell({ children }: { children: React.ReactNode }) 
             >
               <Menu className="h-5 w-5" strokeWidth={1.8} aria-hidden />
             </button>
-            <span className="text-sm font-semibold text-slate-200">
-              AgentX<span className="text-accent-400"> Panel</span>
+            <span className="text-sm font-semibold text-white">
+              AgentX<span className="text-accent-300"> Panel</span>
             </span>
           </header>
 
@@ -201,7 +201,7 @@ export default function PanelShell({ children }: { children: React.ReactNode }) 
                 onClick={() => setDrawerOpen(false)}
                 aria-hidden
               />
-              <aside className="absolute inset-y-0 left-0 flex w-64 flex-col border-r border-surface-3 bg-surface-1 shadow-2xl">
+              <aside className="absolute inset-y-0 left-0 flex w-64 flex-col border-r border-white/[0.04] bg-surface-1 shadow-2xl animate-slide-in-left">
                 <div className="flex items-center justify-between pr-3">
                   <Brand />
                   <button
