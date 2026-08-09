@@ -10,20 +10,23 @@ interface FlowFooterProps {
   hint?: string;
 }
 
-/** Ambient footer — only shows live count when something is running, otherwise a subtle hint. */
+/** Footer plek mock: ─ ▸ N running · tasks:N ▁ · Tab expand · / palette · q quit */
 export function FlowFooter({ running, total, activity, hint }: FlowFooterProps): React.ReactNode {
   return (
-    <Box justifyContent="space-between">
-      <Box flexDirection="row" gap={2}>
-        {running > 0 ? (
-          <Text color={c(palette.accent)}>▸ {running} running</Text>
-        ) : (
-          <Text dimColor>idle</Text>
-        )}
-        <Text dimColor>tasks:{total}</Text>
-        <Sparkline data={activity} color={palette.accent} />
+    <Box flexDirection="column" gap={1}>
+      <Text dimColor>{'─'.repeat(48)}</Text>
+      <Box justifyContent="space-between">
+        <Box flexDirection="row" gap={2}>
+          {running > 0 ? (
+            <Text color={c(palette.accent)}>▸ {running} running</Text>
+          ) : (
+            <Text dimColor>idle</Text>
+          )}
+          <Text dimColor>tasks:{total}</Text>
+          <Sparkline data={activity} color={palette.accent} />
+        </Box>
+        <Text dimColor>{hint ?? 'Tab expand · / palette · q quit'}</Text>
       </Box>
-      <Text dimColor>{hint ?? 'Tab expand · / commands · q quit'}</Text>
     </Box>
   );
 }

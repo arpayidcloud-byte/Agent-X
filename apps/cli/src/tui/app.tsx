@@ -661,7 +661,7 @@ export default function AgentXTUI(): React.ReactNode {
           running={tasks.filter((t) => t.status === 'running' || t.status === 'pending').length}
           total={tasks.length}
           activity={taskHistory}
-          hint={streaming || chatReconnecting ? 'streaming…' : ' / commands · q quit'}
+          hint={streaming || chatReconnecting ? 'streaming…' : 'Tab expand · / palette · q quit'}
         />
       </Box>
     </Box>
