@@ -14,6 +14,8 @@ import {
   Trash2,
   X,
   XCircle,
+  Sparkles,
+  Boxes,
 } from 'lucide-react';
 import {
   adminListGroups,
@@ -200,18 +202,19 @@ export default function GroupsView() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-lg font-semibold text-slate-100">Combo Providers</h1>
-          <p className="mt-0.5 max-w-xl text-xs leading-relaxed text-slate-500">
+          <div className="flex items-center gap-2"><span className="flex h-7 w-7 items-center justify-center rounded-xl bg-accent-500/10 ring-1 ring-accent-500/20"><Boxes className="h-3.5 w-3.5 text-accent-300" strokeWidth={1.8} /></span><h1 className="text-xl font-bold tracking-tight text-white">Combo Providers</h1></div>
+          <p className="mt-1.5 max-w-xl text-sm leading-relaxed text-slate-400">
             Gabungan beberapa provider dalam satu nama — dipakai di CLI/web sebagai{' '}
             <code className="text-slate-400">provider</code>. Server otomatis memilih member sesuai
             strategi &amp; failover ke member berikutnya saat gagal (5xx/429/timeout).
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <span className="hidden items-center gap-1.5 rounded-full border border-white/[0.06] bg-surface-2/60 px-3 py-1.5 text-xs text-slate-500 sm:flex"><Sparkles className="h-3 w-3 text-accent-300" /> Obsidian Warp</span>
           <button
             type="button"
             onClick={refresh}
-            className="flex items-center gap-1.5 rounded-lg border border-surface-3 px-3 py-1.5 text-xs font-medium text-slate-300 transition-colors hover:bg-surface-2"
+            className="flex items-center gap-1.5 rounded-xl border border-white/[0.06] bg-surface-2/60 px-3 py-1.5 text-xs font-medium text-slate-300 transition-colors hover:bg-surface-3 hover:text-white"
           >
             <RefreshCw className="h-3.5 w-3.5" strokeWidth={1.8} aria-hidden />
             Refresh
@@ -219,7 +222,7 @@ export default function GroupsView() {
           <button
             type="button"
             onClick={openCreate}
-            className="flex items-center gap-1.5 rounded-lg bg-accent-500 px-3 py-1.5 text-xs font-semibold text-slate-950 transition-colors hover:bg-accent-400"
+            className="flex items-center gap-1.5 rounded-xl bg-accent-500 px-3.5 py-1.5 text-xs font-semibold text-white shadow-[0_2px_10px_rgba(79,70,229,0.35)] transition-colors hover:bg-accent-400"
           >
             <Plus className="h-3.5 w-3.5" strokeWidth={2.2} aria-hidden />
             Add combo
@@ -234,11 +237,11 @@ export default function GroupsView() {
       )}
 
       {loading ? (
-        <div className="flex items-center justify-center rounded-xl border border-surface-3 bg-surface-1 py-16">
+        <div className="glass-card flex items-center justify-center rounded-2xl py-16">
           <Loader2 className="h-5 w-5 animate-spin text-accent-400" aria-hidden />
         </div>
       ) : groups.length === 0 ? (
-        <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-surface-3 bg-surface-1 py-16 text-center">
+        <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-white/[0.06] bg-surface-1/50 py-16 text-center">
           <Layers className="mb-3 h-8 w-8 text-slate-600" strokeWidth={1.5} aria-hidden />
           <p className="text-sm text-slate-400">Belum ada combo provider.</p>
           <p className="mt-1 max-w-sm text-xs text-slate-600">
@@ -247,20 +250,20 @@ export default function GroupsView() {
           </p>
         </div>
       ) : (
-        <div className="space-y-3">
+        <div className="grid gap-4 md:grid-cols-2">
           {groups.map((g) => {
             const test = testResult[g.name];
             return (
               <div
                 key={g.name}
-                className={`rounded-xl border border-surface-3 bg-surface-1 p-4 shadow-soft transition-opacity ${
+                className={`glass-card rounded-2xl p-4 transition-all hover:border-white/[0.08] ${
                   g.enabled ? '' : 'opacity-60'
                 }`}
               >
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
-                      <h3 className="font-mono text-sm font-semibold text-slate-100">{g.name}</h3>
+                      <h3 className="font-mono text-sm font-semibold tracking-tight text-white">{g.name}</h3>
                       <span className="flex items-center gap-1 rounded-full bg-surface-3 px-2 py-0.5 text-[10px] font-medium text-slate-400">
                         <GitBranch className="h-3 w-3" aria-hidden />
                         {STRATEGY_LABEL[g.strategy] ?? g.strategy}
