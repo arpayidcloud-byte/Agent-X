@@ -53,7 +53,7 @@ function isActive(item: NavItem, pathname: string): boolean {
 }
 
 /* ─── Sidebar nav links ──────────────────────────────────────── */
-
+/* ─── Sidebar nav links ──────────────────────────────────────── */
 function NavLinks({ pathname, onNavigate }: { pathname: string; onNavigate?: () => void }) {
   const seenGroups = new Set<string>();
 
@@ -69,7 +69,7 @@ function NavLinks({ pathname, onNavigate }: { pathname: string; onNavigate?: () 
         return (
           <div key={item.href}>
             {showGroup && (
-              <p className="mt-4 mb-1.5 px-3 text-[10px] font-semibold uppercase tracking-widest text-slate-600">
+              <p className="mt-4 mb-1.5 px-3 text-[10px] font-semibold uppercase tracking-widest text-slate-500">
                 {GROUP_LABELS[item.group]}
               </p>
             )}
@@ -77,13 +77,12 @@ function NavLinks({ pathname, onNavigate }: { pathname: string; onNavigate?: () 
               href={item.href}
               onClick={onNavigate}
               aria-current={active ? 'page' : undefined}
-              className={`group relative flex items-center gap-3 rounded-lg px-3 py-2 text-[13px] font-medium transition-all duration-150 ${
+              className={`group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-[13px] font-medium transition-all duration-150 ${
                 active
-                  ? 'bg-surface-2 text-white'
+                  ? 'bg-surface-2 text-white shadow-sm'
                   : 'text-slate-400 hover:bg-white/[0.03] hover:text-slate-200'
               }`}
             >
-              {/* Active indicator — indigo gradient bar */}
               {active && (
                 <div className="absolute left-0 top-1 bottom-1 w-0.5 rounded-r-full bg-gradient-to-b from-accent-400 to-secondary-400" />
               )}
@@ -91,7 +90,7 @@ function NavLinks({ pathname, onNavigate }: { pathname: string; onNavigate?: () 
                 className={`h-4 w-4 shrink-0 transition-colors duration-150 ${
                   active ? 'text-accent-300' : 'text-slate-500 group-hover:text-slate-300'
                 }`}
-                strokeWidth={1.8}
+                strokeWidth={active ? 2 : 1.8}
                 aria-hidden
               />
               {item.label}
