@@ -336,6 +336,11 @@ export default function AgentXTUI(): React.ReactNode {
         void refreshData();
         return;
       }
+      if (cmd === '/dash') {
+        setDashOpen(true);
+        void refreshData();
+        return;
+      }
       if (cmd === '/deck' || cmd === '/d') {
         setOverlay('deck');
         return;
@@ -477,12 +482,12 @@ export default function AgentXTUI(): React.ReactNode {
           return;
         }
         if (dashOpen) {
-          if (key.escape || _input === '\t') setDashOpen(false);
+          if (key.escape || key.tab || _input === '\t') setDashOpen(false);
           return;
         }
         // Full-screen overlays own the keyboard.
         if (shellResult || logTaskId || modelPickerOpen) return;
-        if (overlay === 'none' && _input === '\t') {
+        if (overlay === 'none' && (key.tab || _input === '\t')) {
           setDashOpen(true);
           void refreshData();
           return;
@@ -508,6 +513,7 @@ export default function AgentXTUI(): React.ReactNode {
         authenticated,
         exit,
         overlay,
+        dashOpen,
         taskSubView,
         navigateTask,
         tasks.length,
@@ -691,7 +697,7 @@ export default function AgentXTUI(): React.ReactNode {
           running={tasks.filter((t) => t.status === 'running' || t.status === 'pending').length}
           total={tasks.length}
           activity={taskHistory}
-          hint={streaming || chatReconnecting ? 'streaming…' : 'Tab expand · / palette · q quit'}
+          hint={streaming || chatReconnecting ? 'streaming…' : 'Tab · /dash · / palette · q quit'}
         />
       </Box>
     </Box>
