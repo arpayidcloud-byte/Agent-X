@@ -36,7 +36,16 @@ export interface CostSummary {
 
 /** Chat-first design: the chat view is the main surface; everything else is an overlay. */
 export type OverlayId =
-  'none' | 'tasks' | 'providers' | 'cost' | 'settings' | 'help' | 'router' | 'health' | 'deck';
+  | 'none'
+  | 'tasks'
+  | 'providers'
+  | 'cost'
+  | 'settings'
+  | 'help'
+  | 'router'
+  | 'health'
+  | 'deck'
+  | 'obsidian';
 
 export interface Toast {
   id: number;
