@@ -53,7 +53,6 @@ function isActive(item: NavItem, pathname: string): boolean {
 }
 
 /* ─── Sidebar nav links ──────────────────────────────────────── */
-/* ─── Sidebar nav links ──────────────────────────────────────── */
 function NavLinks({ pathname, onNavigate }: { pathname: string; onNavigate?: () => void }) {
   const seenGroups = new Set<string>();
 
