@@ -650,7 +650,7 @@ export default function AgentXTUI(): React.ReactNode {
             streamMeta={streamMeta}
             history={inputHistory}
             tasks={tasks}
-            onSubmit={(text) => {
+            onSubmit={(text: string) => {
               if (text.startsWith('!')) {
                 handleShell(text.slice(1).trim());
               } else {

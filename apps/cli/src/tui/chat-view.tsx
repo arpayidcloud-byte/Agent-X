@@ -7,7 +7,7 @@
  * - ↑/↓ on an EMPTY draft walks the input history.
  * - Lines starting with `/` are routed to `onCommand`.
  */
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Box, Text, useInput } from 'ink';
 import TextInput from 'ink-text-input';
 import type { ChatMessage, ChatMeta, TaskItem } from './types.js';
@@ -42,6 +42,27 @@ function renderRich(content: string): React.ReactNode[] {
   );
 }
 
+const SLASH_CMDS: Array<{ cmd: string; desc: string }> = [
+  { cmd: '/help', desc: 'bantuan' },
+  { cmd: '/dash', desc: 'Dash overlay 3-panel' },
+  { cmd: '/deck', desc: 'Command Deck' },
+  { cmd: '/obsidian', desc: 'Obsidian dashboard' },
+  { cmd: '/tasks', desc: 'daftar tasks' },
+  { cmd: '/providers', desc: 'LLM providers' },
+  { cmd: '/router', desc: 'router status' },
+  { cmd: '/health', desc: 'health check' },
+  { cmd: '/model', desc: 'ganti provider' },
+  { cmd: '/cost', desc: 'biaya' },
+  { cmd: '/settings', desc: 'pengaturan' },
+  { cmd: '/clear', desc: 'bersihkan chat' },
+  { cmd: '/logout', desc: 'keluar akun' },
+  { cmd: '/quit', desc: 'keluar TUI' },
+  { cmd: '/submit', desc: '/submit <goal> kirim task' },
+  { cmd: '/logs', desc: '/logs <id> tail log' },
+  { cmd: '/shell', desc: '/shell <cmd> jalankan shell' },
+  { cmd: '/btw', desc: '/btw <tanya> cepat' },
+];
+
 function MetaLine({ meta }: { meta: ChatMeta }): React.ReactNode {
   const bits: string[] = [];
   if (meta.provider) bits.push(`⚡ ${meta.provider}${meta.model ? `/${meta.model}` : ''}`);
@@ -68,6 +89,7 @@ export function ChatView({
 }: ChatViewProps): React.ReactNode {
   const [draft, setDraft] = useState('');
   const [histIdx, setHistIdx] = useState(-1);
+  const [slashIdx, setSlashIdx] = useState(0);
 
   // Newest-first, so with column-reverse the latest message pins to the bottom.
   const display: Array<{ role: 'user' | 'assistant'; content: string; live?: boolean }> = [];
@@ -76,13 +98,50 @@ export function ChatView({
   display.reverse();
   const lastLive = display[0]?.live === true;
 
+  const slashOpen = draft.startsWith('/');
+  const slashFilter = draft.slice(1).toLowerCase();
+  const slashList = slashOpen
+    ? SLASH_CMDS.filter((c) => c.cmd.toLowerCase().includes(slashFilter)).slice(0, 8)
+    : [];
+  const slashActive = slashOpen && slashList.length > 0;
+  const clampedIdx = Math.min(slashIdx, Math.max(0, slashList.length - 1));
   const shellMode = draft.startsWith('!');
   const prefix = shellMode ? '!' : '>';
+
+  useEffect(() => {
+    setSlashIdx(0);
+  }, [draft]);
 
   // ↑/↓ walk input history — only on an EMPTY draft (TextInput owns the arrows
   // while there is text, so no conflict).
   useInput(
     (_input, key) => {
+      if (slashActive) {
+        if (key.upArrow) {
+          setSlashIdx((i) => Math.max(0, i - 1));
+          return;
+        }
+        if (key.downArrow) {
+          setSlashIdx((i) => Math.min(slashList.length - 1, i + 1));
+          return;
+        }
+        if (key.tab || key.return) {
+          const pick = slashList[clampedIdx];
+          if (pick) {
+            setDraft('');
+            setSlashIdx(0);
+            setHistIdx(-1);
+            onCommand(pick.cmd);
+          }
+          return;
+        }
+        if (key.escape) {
+          setDraft('');
+          setSlashIdx(0);
+          return;
+        }
+        return;
+      }
       if (streaming) return;
       if (draft !== '') return;
       if (key.upArrow && history.length > 0) {
@@ -100,7 +159,7 @@ export function ChatView({
         }
       }
     },
-    { isActive: !streaming },
+    { isActive: !streaming || slashActive },
   );
 
   const handleSubmit = (value: string): void => {
@@ -172,6 +231,34 @@ export function ChatView({
         )}
         {!streaming && streamMeta && lastLive ? <MetaLine meta={streamMeta} /> : null}
       </Box>
+
+      {/* Slash palette — above input */}
+      {slashActive ? (
+        <Box
+          flexDirection="column"
+          borderStyle="round"
+          borderColor={c(palette.accent)}
+          paddingX={1}
+          marginBottom={1}
+        >
+          <Box justifyContent="space-between">
+            <Text bold color={c(palette.accentBright)}>
+              › palette · {draft || '/'}
+            </Text>
+            <Text dimColor>↑↓ pilih · Tab/Enter pilih · Esc tutup</Text>
+          </Box>
+          {slashList.map((it, i) => (
+            <Text
+              key={it.cmd}
+              color={c(i === clampedIdx ? palette.accentBright : palette.dim)}
+              bold={i === clampedIdx}
+            >
+              {i === clampedIdx ? '▸ ' : '  '}
+              {it.cmd} — {it.desc}
+            </Text>
+          ))}
+        </Box>
+      ) : null}
 
       {/* Input line — Warp style: rounded + ⌘K palette hint */}
       <Box
