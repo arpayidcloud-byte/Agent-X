@@ -38,7 +38,7 @@ export default function LoginForm() {
         return;
       }
       setToken(res.tokens.accessToken);
-      router.replace('/providers');
+      router.replace('/');
     } catch (err) {
       const status = (err as Error & { status?: number }).status;
       const message = err instanceof Error ? err.message : '';
