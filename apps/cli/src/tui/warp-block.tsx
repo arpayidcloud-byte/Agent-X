@@ -15,8 +15,14 @@ interface WarpBlockProps {
  */
 export function WarpBlock({ title, stamp, status, children }: WarpBlockProps): React.ReactNode {
   const glyph = status === 'run' ? '●' : status === 'done' ? '✓' : '○';
-  const color = status === 'run' ? palette.accent : status === 'done' ? palette.ok : palette.dim;
-  const borderColor = status === 'run' ? palette.accent : palette.borderPassive;
+  const color =
+    status === 'run' ? palette.accentBright : status === 'done' ? palette.ok : palette.dim;
+  const borderColor =
+    status === 'run'
+      ? palette.accentBright
+      : status === 'done'
+        ? palette.ok
+        : palette.borderPassive;
   return (
     <Box
       flexDirection="column"

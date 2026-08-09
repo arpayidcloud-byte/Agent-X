@@ -26,6 +26,7 @@ import { CostView } from './cost-view.js';
 import { HelpPanel } from './help-panel.js';
 import { LogTail } from './log-tail.js';
 import { BootScreen } from './boot-screen.js';
+import { DashOverlay } from './dash-overlay.js';
 import { RouterView } from './router-view.js';
 import { HealthView } from './health-view.js';
 import { DeckView } from './deck-view.js';
@@ -106,6 +107,7 @@ export default function AgentXTUI(): React.ReactNode {
 
   // ─── Overlay state ────
   const [overlay, setOverlay] = useState<OverlayId>('none');
+  const [dashOpen, setDashOpen] = useState(false);
   const [shellResult, setShellResult] = useState<ShellResult | null>(null);
   const [modelPickerOpen, setModelPickerOpen] = useState(false);
   const [selectedProvider, setSelectedProvider] = useState<string | null>(null);
@@ -117,6 +119,7 @@ export default function AgentXTUI(): React.ReactNode {
 
   // ─── Data state ────
   const [health, setHealth] = useState<HealthResponse | null>(null);
+  const [deck, setDeck] = useState<any>(null);
   const [tasks, setTasks] = useState<TaskItem[]>([]);
   const [providers, setProviders] = useState<ProviderInfo[]>([]);
   const [cost, setCost] = useState<CostSummary | null>(null);
@@ -163,6 +166,9 @@ export default function AgentXTUI(): React.ReactNode {
       setProviders(p);
       setCost(c);
       setTaskHistory((prev) => [...prev.slice(-19), t.length]);
+      void cloudFetch('/v1/agentx/deck')
+        .then((d: any) => setDeck(d))
+        .catch(() => {});
     } catch (e) {
       const status = (e as Error & { status?: number }).status;
       if (status === 401) {
@@ -470,8 +476,17 @@ export default function AgentXTUI(): React.ReactNode {
           if (key.escape) exit();
           return;
         }
+        if (dashOpen) {
+          if (key.escape || _input === '\t') setDashOpen(false);
+          return;
+        }
         // Full-screen overlays own the keyboard.
         if (shellResult || logTaskId || modelPickerOpen) return;
+        if (overlay === 'none' && _input === '\t') {
+          setDashOpen(true);
+          void refreshData();
+          return;
+        }
         if (overlay === 'none') {
           if (key.escape) exit();
           return;
@@ -514,7 +529,7 @@ export default function AgentXTUI(): React.ReactNode {
     return <AuthScreen onLogin={handleLogin} error={authError} loading={authLoading} />;
   }
 
-  const overlayOpen = overlay !== 'none';
+  const overlayOpen = overlay !== 'none' || dashOpen;
 
   // Shell output modal takes the full screen (ephemeral, Antigravity-style).
   if (shellResult) {
@@ -547,9 +562,17 @@ export default function AgentXTUI(): React.ReactNode {
       {/* Header — Agent-X Platform, no provider */}
       <FlowHeader email={email} healthOk={healthOk} />
 
-      {/* Main surface: chat or overlay */}
+      {/* Main surface: chat or overlay or Dash */}
       <Box flexGrow={1} flexDirection="column">
-        {overlayOpen ? (
+        {dashOpen ? (
+          <DashOverlay
+            deck={deck}
+            loading={loading}
+            version={VERSION}
+            email={email}
+            onClose={() => setDashOpen(false)}
+          />
+        ) : overlayOpen ? (
           <Box flexDirection="column" padding={1} borderStyle="round" borderColor="cyan">
             <Box justifyContent="space-between">
               <Text bold color="cyanBright">
