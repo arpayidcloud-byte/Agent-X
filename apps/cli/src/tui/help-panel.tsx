@@ -60,6 +60,13 @@ export function HelpPanel(): React.ReactNode {
         <Text>
           {' '}
           <Text bold color="green">
+            /obsidian
+          </Text>{' '}
+          (atau /o) — Obsidian dashboard (sidebar + 5 panels, plek referensi)
+        </Text>
+        <Text>
+          {' '}
+          <Text bold color="green">
             /submit &lt;goal&gt;
           </Text>{' '}
           Kirim task langsung dari chat

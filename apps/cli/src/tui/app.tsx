@@ -29,6 +29,7 @@ import { BootScreen } from './boot-screen.js';
 import { RouterView } from './router-view.js';
 import { HealthView } from './health-view.js';
 import { DeckView } from './deck-view.js';
+import { ObsidianDashboard } from './obsidian-dashboard.js';
 import { c, palette } from './theme.js';
 import {
   isCloudAuthed,
@@ -333,6 +334,10 @@ export default function AgentXTUI(): React.ReactNode {
         setOverlay('deck');
         return;
       }
+      if (cmd === '/obsidian' || cmd === '/o') {
+        setOverlay('obsidian');
+        return;
+      }
       if (cmd === '/cost' || cmd === '/c') {
         setOverlay('cost');
         void refreshData();
@@ -556,6 +561,7 @@ export default function AgentXTUI(): React.ReactNode {
                 {overlay === 'router' && '◆ Router'}
                 {overlay === 'health' && '◆ Health'}
                 {overlay === 'deck' && '◆ Command Deck'}
+                {overlay === 'obsidian' && '◆ Obsidian'}
               </Text>
               <Text dimColor>esc: kembali</Text>
             </Box>
@@ -584,6 +590,7 @@ export default function AgentXTUI(): React.ReactNode {
               {overlay === 'router' && <RouterView providers={providers} loading={loading} />}
               {overlay === 'health' && <HealthView health={health} loading={loading} />}
               {overlay === 'deck' && <DeckView />}
+              {overlay === 'obsidian' && <ObsidianDashboard />}
               {overlay === 'settings' && (
                 <Box flexDirection="column" gap={1}>
                   <Text>
