@@ -215,7 +215,13 @@ export async function oauthLogin(
     logger.info('User created via OAuth', { provider, email: profile.email });
   }
   return {
-    user: { id: user.id, email: user.email, roles: user.roles, createdAt: user.createdAt },
+    user: {
+      id: user.id,
+      email: user.email,
+      roles: user.roles,
+      emailVerified: user.emailVerified,
+      createdAt: user.createdAt,
+    },
     tokens: await issueTokens(user),
     created,
   };

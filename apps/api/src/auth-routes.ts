@@ -10,6 +10,8 @@ import {
   resetPasswordWithToken,
   getUserById,
   hasPassword,
+  createEmailVerificationToken,
+  verifyEmailByToken,
   AuthError,
 } from './auth.js';
 import type { AuthenticatedRequest } from './auth.js';
@@ -17,7 +19,7 @@ import { verifyTurnstile } from './turnstile.js';
 import { sendMail } from './mailer.js';
 
 export function registerAuthRoutes(app: Express): void {
-  // ─── Register ────
+  // ─── Register ──── (email verify flow — no auto issueTokens)
   app.post('/v1/auth/register', async (req: Request, res: Response): Promise<void> => {
     try {
       const { email, password, turnstileToken } = req.body ?? {};
@@ -25,11 +27,56 @@ export function registerAuthRoutes(app: Express): void {
         res.status(403).json({ error: 'Human verification failed — please try again.' });
         return;
       }
-      const result = await register(email, password);
-      res.status(201).json(result);
+      await register(email, password);
+      const token = await createEmailVerificationToken(email);
+      const webUrl = process.env.OAUTH_WEB_URL ?? 'http://localhost:30500';
+      const verifyUrl = `${webUrl}/verify-email?token=${encodeURIComponent(token)}`;
+      // Dev: log; prod: email via sendMail (kept non-blocking)
+      await sendMail({
+        to: email.trim().toLowerCase(),
+        subject: 'Verify your AgentX email',
+        text: `Welcome to AgentX!\n\nVerify your email (valid 24h):\n${verifyUrl}\n\nIf this wasn't you, ignore this email.`,
+      }).catch(() => {});
+      res
+        .status(201)
+        .json({ ok: true, message: 'Verification email sent — check your inbox (and spam).' });
     } catch (e) {
       const status = e instanceof Error && 'status' in e ? (e as { status: number }).status : 500;
       res.status(status).json({ error: e instanceof Error ? e.message : String(e) });
+    }
+  });
+
+  // ─── Verify email ────
+  app.post('/v1/auth/verify-email', async (req: Request, res: Response): Promise<void> => {
+    try {
+      const { token } = req.body ?? {};
+      const result = await verifyEmailByToken(token);
+      res.json({ ok: true, email: result.email });
+    } catch (e) {
+      const err = e instanceof AuthError ? e : new AuthError(String(e), 500);
+      res.status(err.status).json({ error: err.message });
+    }
+  });
+
+  app.post('/v1/auth/resend-verification', async (req: Request, res: Response): Promise<void> => {
+    try {
+      const { email } = req.body ?? {};
+      if (!email || typeof email !== 'string') {
+        res.status(400).json({ error: 'Missing field: email' });
+        return;
+      }
+      const token = await createEmailVerificationToken(email);
+      const webUrl = process.env.OAUTH_WEB_URL ?? 'http://localhost:30500';
+      const verifyUrl = `${webUrl}/verify-email?token=${encodeURIComponent(token)}`;
+      await sendMail({
+        to: email.trim().toLowerCase(),
+        subject: 'Verify your AgentX email',
+        text: `Verify your email (valid 24h):\n${verifyUrl}`,
+      }).catch(() => {});
+      res.json({ ok: true });
+    } catch (e) {
+      const err = e instanceof AuthError ? e : new AuthError(String(e), 500);
+      res.status(err.status).json({ error: err.message });
     }
   });
 
