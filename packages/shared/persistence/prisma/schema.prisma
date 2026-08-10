@@ -87,6 +87,17 @@ model User {
   updatedAt    DateTime @updatedAt
 }
 
+// Refresh tokens — persisted so they survive server restarts (replaces in-memory Map).
+model RefreshToken {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  userId    String
+  expiresAt DateTime
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
 // LLM provider connections managed by admins via the web UI
 // (OpenAI-compatible / Anthropic-compatible endpoints). The API key is
 // stored encrypted (AES-256-GCM, see apps/api/src/crypto.ts) — never plain.

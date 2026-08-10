@@ -216,7 +216,7 @@ export async function oauthLogin(
   }
   return {
     user: { id: user.id, email: user.email, roles: user.roles, createdAt: user.createdAt },
-    tokens: issueTokens(user),
+    tokens: await issueTokens(user),
     created,
   };
 }
