@@ -67,4 +67,8 @@ export class PrismaUserRepository {
     const row = await this.prisma.user.update({ where: { id }, data });
     return toRecord(row);
   }
+
+  async updateEmailVerified(id: string, emailVerified: boolean): Promise<void> {
+    await this.prisma.user.update({ where: { id }, data: { emailVerified } });
+  }
 }

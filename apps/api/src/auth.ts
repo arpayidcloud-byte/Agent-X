@@ -2,6 +2,7 @@ import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import { v4 as uuidv4 } from 'uuid';
 import {
+  PrismaEmailVerificationTokenRepository,
   PrismaRefreshTokenRepository,
   PrismaUserRepository,
   dbReady,
@@ -16,6 +17,7 @@ export interface AuthUser {
   id: string;
   email: string;
   roles: string[];
+  emailVerified: boolean;
   createdAt: string;
 }
 
@@ -75,11 +77,16 @@ interface UserBackend {
   updatePassword(id: string, passwordHash: string): Promise<void>;
   deleteUser(id: string): Promise<boolean>;
   updateUserRoles(id: string, roles: string[]): Promise<UserRecord | undefined>;
+  updateEmailVerified(id: string, emailVerified: boolean): Promise<void>;
 }
 
 const memoryUserBackend: UserBackend = {
   async create(record) {
-    const user: UserRecord = { ...record, createdAt: new Date().toISOString() };
+    const user: UserRecord = {
+      ...record,
+      emailVerified: false,
+      createdAt: new Date().toISOString(),
+    };
     userStore.set(user.id, user);
     return user;
   },
@@ -106,6 +113,10 @@ const memoryUserBackend: UserBackend = {
       return user;
     }
     return undefined;
+  },
+  async updateEmailVerified(id, emailVerified) {
+    const user = userStore.get(id);
+    if (user) user.emailVerified = emailVerified;
   },
 };
 
@@ -141,6 +152,9 @@ function prismaUserBackend(prisma: NonNullable<ReturnType<typeof getPrisma>>): U
       } catch {
         return undefined;
       }
+    },
+    async updateEmailVerified(id, emailVerified) {
+      await repo.updateEmailVerified(id, emailVerified);
     },
   };
 }
@@ -218,6 +232,88 @@ function getRefreshTokenBackend(): Promise<RefreshTokenBackend> {
     })();
   }
   return refreshTokenBackendPromise;
+}
+
+// ─── Email-verification token storage (memory fallback, Prisma when DB reachable) ────
+
+interface EmailVerificationTokenBackend {
+  create(record: { email: string; token: string; expiresAt: Date }): Promise<void>;
+  findByToken(
+    token: string,
+  ): Promise<{ email: string; token: string; expiresAt: Date } | undefined>;
+  deleteByToken(token: string): Promise<void>;
+  deleteByEmail(email: string): Promise<void>;
+  deleteExpired(): Promise<void>;
+}
+
+const EMAIL_VERIFICATION_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
+
+const emailVerificationTokenStore = new Map<string, { email: string; expiresAt: Date }>();
+
+const memoryEmailVerificationTokenBackend: EmailVerificationTokenBackend = {
+  async create(record) {
+    emailVerificationTokenStore.set(record.token, {
+      email: record.email,
+      expiresAt: record.expiresAt,
+    });
+  },
+  async findByToken(token) {
+    const entry = emailVerificationTokenStore.get(token);
+    return entry ? { token, ...entry } : undefined;
+  },
+  async deleteByToken(token) {
+    emailVerificationTokenStore.delete(token);
+  },
+  async deleteByEmail(email) {
+    const lower = email.toLowerCase();
+    for (const [k, v] of emailVerificationTokenStore) {
+      if (v.email === lower) emailVerificationTokenStore.delete(k);
+    }
+  },
+  async deleteExpired() {
+    const now = Date.now();
+    for (const [k, v] of emailVerificationTokenStore) {
+      if (v.expiresAt.getTime() <= now) emailVerificationTokenStore.delete(k);
+    }
+  },
+};
+
+function prismaEmailVerificationTokenBackend(
+  prisma: NonNullable<ReturnType<typeof getPrisma>>,
+): EmailVerificationTokenBackend {
+  const repo = new PrismaEmailVerificationTokenRepository(prisma);
+  return {
+    async create(record) {
+      await repo.create(record);
+    },
+    async findByToken(token) {
+      return repo.findByToken(token);
+    },
+    async deleteByToken(token) {
+      await repo.deleteByToken(token);
+    },
+    async deleteByEmail(email) {
+      await repo.deleteByEmail(email);
+    },
+    async deleteExpired() {
+      await repo.deleteExpired();
+    },
+  };
+}
+
+let emailVerificationTokenBackendPromise: Promise<EmailVerificationTokenBackend> | null = null;
+
+function getEmailVerificationTokenBackend(): Promise<EmailVerificationTokenBackend> {
+  if (emailVerificationTokenBackendPromise === null) {
+    emailVerificationTokenBackendPromise = (async () => {
+      if (await dbReady()) {
+        const prisma = getPrisma();
+        if (prisma) return prismaEmailVerificationTokenBackend(prisma);
+      }
+      return memoryEmailVerificationTokenBackend;
+    })();
+  }
+  return emailVerificationTokenBackendPromise;
 }
 
 // ─── Core auth operations ────
@@ -341,6 +437,38 @@ export async function getUserById(userId: string): Promise<UserRecord | undefine
   return backend.findById(userId);
 }
 
+export async function createEmailVerificationToken(email: string): Promise<string> {
+  const normalized = email.trim().toLowerCase();
+  const backend = await getEmailVerificationTokenBackend();
+  const token = uuidv4().replace(/-/g, '');
+  const expiresAt = new Date(Date.now() + EMAIL_VERIFICATION_TTL_MS);
+  await backend.deleteByEmail(normalized);
+  await backend.create({ email: normalized, token, expiresAt });
+  logger.info('Email verification token created', {
+    email: normalized,
+    tokenPreview: token.slice(0, 8) + '…',
+  });
+  return token;
+}
+
+export async function verifyEmailByToken(token: string): Promise<{ email: string }> {
+  if (!token || typeof token !== 'string') throw new AuthError('Missing field: token', 400);
+  const backend = await getEmailVerificationTokenBackend();
+  const entry = await backend.findByToken(token);
+  if (!entry) throw new AuthError('Invalid or expired verification token', 400);
+  if (new Date() > entry.expiresAt) {
+    await backend.deleteByToken(token);
+    throw new AuthError('Verification token expired', 400);
+  }
+  const userBackend = await getUserBackend();
+  const user = await userBackend.findByEmail(entry.email);
+  if (!user) throw new AuthError('User not found for verification token', 404);
+  await userBackend.updateEmailVerified(user.id, true);
+  await backend.deleteByToken(token);
+  logger.info('Email verified', { email: entry.email });
+  return { email: entry.email };
+}
+
 /**
  * Set a first password for an account that has none (OAuth-created users).
  * Refuses when a password already exists — those must use changePassword.
@@ -427,7 +555,13 @@ export async function updateUserRoles(
   const backend = await getUserBackend();
   const user = await backend.updateUserRoles(userId, roles);
   if (!user) return undefined;
-  return { id: user.id, email: user.email, roles: user.roles, createdAt: user.createdAt };
+  return {
+    id: user.id,
+    email: user.email,
+    roles: user.roles,
+    emailVerified: user.emailVerified,
+    createdAt: user.createdAt,
+  };
 }
 
 /** All registered users (password hashes stripped) — for team management. */
