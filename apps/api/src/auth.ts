@@ -38,9 +38,18 @@ const ADMIN_EMAILS = (process.env.ADMIN_EMAILS ?? '')
   .filter(Boolean);
 
 // AUTH_ENABLED gates the admin endpoints (GET waitlist, PATCH status, GET feedback).
-// When off (default, and in tests) admin endpoints are open for backwards
+// When off (tests) admin endpoints are open for backwards
 // compatibility; when on, they require a Bearer token with role 'admin'.
-export const AUTH_ENABLED = process.env.AUTH_ENABLED === 'true';
+export const AUTH_ENABLED = process.env.AUTH_ENABLED !== 'false';
+
+if (process.env.NODE_ENV === 'production') {
+  if (!process.env.JWT_SECRET) {
+    throw new Error('JWT_SECRET must be defined in production');
+  }
+  if (!AUTH_ENABLED) {
+    logger.warn('AUTH_ENABLED is false in production — this is insecure!');
+  }
+}
 
 // ─── User storage (memory fallback, Prisma when DB reachable) ────
 const userStore = new Map<string, UserRecord>();
