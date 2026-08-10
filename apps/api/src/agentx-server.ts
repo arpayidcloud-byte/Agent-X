@@ -1003,9 +1003,9 @@ app.get('/v1/cost/summary', async (req, res) => {
     const totalCostUsd = s.totalCostUsd;
     const totalTokens = s.totalTokens;
     const totalRequests = s.totalRequests;
-    const inputTokens = s.byDay.reduce((sum: number) => sum + 0, 0);
-    const outputTokens = s.byDay.reduce((sum: number) => sum + 0, 0);
-    const avgLatencyMs = 0;
+    const inputTokens = s.inputTokens;
+    const outputTokens = s.outputTokens;
+    const avgLatencyMs = s.avgLatencyMs;
     res.json({
       overview: {
         totalCostUsd,
