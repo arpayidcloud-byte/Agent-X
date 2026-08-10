@@ -5,6 +5,7 @@ export interface UserRecord {
   email: string;
   passwordHash: string;
   roles: string[];
+  emailVerified: boolean;
   createdAt: string;
 }
 
@@ -13,6 +14,7 @@ function toRecord(row: {
   email: string;
   passwordHash: string;
   roles: string[];
+  emailVerified: boolean;
   createdAt: Date;
 }): UserRecord {
   return {
@@ -20,6 +22,7 @@ function toRecord(row: {
     email: row.email,
     passwordHash: row.passwordHash,
     roles: row.roles,
+    emailVerified: row.emailVerified,
     createdAt: row.createdAt.toISOString(),
   };
 }
