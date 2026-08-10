@@ -1,7 +1,12 @@
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import { v4 as uuidv4 } from 'uuid';
-import { PrismaUserRepository, dbReady, getPrisma } from '@agent-xai/persistence';
+import {
+  PrismaRefreshTokenRepository,
+  PrismaUserRepository,
+  dbReady,
+  getPrisma,
+} from '@agent-xai/persistence';
 import type { UserRecord } from '@agent-xai/persistence';
 import { Logger } from '@agent-xai/observability';
 
@@ -38,13 +43,21 @@ const ADMIN_EMAILS = (process.env.ADMIN_EMAILS ?? '')
   .filter(Boolean);
 
 // AUTH_ENABLED gates the admin endpoints (GET waitlist, PATCH status, GET feedback).
-// When off (default, and in tests) admin endpoints are open for backwards
+// When off (tests) admin endpoints are open for backwards
 // compatibility; when on, they require a Bearer token with role 'admin'.
-export const AUTH_ENABLED = process.env.AUTH_ENABLED === 'true';
+export const AUTH_ENABLED = process.env.AUTH_ENABLED !== 'false';
+
+if (process.env.NODE_ENV === 'production') {
+  if (!process.env.JWT_SECRET) {
+    throw new Error('JWT_SECRET must be defined in production');
+  }
+  if (!AUTH_ENABLED) {
+    logger.warn('AUTH_ENABLED is false in production — this is insecure!');
+  }
+}
 
 // ─── User storage (memory fallback, Prisma when DB reachable) ────
 const userStore = new Map<string, UserRecord>();
-const refreshTokens = new Map<string, { userId: string; expiresAt: Date }>();
 // One-time password reset tokens (30 min TTL), like refreshTokens.
 const passwordResetTokens = new Map<string, { userId: string; expiresAt: Date }>();
 const PASSWORD_RESET_TTL_MS = 30 * 60 * 1000; // 30 minutes
@@ -147,6 +160,66 @@ export function getUserBackend(): Promise<UserBackend> {
   return userBackendPromise;
 }
 
+// ─── Refresh-token storage (memory fallback, Prisma when DB reachable) ────
+
+interface RefreshTokenBackend {
+  create(record: { token: string; userId: string; expiresAt: Date }): Promise<void>;
+  findByToken(
+    token: string,
+  ): Promise<{ token: string; userId: string; expiresAt: Date } | undefined>;
+  delete(token: string): Promise<void>;
+}
+
+const refreshTokenStore = new Map<string, { userId: string; expiresAt: Date }>();
+
+const memoryRefreshTokenBackend: RefreshTokenBackend = {
+  async create(record) {
+    refreshTokenStore.set(record.token, {
+      userId: record.userId,
+      expiresAt: record.expiresAt,
+    });
+  },
+  async findByToken(token) {
+    const entry = refreshTokenStore.get(token);
+    return entry ? { token, ...entry } : undefined;
+  },
+  async delete(token) {
+    refreshTokenStore.delete(token);
+  },
+};
+
+function prismaRefreshTokenBackend(
+  prisma: NonNullable<ReturnType<typeof getPrisma>>,
+): RefreshTokenBackend {
+  const repo = new PrismaRefreshTokenRepository(prisma);
+  return {
+    async create(record) {
+      await repo.create(record);
+    },
+    async findByToken(token) {
+      return repo.findByToken(token);
+    },
+    async delete(token) {
+      await repo.delete(token);
+    },
+  };
+}
+
+let refreshTokenBackendPromise: Promise<RefreshTokenBackend> | null = null;
+
+function getRefreshTokenBackend(): Promise<RefreshTokenBackend> {
+  if (refreshTokenBackendPromise === null) {
+    refreshTokenBackendPromise = (async () => {
+      if (await dbReady()) {
+        const prisma = getPrisma();
+        if (prisma) return prismaRefreshTokenBackend(prisma);
+      }
+      return memoryRefreshTokenBackend;
+    })();
+  }
+  return refreshTokenBackendPromise;
+}
+
 // ─── Core auth operations ────
 export class AuthError extends Error {
   constructor(
@@ -190,7 +263,7 @@ export async function register(
     roles: rolesFor(normalized),
   });
   logger.info('User registered', { email: normalized, roles: user.roles });
-  return { user: toAuthUser(user), tokens: issueTokens(user) };
+  return { user: toAuthUser(user), tokens: await issueTokens(user) };
 }
 
 export async function login(
@@ -210,11 +283,12 @@ export async function login(
     throw new AuthError('Invalid credentials', 401);
   }
   logger.info('User logged in', { email: user.email });
-  return { user: toAuthUser(user), tokens: issueTokens(user) };
+  return { user: toAuthUser(user), tokens: await issueTokens(user) };
 }
 
 export async function refresh(refreshToken: string): Promise<AuthTokens> {
-  const tokenData = refreshTokens.get(refreshToken);
+  const tokenBackend = await getRefreshTokenBackend();
+  const tokenData = await tokenBackend.findByToken(refreshToken);
   if (!tokenData || new Date() > tokenData.expiresAt) {
     throw new AuthError('Invalid or expired refresh token', 401);
   }
@@ -223,8 +297,8 @@ export async function refresh(refreshToken: string): Promise<AuthTokens> {
   if (!user) {
     throw new AuthError('User not found', 401);
   }
-  refreshTokens.delete(refreshToken);
-  const tokens = issueTokens(user);
+  await tokenBackend.delete(refreshToken);
+  const tokens = await issueTokens(user);
   return tokens;
 }
 
@@ -371,12 +445,14 @@ export function verifyToken(token: string): JWTPayload {
   }
 }
 
-export function issueTokens(user: UserRecord): AuthTokens {
+export async function issueTokens(user: UserRecord): Promise<AuthTokens> {
   const accessToken = jwt.sign({ sub: user.id, email: user.email, roles: user.roles }, JWT_SECRET, {
     expiresIn: ACCESS_TOKEN_TTL,
   });
   const refreshToken = uuidv4();
-  refreshTokens.set(refreshToken, {
+  const tokenBackend = await getRefreshTokenBackend();
+  await tokenBackend.create({
+    token: refreshToken,
     userId: user.id,
     expiresAt: new Date(Date.now() + REFRESH_TOKEN_TTL_MS),
   });

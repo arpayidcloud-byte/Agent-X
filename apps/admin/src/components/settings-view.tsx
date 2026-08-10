@@ -24,6 +24,8 @@ import {
   type CliTokenView,
 } from '@/lib/api';
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL || '';
+
 // ─── Shared card shell ────
 function Card({
   title,
@@ -385,7 +387,7 @@ function CliSyncCard() {
   };
 
   const exampleCmd = (withToken: string) =>
-    `agentx config pull --token ${withToken} --api https://api.id-tech.cloud`;
+    `agentx config pull --token ${withToken} --api ${API_URL || 'https://api.id-tech.cloud'}`;
 
   return (
     <Card title="CLI Sync" icon={<TerminalSquare className="h-4 w-4" strokeWidth={1.8} />}>

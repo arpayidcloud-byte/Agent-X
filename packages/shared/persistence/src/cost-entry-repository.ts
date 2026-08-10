@@ -41,6 +41,9 @@ export interface CostSummary {
   totalCostUsd: number;
   totalRequests: number;
   totalTokens: number;
+  inputTokens: number;
+  outputTokens: number;
+  avgLatencyMs: number;
   byProvider: Array<{
     provider: string;
     requests: number;
@@ -109,6 +112,10 @@ export class CostEntryRepository {
     const totalCostUsd = entries.reduce((sum, e) => sum + e.costUsd, 0);
     const totalRequests = entries.length;
     const totalTokens = entries.reduce((sum, e) => sum + e.totalTokens, 0);
+    const inputTokens = entries.reduce((sum, e) => sum + e.inputTokens, 0);
+    const outputTokens = entries.reduce((sum, e) => sum + e.outputTokens, 0);
+    const avgLatencyMs =
+      totalRequests > 0 ? entries.reduce((sum, e) => sum + e.latencyMs, 0) / totalRequests : 0;
 
     // By provider
     const providerMap = new Map<string, { requests: number; costUsd: number; tokens: number }>();
@@ -151,6 +158,16 @@ export class CostEntryRepository {
       .map(([date, data]) => ({ date, ...data }))
       .sort((a, b) => a.date.localeCompare(b.date));
 
-    return { totalCostUsd, totalRequests, totalTokens, byProvider, byModel, byDay };
+    return {
+      totalCostUsd,
+      totalRequests,
+      totalTokens,
+      inputTokens,
+      outputTokens,
+      avgLatencyMs,
+      byProvider,
+      byModel,
+      byDay,
+    };
   }
 }

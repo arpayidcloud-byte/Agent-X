@@ -45,9 +45,11 @@ const EMPTY_FORM = {
   isFeatured: false,
 };
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL || '';
+
 async function apiFetch(path: string, options?: RequestInit) {
   const token = localStorage.getItem('agentx_admin_token');
-  const res = await fetch(`https://api.id-tech.cloud${path}`, {
+  const res = await fetch(`${API_URL}${path}`, {
     ...options,
     headers: {
       'Content-Type': 'application/json',
@@ -220,14 +222,21 @@ export default function MarketplaceView() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <div className="flex items-center gap-2"><span className="flex h-7 w-7 items-center justify-center rounded-xl bg-accent-500/10 ring-1 ring-accent-500/20"><Store className="h-3.5 w-3.5 text-accent-300" strokeWidth={1.8} /></span><h1 className="text-xl font-bold tracking-tight text-white">Marketplace</h1></div>
+          <div className="flex items-center gap-2">
+            <span className="flex h-7 w-7 items-center justify-center rounded-xl bg-accent-500/10 ring-1 ring-accent-500/20">
+              <Store className="h-3.5 w-3.5 text-accent-300" strokeWidth={1.8} />
+            </span>
+            <h1 className="text-xl font-bold tracking-tight text-white">Marketplace</h1>
+          </div>
           <p className="mt-1.5 text-sm leading-relaxed text-slate-400">
             {templates.length} agent template{templates.length !== 1 ? 's' : ''} · Browse, create,
             manage
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <span className="hidden items-center gap-1.5 rounded-full border border-white/[0.06] bg-surface-2/60 px-3 py-1.5 text-xs text-slate-500 sm:flex"><Sparkles className="h-3 w-3 text-accent-300" /> Obsidian Warp</span>
+          <span className="hidden items-center gap-1.5 rounded-full border border-white/[0.06] bg-surface-2/60 px-3 py-1.5 text-xs text-slate-500 sm:flex">
+            <Sparkles className="h-3 w-3 text-accent-300" /> Obsidian Warp
+          </span>
           <button
             type="button"
             onClick={() => void load()}
