@@ -45,6 +45,7 @@ import { registerProviderGroupRoutes } from './provider-group-routes.js';
 import { registerDeckRoutes } from './deck.js';
 import { registerBillingRoutes } from './billing-routes.js';
 import { quotaMiddleware } from './middleware/quota.js';
+import { registerTrialCronRoutes } from './trial-cron.js';
 import { syncProvidersFromDb } from './llm-providers.js';
 import {
   publishEvent,
@@ -96,6 +97,7 @@ app.use((req, res, next) => {
 registerAuthRoutes(app);
 registerOAuthRoutes(app);
 registerBillingRoutes(app);
+registerTrialCronRoutes(app);
 
 // ─── Swagger / OpenAPI docs ────
 mountSwagger(app);
