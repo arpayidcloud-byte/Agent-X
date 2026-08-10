@@ -67,9 +67,11 @@ function nextNodeId(): string {
   return `${nodeIdCounter}${Date.now().toString(36)}`;
 }
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL || '';
+
 async function apiFetch(path: string, options?: RequestInit) {
   const token = localStorage.getItem('agentx_admin_token');
-  const res = await fetch(`https://api.id-tech.cloud${path}`, {
+  const res = await fetch(`${API_URL}${path}`, {
     ...options,
     headers: {
       'Content-Type': 'application/json',
