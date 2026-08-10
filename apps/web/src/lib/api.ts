@@ -1,6 +1,6 @@
 // Agent-X API client — dashboard consumes the live API server.
 // The API server runs on PORT (default 4000), see apps/api/src/agentx-server.ts.
-export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
+export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:30400';
 
 export interface ProviderHealth {
   name: string;

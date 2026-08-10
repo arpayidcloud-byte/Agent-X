@@ -5,7 +5,7 @@
   "rewrites": [
     {
       "source": "/api/v1/:path*",
-      "destination": "https://api-staging.agent-x.com/api/v1/:path*"
+      "destination": "https://api.id-tech.cloud/api/v1/:path*"
     }
   ]
 }
