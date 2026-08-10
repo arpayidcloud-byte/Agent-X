@@ -24,6 +24,8 @@ import {
   type CliTokenView,
 } from '@/lib/api';
 
+import { BillingCard } from './billing-card';
+
 const API_URL = process.env.NEXT_PUBLIC_API_URL || '';
 
 // ─── Shared card shell ────
@@ -519,8 +521,9 @@ export default function SettingsView() {
       </div>
       <div className="grid gap-6 lg:grid-cols-2">
         <ChangePasswordCard />
-        <BackupCard />
+        <BillingCard />
       </div>
+      <BackupCard />
       <CliSyncCard />
     </div>
   );

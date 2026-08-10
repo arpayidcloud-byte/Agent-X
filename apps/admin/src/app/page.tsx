@@ -27,6 +27,8 @@ import {
   type HealthReport,
 } from '@/lib/api';
 
+import { AdminMrrCard } from '@/components/admin-mrr-card';
+
 function formatDuration(seconds: number): string {
   if (seconds < 60) return `${Math.floor(seconds)}s`;
   if (seconds < 3600) return `${Math.floor(seconds / 60)}m ${Math.floor(seconds % 60)}s`;
@@ -156,6 +158,7 @@ export default function AdminDashboard() {
           </p>
           <p className="mt-1 text-[11px] text-slate-500">healthy providers</p>
         </Link>
+        <AdminMrrCard />
 
         <Link href="/tasks" className="stat-card card-hover group rounded-xl p-4">
           <div className="flex items-center justify-between">
