@@ -18,6 +18,7 @@ import {
 import type { AuthenticatedRequest } from './auth.js';
 import { verifyTurnstile } from './turnstile.js';
 import { sendMail } from './mailer.js';
+import { createTrialOnRegister } from '@agent-xai/billing';
 
 export function registerAuthRoutes(app: Express): void {
   // ─── Register ──── (email verify flow — no auto issueTokens)
@@ -28,7 +29,14 @@ export function registerAuthRoutes(app: Express): void {
         res.status(403).json({ error: 'Human verification failed — please try again.' });
         return;
       }
-      await register(email, password);
+      const regRes = await register(email, password);
+      // Auto-create trial org for new user (no-op without DB or Plan seed)
+      try {
+        const trial = regRes?.user?.id ? await createTrialOnRegister(regRes.user.id, email) : null;
+        void trial;
+      } catch {
+        /* non-blocking — trial creation fail is not a register fail */
+      }
       const token = await createEmailVerificationToken(email);
       const webUrl = process.env.OAUTH_WEB_URL ?? 'http://localhost:30500';
       const verifyUrl = `${webUrl}/verify-email?token=${encodeURIComponent(token)}`;
