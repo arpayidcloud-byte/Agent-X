@@ -596,6 +596,14 @@ export async function resetPassword(token: string, newPassword: string): Promise
   });
 }
 
+/** Verify email address with the one-time token from the email. */
+export async function verifyEmail(token: string): Promise<{ ok: boolean }> {
+  return authJson<{ ok: boolean }>('/v1/auth/verify-email', {
+    method: 'POST',
+    body: JSON.stringify({ token }),
+  });
+}
+
 export interface TeamMember {
   id: string;
   email: string;
