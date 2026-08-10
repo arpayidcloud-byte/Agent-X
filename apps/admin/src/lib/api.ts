@@ -1,5 +1,5 @@
 // AgentX Panel API client — talks to the shared AgentX API (api.id-tech.cloud).
-export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
+export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:30400';
 
 const TOKEN_KEY = 'agentx_admin_token';
 

@@ -10,10 +10,11 @@ import {
   CheckCircle2,
   MinusCircle,
 } from 'lucide-react';
+import { API_URL } from '@/lib/api';
 
 async function apiFetch(path: string, options?: RequestInit) {
   const token = localStorage.getItem('agentx_admin_token');
-  const res = await fetch(`https://api.id-tech.cloud${path}`, {
+  const res = await fetch(`${API_URL}${path}`, {
     ...options,
     headers: {
       'Content-Type': 'application/json',
