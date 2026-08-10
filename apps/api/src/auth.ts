@@ -53,6 +53,9 @@ if (process.env.NODE_ENV === 'production') {
   if (!process.env.JWT_SECRET) {
     throw new Error('JWT_SECRET must be defined in production');
   }
+  if (JWT_SECRET.length < 32) {
+    throw new Error('JWT_SECRET is too short (< 32 chars) in production — must be >= 32');
+  }
   if (!AUTH_ENABLED) {
     logger.warn('AUTH_ENABLED is false in production — this is insecure!');
   }
@@ -621,19 +624,7 @@ export function requireAuth(req: AuthenticatedRequest, res: Response, next: Next
   }
 }
 
-/**
- * Admin guard for beta management endpoints. When AUTH_ENABLED is false
- * (default / tests) it passes through; when true it requires role 'admin'.
- */
-export function maybeRequireAdmin(
-  req: AuthenticatedRequest,
-  res: Response,
-  next: NextFunction,
-): void {
-  if (!AUTH_ENABLED) {
-    next();
-    return;
-  }
+export function requireAdmin(req: AuthenticatedRequest, res: Response, next: NextFunction): void {
   const token = bearerToken(req);
   if (!token) {
     res.status(401).json({ error: 'Missing Bearer token' });
@@ -651,3 +642,6 @@ export function maybeRequireAdmin(
     res.status(401).json({ error: e instanceof AuthError ? e.message : 'Unauthorized' });
   }
 }
+
+/** @deprecated alias — prefer `requireAdmin`. Kept for 29 call sites. */
+export const maybeRequireAdmin = requireAdmin;
