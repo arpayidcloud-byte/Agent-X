@@ -2,7 +2,7 @@ import type { Express, Request, Response } from 'express';
 import type { QualityBackend } from './quality-store.js';
 import { getQualityBackend } from './quality-store.js';
 import { EvalExperimentRepository } from '@agent-xai/persistence';
-import { maybeRequireAdmin } from './auth.js';
+import { maybeRequireAdmin, requireAuth } from './auth.js';
 
 /**
  * Evaluation benchmark suite — Phase 8 (#114).
@@ -145,7 +145,7 @@ export function registerEvalRoutes(app: Express): void {
   // ─── Daftar benchmark runs ────
   app.get(
     '/v1/eval/benchmarks',
-    maybeRequireAdmin,
+    requireAuth,
     async (_req: Request, res: Response): Promise<void> => {
       try {
         const backend: QualityBackend = await getQualityBackend();
@@ -179,7 +179,7 @@ export function registerEvalRoutes(app: Express): void {
   // ─── Leaderboard provider/model ────
   app.get(
     '/v1/eval/leaderboard',
-    maybeRequireAdmin,
+    requireAuth,
     async (req: Request, res: Response): Promise<void> => {
       try {
         const backend: QualityBackend = await getQualityBackend();
@@ -282,7 +282,7 @@ export function registerEvalRoutes(app: Express): void {
   // ─── Daftar A/B experiments ────
   app.get(
     '/v1/eval/experiments',
-    maybeRequireAdmin,
+    requireAuth,
     async (_req: Request, res: Response): Promise<void> => {
       try {
         const repo = new EvalExperimentRepository();
@@ -296,58 +296,50 @@ export function registerEvalRoutes(app: Express): void {
   );
 
   // ─── Win-rate summary ────
-  app.get(
-    '/v1/eval/winrates',
-    maybeRequireAdmin,
-    async (_req: Request, res: Response): Promise<void> => {
-      try {
-        const repo = new EvalExperimentRepository();
-        const winRates = await repo.winRates();
-        res.json({ winRates });
-      } catch (e) {
-        const err = e instanceof Error ? e.message : String(e);
-        res.status(500).json({ error: err });
-      }
-    },
-  );
+  app.get('/v1/eval/winrates', requireAuth, async (_req: Request, res: Response): Promise<void> => {
+    try {
+      const repo = new EvalExperimentRepository();
+      const winRates = await repo.winRates();
+      res.json({ winRates });
+    } catch (e) {
+      const err = e instanceof Error ? e.message : String(e);
+      res.status(500).json({ error: err });
+    }
+  });
 
   // ─── Quality gates status (#117) ────
-  app.get(
-    '/v1/eval/gates',
-    maybeRequireAdmin,
-    async (_req: Request, res: Response): Promise<void> => {
-      try {
-        const threshold = Number(process.env.QUALITY_GATE_THRESHOLD ?? 70);
-        const backend: QualityBackend = await getQualityBackend();
-        const scores = await backend.findAll(200);
-        const below = scores.filter((s) => s.overall < threshold);
-        const above = scores.filter((s) => s.overall >= threshold);
-        const avgOverall =
-          scores.length > 0
-            ? Number((scores.reduce((acc, s) => acc + s.overall, 0) / scores.length).toFixed(1))
-            : 0;
-        const { getFeedbackBackend } = await import('./feedback-store.js');
-        const fbBackend = await getFeedbackBackend();
-        const feedback = await fbBackend.findAll(200);
-        res.json({
-          gate: {
-            threshold,
-            configurableVia: 'QUALITY_GATE_THRESHOLD',
-            totalScores: scores.length,
-            belowThreshold: below.length,
-            aboveThreshold: above.length,
-            avgOverall,
-            autoFeedbackGenerated: feedback.length,
-            passingRate:
-              scores.length > 0 ? Number(((above.length / scores.length) * 100).toFixed(1)) : 0,
-          },
-        });
-      } catch (e) {
-        const err = e instanceof Error ? e.message : String(e);
-        res.status(500).json({ error: err });
-      }
-    },
-  );
+  app.get('/v1/eval/gates', requireAuth, async (_req: Request, res: Response): Promise<void> => {
+    try {
+      const threshold = Number(process.env.QUALITY_GATE_THRESHOLD ?? 70);
+      const backend: QualityBackend = await getQualityBackend();
+      const scores = await backend.findAll(200);
+      const below = scores.filter((s) => s.overall < threshold);
+      const above = scores.filter((s) => s.overall >= threshold);
+      const avgOverall =
+        scores.length > 0
+          ? Number((scores.reduce((acc, s) => acc + s.overall, 0) / scores.length).toFixed(1))
+          : 0;
+      const { getFeedbackBackend } = await import('./feedback-store.js');
+      const fbBackend = await getFeedbackBackend();
+      const feedback = await fbBackend.findAll(200);
+      res.json({
+        gate: {
+          threshold,
+          configurableVia: 'QUALITY_GATE_THRESHOLD',
+          totalScores: scores.length,
+          belowThreshold: below.length,
+          aboveThreshold: above.length,
+          avgOverall,
+          autoFeedbackGenerated: feedback.length,
+          passingRate:
+            scores.length > 0 ? Number(((above.length / scores.length) * 100).toFixed(1)) : 0,
+        },
+      });
+    } catch (e) {
+      const err = e instanceof Error ? e.message : String(e);
+      res.status(500).json({ error: err });
+    }
+  });
 }
 
 function summarize(results: BenchmarkResult[]): BenchmarkSummary[] {

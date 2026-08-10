@@ -1,6 +1,6 @@
 import type { Express, Request, Response } from 'express';
 import { getWorkflowRepository } from '@agent-xai/persistence';
-import { maybeRequireAdmin } from './auth.js';
+import { maybeRequireAdmin, requireAuth } from './auth.js';
 
 /**
  * Workflow CRUD API for the visual workflow builder.
@@ -16,7 +16,7 @@ export function registerWorkflowRoutes(app: Express): void {
   const repo = getWorkflowRepository();
 
   // ─── List workflows ────
-  app.get('/v1/workflows', maybeRequireAdmin, async (req: Request, res: Response) => {
+  app.get('/v1/workflows', requireAuth, async (req: Request, res: Response) => {
     try {
       const limit = Math.min(Number(req.query.limit) || 50, 200);
       const offset = Number(req.query.offset) || 0;
@@ -28,7 +28,7 @@ export function registerWorkflowRoutes(app: Express): void {
   });
 
   // ─── Get workflow detail ────
-  app.get('/v1/workflows/:id', maybeRequireAdmin, async (req: Request, res: Response) => {
+  app.get('/v1/workflows/:id', requireAuth, async (req: Request, res: Response) => {
     try {
       const workflow = await repo.getById(String(req.params.id));
       if (!workflow) {
