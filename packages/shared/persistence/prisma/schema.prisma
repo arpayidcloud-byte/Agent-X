@@ -328,3 +328,31 @@ model Workflow {
   @@index([ownerId])
   @@index([isPublished])
 }
+
+// ─── Phase 3: Billing & Quota ───
+
+model Subscription {
+  id               String    @id @default(cuid())
+  userId           String
+  status           String    @default("active") // active | canceled | past_due | trialing
+  plan             String    @default("free")   // free | pro | enterprise
+  currentPeriodEnd DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  @@unique([userId])
+  @@index([status])
+}
+
+// Per-user feature limits derived from the subscription plan.
+model Entitlement {
+  id        String   @id @default(cuid())
+  userId    String
+  feature   String   // e.g. "tasks_per_day", "max_concurrent_runs"
+  limit     Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, feature])
+  @@index([feature])
+}
