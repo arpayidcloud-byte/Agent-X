@@ -1,5 +1,6 @@
 import type { Express, Request, Response } from 'express';
 import { getWorkflowRepository } from '@agent-xai/persistence';
+import { maybeRequireAdmin } from './auth.js';
 
 /**
  * Workflow CRUD API for the visual workflow builder.
@@ -15,7 +16,7 @@ export function registerWorkflowRoutes(app: Express): void {
   const repo = getWorkflowRepository();
 
   // ─── List workflows ────
-  app.get('/v1/workflows', async (req: Request, res: Response) => {
+  app.get('/v1/workflows', maybeRequireAdmin, async (req: Request, res: Response) => {
     try {
       const limit = Math.min(Number(req.query.limit) || 50, 200);
       const offset = Number(req.query.offset) || 0;
@@ -27,7 +28,7 @@ export function registerWorkflowRoutes(app: Express): void {
   });
 
   // ─── Get workflow detail ────
-  app.get('/v1/workflows/:id', async (req: Request, res: Response) => {
+  app.get('/v1/workflows/:id', maybeRequireAdmin, async (req: Request, res: Response) => {
     try {
       const workflow = await repo.getById(String(req.params.id));
       if (!workflow) {
@@ -41,7 +42,7 @@ export function registerWorkflowRoutes(app: Express): void {
   });
 
   // ─── Create workflow ────
-  app.post('/v1/workflows', async (req: Request, res: Response) => {
+  app.post('/v1/workflows', maybeRequireAdmin, async (req: Request, res: Response) => {
     try {
       const { name, description, nodes, edges, isPublished, ownerId } = req.body ?? {};
       if (!name || typeof name !== 'string') {
@@ -63,7 +64,7 @@ export function registerWorkflowRoutes(app: Express): void {
   });
 
   // ─── Update workflow ────
-  app.put('/v1/workflows/:id', async (req: Request, res: Response) => {
+  app.put('/v1/workflows/:id', maybeRequireAdmin, async (req: Request, res: Response) => {
     try {
       const { name, description, nodes, edges, isPublished, ownerId } = req.body ?? {};
       const existing = await repo.getById(String(req.params.id));
@@ -86,7 +87,7 @@ export function registerWorkflowRoutes(app: Express): void {
   });
 
   // ─── Delete workflow ────
-  app.delete('/v1/workflows/:id', async (req: Request, res: Response) => {
+  app.delete('/v1/workflows/:id', maybeRequireAdmin, async (req: Request, res: Response) => {
     try {
       const ok = await repo.remove(String(req.params.id));
       if (!ok) {
