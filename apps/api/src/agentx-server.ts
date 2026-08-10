@@ -44,6 +44,7 @@ import { registerCliRoutes } from './cli-routes.js';
 import { registerProviderGroupRoutes } from './provider-group-routes.js';
 import { registerDeckRoutes } from './deck.js';
 import { registerBillingRoutes } from './billing-routes.js';
+import { quotaMiddleware } from './middleware/quota.js';
 import { syncProvidersFromDb } from './llm-providers.js';
 import {
   publishEvent,
@@ -186,7 +187,7 @@ app.get('/health', async (_req, res) => {
 });
 
 // ─── LLM run endpoint (wired to router) ────
-app.post('/v1/agentx/run', requireAuth, async (req, res): Promise<void> => {
+app.post('/v1/agentx/run', requireAuth, quotaMiddleware, async (req, res): Promise<void> => {
   try {
     const { prompt, taskId, description, complexity, type, budget, provider } = req.body ?? {};
 
@@ -263,7 +264,7 @@ app.post('/v1/agentx/run', requireAuth, async (req, res): Promise<void> => {
 // ─── Async stream run (Web Pro: SSE real-time task execution) ────
 // POST returns 202 + taskId immediately; the task runs in the background and
 // emits lifecycle events consumed via GET /v1/agentx/tasks/:id/events.
-app.post('/v1/agentx/run/stream', requireAuth, async (req, res): Promise<void> => {
+app.post('/v1/agentx/run/stream', requireAuth, quotaMiddleware, async (req, res): Promise<void> => {
   try {
     const { prompt, taskId, description, complexity, type, budget, provider } = req.body ?? {};
 
@@ -466,7 +467,7 @@ app.get('/v1/agentx/tasks/:id/events', (req, res) => {
 // ─── Chat (Web Pro): single-turn with transcript context ────
 // Builds a bounded transcript prompt from the conversation, then routes it
 // through the LLM router like any other task.
-app.post('/v1/agentx/chat', requireAuth, async (req, res): Promise<void> => {
+app.post('/v1/agentx/chat', requireAuth, quotaMiddleware, async (req, res): Promise<void> => {
   try {
     const { messages, taskId, complexity, type, budget, provider } = req.body ?? {};
     const parsed = parseChatMessages(messages);
@@ -517,73 +518,78 @@ app.post('/v1/agentx/chat', requireAuth, async (req, res): Promise<void> => {
 // ─── Chat streaming (Web Pro): SSE token stream ────
 // POST returns 202 + chatId; events (start -> chunk* -> complete/error) are
 // consumed via GET /v1/agentx/chat/:id/events.
-app.post('/v1/agentx/chat/stream', requireAuth, async (req, res): Promise<void> => {
-  try {
-    const { messages, taskId, complexity, type, budget, provider } = req.body ?? {};
-    const parsed = parseChatMessages(messages);
-    if (!parsed) {
-      res.status(400).json({
-        error:
-          'Missing or invalid field: messages (non-empty array of {role: user|assistant, content: string})',
-      });
-      return;
-    }
-    const last = parsed[parsed.length - 1]!;
-    const chatId = `chat-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-    const request = {
-      taskId: taskId ?? chatId,
-      description: last.content.slice(0, 120),
-      complexity: complexity ?? 'medium',
-      type: type ?? 'reasoning',
-      budget: budget ?? 'medium',
-      provider: typeof provider === 'string' ? provider : undefined,
-    };
-
-    res.status(202).json({ chatId, status: 'accepted' });
-
-    void (async () => {
-      try {
-        const response = await executeRoute(router, request, buildChatPrompt(parsed));
-        const startedAt = new Date().toISOString();
-        publishChatEvent({
-          type: 'start',
-          chatId,
-          provider: response.provider,
-          model: response.model,
-          at: startedAt,
+app.post(
+  '/v1/agentx/chat/stream',
+  requireAuth,
+  quotaMiddleware,
+  async (req, res): Promise<void> => {
+    try {
+      const { messages, taskId, complexity, type, budget, provider } = req.body ?? {};
+      const parsed = parseChatMessages(messages);
+      if (!parsed) {
+        res.status(400).json({
+          error:
+            'Missing or invalid field: messages (non-empty array of {role: user|assistant, content: string})',
         });
-        for (const chunk of chunkText(response.message)) {
-          await delay(CHAT_CHUNK_DELAY_MS);
+        return;
+      }
+      const last = parsed[parsed.length - 1]!;
+      const chatId = `chat-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+      const request = {
+        taskId: taskId ?? chatId,
+        description: last.content.slice(0, 120),
+        complexity: complexity ?? 'medium',
+        type: type ?? 'reasoning',
+        budget: budget ?? 'medium',
+        provider: typeof provider === 'string' ? provider : undefined,
+      };
+
+      res.status(202).json({ chatId, status: 'accepted' });
+
+      void (async () => {
+        try {
+          const response = await executeRoute(router, request, buildChatPrompt(parsed));
+          const startedAt = new Date().toISOString();
           publishChatEvent({
-            type: 'chunk',
+            type: 'start',
             chatId,
-            text: chunk,
+            provider: response.provider,
+            model: response.model,
+            at: startedAt,
+          });
+          for (const chunk of chunkText(response.message)) {
+            await delay(CHAT_CHUNK_DELAY_MS);
+            publishChatEvent({
+              type: 'chunk',
+              chatId,
+              text: chunk,
+              at: new Date().toISOString(),
+            });
+          }
+          publishChatEvent({
+            type: 'complete',
+            chatId,
+            usage: response.usage,
+            cost: response.cost,
+            latencyMs: response.latencyMs,
+            at: new Date().toISOString(),
+          });
+        } catch (runErr) {
+          const err = runErr instanceof Error ? runErr.message : String(runErr);
+          publishChatEvent({
+            type: 'error',
+            chatId,
+            error: err,
             at: new Date().toISOString(),
           });
         }
-        publishChatEvent({
-          type: 'complete',
-          chatId,
-          usage: response.usage,
-          cost: response.cost,
-          latencyMs: response.latencyMs,
-          at: new Date().toISOString(),
-        });
-      } catch (runErr) {
-        const err = runErr instanceof Error ? runErr.message : String(runErr);
-        publishChatEvent({
-          type: 'error',
-          chatId,
-          error: err,
-          at: new Date().toISOString(),
-        });
-      }
-    })();
-  } catch (e) {
-    const err = e instanceof Error ? e.message : String(e);
-    res.status(500).json({ error: err });
-  }
-});
+      })();
+    } catch (e) {
+      const err = e instanceof Error ? e.message : String(e);
+      res.status(500).json({ error: err });
+    }
+  },
+);
 
 // ─── Chat SSE event stream (Web Pro) ────
 app.get('/v1/agentx/chat/:id/events', (req, res) => {
@@ -759,34 +765,39 @@ app.delete('/v1/prompt-templates/:id', maybeRequireAdmin, async (req, res) => {
 // POST accepts multiple goals (one per element) and runs them through the
 // specialist team concurrently (bounded pool). Returns 202 + runId; progress
 // streams over GET /v1/agentx/multi-agent/:runId/events (SSE/WS).
-app.post('/v1/agentx/multi-agent/run', requireAuth, async (req, res): Promise<void> => {
-  try {
-    const { goals, concurrency } = req.body ?? {};
-    if (!Array.isArray(goals) || goals.length === 0 || goals.length > 10) {
-      res.status(400).json({
-        error: 'Missing or invalid field: goals (non-empty array of 1-10 strings)',
-      });
-      return;
-    }
-    for (const g of goals) {
-      if (typeof g !== 'string' || g.trim().length === 0) {
-        res.status(400).json({ error: 'Invalid field: goals must be non-empty strings' });
+app.post(
+  '/v1/agentx/multi-agent/run',
+  requireAuth,
+  quotaMiddleware,
+  async (req, res): Promise<void> => {
+    try {
+      const { goals, concurrency } = req.body ?? {};
+      if (!Array.isArray(goals) || goals.length === 0 || goals.length > 10) {
+        res.status(400).json({
+          error: 'Missing or invalid field: goals (non-empty array of 1-10 strings)',
+        });
         return;
       }
+      for (const g of goals) {
+        if (typeof g !== 'string' || g.trim().length === 0) {
+          res.status(400).json({ error: 'Invalid field: goals must be non-empty strings' });
+          return;
+        }
+      }
+      const parsedConcurrency = Number.isFinite(concurrency)
+        ? Math.min(4, Math.max(1, Math.round(concurrency)))
+        : 2;
+      const run = startParallelRun({
+        goals: goals.map((g: string) => g.trim()),
+        concurrency: parsedConcurrency,
+      });
+      res.status(202).json({ runId: run.runId, status: run.status, concurrency: run.concurrency });
+    } catch (e) {
+      const err = e instanceof Error ? e.message : String(e);
+      res.status(500).json({ error: err });
     }
-    const parsedConcurrency = Number.isFinite(concurrency)
-      ? Math.min(4, Math.max(1, Math.round(concurrency)))
-      : 2;
-    const run = startParallelRun({
-      goals: goals.map((g: string) => g.trim()),
-      concurrency: parsedConcurrency,
-    });
-    res.status(202).json({ runId: run.runId, status: run.status, concurrency: run.concurrency });
-  } catch (e) {
-    const err = e instanceof Error ? e.message : String(e);
-    res.status(500).json({ error: err });
-  }
-});
+  },
+);
 
 // SSE stream for a parallel run: replay history, then live events.
 app.get('/v1/agentx/multi-agent/:runId/events', (req, res) => {
