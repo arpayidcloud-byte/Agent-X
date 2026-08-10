@@ -3,13 +3,36 @@ import type { Server } from 'node:http';
 
 // Mock providers must be registered before the server module initializes.
 process.env.ENABLE_MOCK_PROVIDER = 'true';
+process.env.AUTH_ENABLED = 'true';
+process.env.ADMIN_EMAILS = 'admin@agentx.dev';
+process.env.JWT_SECRET = 'test-secret';
 // Tests are DB-less: force the in-memory beta backend regardless of DATABASE_URL.
 delete process.env.DATABASE_URL;
-const { app, waitlistStore, feedbackStore } = await import('../agentx-server.js');
+const { app, waitlistStore, feedbackStore, resetBetaStores } = await import('../agentx-server.js');
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function asJson<T = any>(res: Response): Promise<T> {
   return (await res.json()) as T;
+}
+
+async function adminHeaders(baseUrl: string): Promise<Record<string, string>> {
+  const email = 'admin@agentx.dev';
+  const password = 'password123';
+  // Ensure admin exists — register is idempotent (409 if already exists)
+  await fetch(`${baseUrl}/v1/auth/register`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, password }),
+  });
+  const loginRes = await fetch(`${baseUrl}/v1/auth/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, password }),
+  });
+  if (!loginRes.ok)
+    throw new Error(`admin login failed: ${loginRes.status} ${await loginRes.text()}`);
+  const body = (await loginRes.json()) as { tokens: { accessToken: string } };
+  return { Authorization: `Bearer ${body.tokens.accessToken}` };
 }
 
 describe('Beta recruitment API (waitlist + feedback)', () => {
@@ -17,6 +40,7 @@ describe('Beta recruitment API (waitlist + feedback)', () => {
   let baseUrl: string;
 
   beforeEach(async () => {
+    resetBetaStores();
     waitlistStore.clear();
     feedbackStore.clear();
     if (server) await new Promise((resolve) => server.close(resolve));
@@ -82,7 +106,8 @@ describe('Beta recruitment API (waitlist + feedback)', () => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email: 'second@example.com' }),
     });
-    const res = await fetch(`${baseUrl}/v1/beta/waitlist`);
+    const headers = await adminHeaders(baseUrl);
+    const res = await fetch(`${baseUrl}/v1/beta/waitlist`, { headers });
     const body = await asJson(res);
     expect(body.total).toBe(2);
     expect(body.entries[0].email).toBe('second@example.com');
@@ -116,9 +141,10 @@ describe('Beta recruitment API (waitlist + feedback)', () => {
     const signupBody = await asJson(signup);
     const id = signupBody.entry.id;
 
+    const headers = await adminHeaders(baseUrl);
     const res = await fetch(`${baseUrl}/v1/beta/waitlist/${id}/status`, {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...headers },
       body: JSON.stringify({ status: 'invited' }),
     });
     expect(res.status).toBe(200);
@@ -136,9 +162,10 @@ describe('Beta recruitment API (waitlist + feedback)', () => {
     const signupBody = await asJson(signup);
     const id = signupBody.entry.id;
 
+    const headers = await adminHeaders(baseUrl);
     const res = await fetch(`${baseUrl}/v1/beta/waitlist/${id}/status`, {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...headers },
       body: JSON.stringify({ status: 'bogus' }),
     });
     expect(res.status).toBe(400);
@@ -147,9 +174,10 @@ describe('Beta recruitment API (waitlist + feedback)', () => {
   });
 
   it('PATCH /v1/beta/waitlist/:id/status returns 404 for unknown id', async () => {
+    const headers = await adminHeaders(baseUrl);
     const res = await fetch(`${baseUrl}/v1/beta/waitlist/nonexistent/status`, {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...headers },
       body: JSON.stringify({ status: 'active' }),
     });
     expect(res.status).toBe(404);
@@ -220,7 +248,8 @@ describe('Beta recruitment API (waitlist + feedback)', () => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ category: 'ux', message: 'second issue' }),
     });
-    const res = await fetch(`${baseUrl}/v1/beta/feedback`);
+    const headers = await adminHeaders(baseUrl);
+    const res = await fetch(`${baseUrl}/v1/beta/feedback`, { headers });
     const body = await asJson(res);
     expect(body.total).toBe(2);
     expect(body.entries[0].message).toBe('second issue');

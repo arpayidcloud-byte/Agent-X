@@ -184,7 +184,7 @@ app.get('/health', async (_req, res) => {
 });
 
 // ─── LLM run endpoint (wired to router) ────
-app.post('/v1/agentx/run', async (req, res): Promise<void> => {
+app.post('/v1/agentx/run', requireAuth, async (req, res): Promise<void> => {
   try {
     const { prompt, taskId, description, complexity, type, budget, provider } = req.body ?? {};
 
@@ -261,7 +261,7 @@ app.post('/v1/agentx/run', async (req, res): Promise<void> => {
 // ─── Async stream run (Web Pro: SSE real-time task execution) ────
 // POST returns 202 + taskId immediately; the task runs in the background and
 // emits lifecycle events consumed via GET /v1/agentx/tasks/:id/events.
-app.post('/v1/agentx/run/stream', async (req, res): Promise<void> => {
+app.post('/v1/agentx/run/stream', requireAuth, async (req, res): Promise<void> => {
   try {
     const { prompt, taskId, description, complexity, type, budget, provider } = req.body ?? {};
 
@@ -464,7 +464,7 @@ app.get('/v1/agentx/tasks/:id/events', (req, res) => {
 // ─── Chat (Web Pro): single-turn with transcript context ────
 // Builds a bounded transcript prompt from the conversation, then routes it
 // through the LLM router like any other task.
-app.post('/v1/agentx/chat', async (req, res): Promise<void> => {
+app.post('/v1/agentx/chat', requireAuth, async (req, res): Promise<void> => {
   try {
     const { messages, taskId, complexity, type, budget, provider } = req.body ?? {};
     const parsed = parseChatMessages(messages);
@@ -515,7 +515,7 @@ app.post('/v1/agentx/chat', async (req, res): Promise<void> => {
 // ─── Chat streaming (Web Pro): SSE token stream ────
 // POST returns 202 + chatId; events (start -> chunk* -> complete/error) are
 // consumed via GET /v1/agentx/chat/:id/events.
-app.post('/v1/agentx/chat/stream', async (req, res): Promise<void> => {
+app.post('/v1/agentx/chat/stream', requireAuth, async (req, res): Promise<void> => {
   try {
     const { messages, taskId, complexity, type, budget, provider } = req.body ?? {};
     const parsed = parseChatMessages(messages);
@@ -757,7 +757,7 @@ app.delete('/v1/prompt-templates/:id', maybeRequireAdmin, async (req, res) => {
 // POST accepts multiple goals (one per element) and runs them through the
 // specialist team concurrently (bounded pool). Returns 202 + runId; progress
 // streams over GET /v1/agentx/multi-agent/:runId/events (SSE/WS).
-app.post('/v1/agentx/multi-agent/run', async (req, res): Promise<void> => {
+app.post('/v1/agentx/multi-agent/run', requireAuth, async (req, res): Promise<void> => {
   try {
     const { goals, concurrency } = req.body ?? {};
     if (!Array.isArray(goals) || goals.length === 0 || goals.length > 10) {

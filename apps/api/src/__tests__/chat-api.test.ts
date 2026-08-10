@@ -4,7 +4,27 @@ import { chunkText, buildChatPrompt, parseChatMessages } from '../chat-stream.js
 
 // Mock providers must be registered before the server module initializes.
 process.env.ENABLE_MOCK_PROVIDER = 'true';
+process.env.AUTH_ENABLED = 'true';
+process.env.ADMIN_EMAILS = 'admin@agentx.dev';
+process.env.JWT_SECRET = 'test-secret';
+delete process.env.DATABASE_URL;
 const { app } = await import('../agentx-server.js');
+
+async function authHeader(baseUrl: string): Promise<Record<string, string>> {
+  const email = `chat-${Date.now()}-${Math.random().toString(36).slice(2, 6)}@agentx.dev`;
+  await fetch(`${baseUrl}/v1/auth/register`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, password: 'Test1234!' }),
+  });
+  const login = await fetch(`${baseUrl}/v1/auth/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, password: 'Test1234!' }),
+  });
+  const { tokens } = (await login.json()) as { tokens: { accessToken: string } };
+  return { Authorization: `Bearer ${tokens.accessToken}` };
+}
 
 describe('Chat API (Web Pro)', () => {
   let server: Server;
@@ -23,9 +43,10 @@ describe('Chat API (Web Pro)', () => {
   });
 
   it('POST /v1/agentx/chat returns a routed response with transcript context', async () => {
+    const headers = await authHeader(baseUrl);
     const res = await fetch(`${baseUrl}/v1/agentx/chat`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...headers },
       body: JSON.stringify({
         messages: [
           { role: 'user', content: 'Hello' },
@@ -42,6 +63,7 @@ describe('Chat API (Web Pro)', () => {
   });
 
   it('POST /v1/agentx/chat rejects malformed messages with 400', async () => {
+    const headers = await authHeader(baseUrl);
     const cases = [
       {},
       { messages: [] },
@@ -52,7 +74,7 @@ describe('Chat API (Web Pro)', () => {
     for (const body of cases) {
       const res = await fetch(`${baseUrl}/v1/agentx/chat`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...headers },
         body: JSON.stringify(body),
       });
       expect(res.status).toBe(400);
@@ -60,9 +82,10 @@ describe('Chat API (Web Pro)', () => {
   });
 
   it('POST /v1/agentx/chat/stream returns 202 + SSE start/chunk/complete sequence', async () => {
+    const headers = await authHeader(baseUrl);
     const runRes = await fetch(`${baseUrl}/v1/agentx/chat/stream`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...headers },
       body: JSON.stringify({ messages: [{ role: 'user', content: 'Stream this answer' }] }),
     });
     expect(runRes.status).toBe(202);

@@ -178,11 +178,16 @@ describe('Password recovery (set / forgot / reset)', () => {
   });
 
   it('change-password still requires the current password (no bypass)', async () => {
-    const reg = await post(baseUrl, '/v1/auth/register', {
+    await post(baseUrl, '/v1/auth/register', {
       email: 'pw@test.com',
       password: 'original-pass',
     });
-    const { tokens } = await asJson(reg);
+    const loginRes = await post(baseUrl, '/v1/auth/cli-login', {
+      email: 'pw@test.com',
+      password: 'original-pass',
+    });
+    expect(loginRes.status).toBe(200);
+    const { tokens } = await asJson(loginRes);
 
     const wrong = await post(
       baseUrl,

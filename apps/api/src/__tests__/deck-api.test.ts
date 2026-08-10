@@ -2,7 +2,27 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import type { Server } from 'node:http';
 
 process.env.ENABLE_MOCK_PROVIDER = 'true';
+process.env.AUTH_ENABLED = 'true';
+process.env.ADMIN_EMAILS = 'admin@agentx.dev';
+process.env.JWT_SECRET = 'test-secret';
+delete process.env.DATABASE_URL;
 const { app } = await import('../agentx-server.js');
+
+async function authHeader(baseUrl: string): Promise<Record<string, string>> {
+  const email = `deck-${Date.now()}-${Math.random().toString(36).slice(2, 6)}@agentx.dev`;
+  await fetch(`${baseUrl}/v1/auth/register`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, password: 'Test1234!' }),
+  });
+  const login = await fetch(`${baseUrl}/v1/auth/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, password: 'Test1234!' }),
+  });
+  const { tokens } = (await login.json()) as { tokens: { accessToken: string } };
+  return { Authorization: `Bearer ${tokens.accessToken}` };
+}
 
 interface DeckPayload {
   generatedAt: string;
@@ -60,9 +80,10 @@ describe('Command Deck API (Web Pro)', () => {
 
   it('records a run/stream task and reflects real progress + token usage in deck.task', async () => {
     const start = Date.now();
+    const headers = await authHeader(baseUrl);
     const res = await fetch(`${baseUrl}/v1/agentx/run/stream`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...headers },
       body: JSON.stringify({ prompt: 'deck proof task', description: 'deck proof' }),
     });
     expect(res.status).toBe(202);

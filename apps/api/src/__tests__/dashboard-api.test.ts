@@ -1,13 +1,31 @@
 import { describe, it, expect, beforeEach, afterAll } from 'vitest';
 import type { Server } from 'node:http';
 
-// Mock providers must be registered before the server module initializes.
 process.env.ENABLE_MOCK_PROVIDER = 'true';
+process.env.AUTH_ENABLED = 'true';
+process.env.ADMIN_EMAILS = 'admin@agentx.dev';
+process.env.JWT_SECRET = 'test-secret';
+delete process.env.DATABASE_URL;
 const { app, taskStore } = await import('../agentx-server.js');
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function asJson<T = any>(res: Response): Promise<T> {
   return (await res.json()) as T;
+}
+async function authHeader(baseUrl: string): Promise<Record<string, string>> {
+  const email = `dash-${Date.now()}-${Math.random().toString(36).slice(2, 6)}@agentx.dev`;
+  await fetch(`${baseUrl}/v1/auth/register`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, password: 'Test1234!' }),
+  });
+  const login = await fetch(`${baseUrl}/v1/auth/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, password: 'Test1234!' }),
+  });
+  const { tokens } = (await login.json()) as { tokens: { accessToken: string } };
+  return { Authorization: `Bearer ${tokens.accessToken}` };
 }
 
 describe('Dashboard API (task store, stats)', () => {
@@ -28,9 +46,10 @@ describe('Dashboard API (task store, stats)', () => {
   });
 
   it('POST /v1/agentx/run records a task and GET /v1/agentx/tasks returns it', async () => {
+    const headers = await authHeader(baseUrl);
     const runRes = await fetch(`${baseUrl}/v1/agentx/run`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...headers },
       body: JSON.stringify({ prompt: 'Hello from dashboard test', taskId: 'test-task-1' }),
     });
     expect(runRes.status).toBe(200);
@@ -49,10 +68,11 @@ describe('Dashboard API (task store, stats)', () => {
   });
 
   it('GET /v1/agentx/tasks respects limit and orders newest first', async () => {
+    const headers = await authHeader(baseUrl);
     for (let i = 0; i < 5; i++) {
       await fetch(`${baseUrl}/v1/agentx/run`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...headers },
         body: JSON.stringify({ prompt: `task ${i}`, taskId: `limit-task-${i}` }),
       });
     }
@@ -65,9 +85,10 @@ describe('Dashboard API (task store, stats)', () => {
   });
 
   it('POST /v1/agentx/run without prompt returns 400 and records nothing', async () => {
+    const headers = await authHeader(baseUrl);
     const res = await fetch(`${baseUrl}/v1/agentx/run`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...headers },
       body: JSON.stringify({}),
     });
     expect(res.status).toBe(400);
@@ -78,10 +99,11 @@ describe('Dashboard API (task store, stats)', () => {
   });
 
   it('GET /v1/agentx/stats returns metric totals as JSON', async () => {
+    const headers = await authHeader(baseUrl);
     // Fire one request so at least llm_requests_total > 0
     await fetch(`${baseUrl}/v1/agentx/run`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...headers },
       body: JSON.stringify({ prompt: 'stats probe', taskId: 'stats-task-1' }),
     });
     const res = await fetch(`${baseUrl}/v1/agentx/stats`);
