@@ -1,0 +1,30 @@
+{
+  "name": "@agent-xai/billing",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc --build",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "lint": "eslint src/"
+  },
+  "dependencies": {
+    "@agent-xai/persistence": "workspace:^"
+  },
+  "devDependencies": {
+    "typescript": "5.4.5",
+    "vitest": "^3.2.6",
+    "@types/node": "^20.0.0"
+  }
+}
