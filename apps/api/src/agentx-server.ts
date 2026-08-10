@@ -15,7 +15,14 @@ import {
   type QualityGrade,
 } from '@agent-xai/quality-scoring';
 import { generateFeedback, buildRevisionPrompt } from '@agent-xai/agent-feedback';
-import { maybeRequireAdmin, listUsers, register, deleteUser, updateUserRoles } from './auth.js';
+import {
+  maybeRequireAdmin,
+  requireAuth,
+  listUsers,
+  register,
+  deleteUser,
+  updateUserRoles,
+} from './auth.js';
 import { createHttpServer } from './ws-bridge.js';
 import { PromptTemplateRepository, getPrisma } from '@agent-xai/persistence';
 import { mountSwagger } from './swagger.js';
@@ -996,7 +1003,7 @@ app.post('/v1/feedback/:id/revision', async (req, res): Promise<void> => {
 // ─── Cost tracking: summary ────
 // Persistent cost data from CostEntry table (historical).
 // Wrapped in { overview, byProvider, byModel } to match admin panel format.
-app.get('/v1/cost/summary', async (req, res) => {
+app.get('/v1/cost/summary', maybeRequireAdmin, async (req, res) => {
   try {
     const days = Number(req.query.days) || 30;
     const s = await costRepo.getSummary(days);
@@ -1029,7 +1036,7 @@ app.get('/v1/cost/summary', async (req, res) => {
 });
 
 // ─── Cost tracking: entries list ────
-app.get('/v1/cost/entries', async (req, res) => {
+app.get('/v1/cost/entries', maybeRequireAdmin, async (req, res) => {
   try {
     const limit = Math.min(Number(req.query.limit) || 50, 200);
     const offset = Number(req.query.offset) || 0;
@@ -1042,7 +1049,7 @@ app.get('/v1/cost/entries', async (req, res) => {
 
 // ─── Analytics summary (Web Pro) ────
 // Aggregates the LLM metrics registry into a dashboard-friendly summary.
-app.get('/v1/analytics/summary', async (_req, res) => {
+app.get('/v1/analytics/summary', requireAuth, async (_req, res) => {
   try {
     const snapshot = await llmMetrics.getSnapshot();
     res.json(computeAnalyticsSummary(snapshot));

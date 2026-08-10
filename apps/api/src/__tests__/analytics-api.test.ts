@@ -1,18 +1,37 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import type { Server } from 'node:http';
 
+const ADMIN_EMAIL = `analytics-admin-${Date.now()}@agentx.dev`;
 process.env.ENABLE_MOCK_PROVIDER = 'true';
+process.env.AUTH_ENABLED = 'true';
+process.env.ADMIN_EMAILS = ADMIN_EMAIL;
 const { app } = await import('../agentx-server.js');
 
 describe('Analytics API (Web Pro)', () => {
   let server: Server;
   let baseUrl: string;
+  let token: string;
 
   beforeAll(async () => {
     server = app.listen(0);
     const address = server.address();
     if (!address || typeof address === 'string') throw new Error('no port');
     baseUrl = `http://127.0.0.1:${address.port}`;
+
+    // Register admin & login to obtain a valid Bearer token
+    const reg = await fetch(`${baseUrl}/v1/auth/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: ADMIN_EMAIL, password: 'Test1234!' }),
+    });
+    expect(reg.status).toBe(201);
+    const login = await fetch(`${baseUrl}/v1/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: ADMIN_EMAIL, password: 'Test1234!' }),
+    });
+    const body = (await login.json()) as { tokens: { accessToken: string } };
+    token = body.tokens.accessToken;
   });
 
   afterAll(async () => {
@@ -20,7 +39,9 @@ describe('Analytics API (Web Pro)', () => {
   });
 
   it('GET /v1/analytics/summary returns a well-formed summary', async () => {
-    const res = await fetch(`${baseUrl}/v1/analytics/summary`);
+    const res = await fetch(`${baseUrl}/v1/analytics/summary`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
     expect(res.status).toBe(200);
     const body = (await res.json()) as {
       generatedAt: string;
@@ -36,7 +57,8 @@ describe('Analytics API (Web Pro)', () => {
   });
 
   it('records a request and reflects it in the summary', async () => {
-    const before = (await (await fetch(`${baseUrl}/v1/analytics/summary`)).json()) as {
+    const headers = { Authorization: `Bearer ${token}` };
+    const before = (await (await fetch(`${baseUrl}/v1/analytics/summary`, { headers })).json()) as {
       overview: { totalRequests: number };
     };
     await fetch(`${baseUrl}/v1/agentx/run`, {
@@ -45,9 +67,14 @@ describe('Analytics API (Web Pro)', () => {
       body: JSON.stringify({ prompt: 'analytics proof' }),
     });
     // llmMetrics is a shared singleton; verify the counter incremented.
-    const after = (await (await fetch(`${baseUrl}/v1/analytics/summary`)).json()) as {
+    const after = (await (await fetch(`${baseUrl}/v1/analytics/summary`, { headers })).json()) as {
       overview: { totalRequests: number };
     };
     expect(after.overview.totalRequests).toBeGreaterThanOrEqual(before.overview.totalRequests);
+  });
+
+  it('GET /v1/analytics/summary requires auth (401 without token)', async () => {
+    const res = await fetch(`${baseUrl}/v1/analytics/summary`);
+    expect(res.status).toBe(401);
   });
 });
