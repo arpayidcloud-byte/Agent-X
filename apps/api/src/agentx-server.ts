@@ -43,6 +43,7 @@ import { registerAdminLlmRoutes } from './admin-llm-routes.js';
 import { registerCliRoutes } from './cli-routes.js';
 import { registerProviderGroupRoutes } from './provider-group-routes.js';
 import { registerDeckRoutes } from './deck.js';
+import { registerBillingRoutes } from './billing-routes.js';
 import { syncProvidersFromDb } from './llm-providers.js';
 import {
   publishEvent,
@@ -93,6 +94,7 @@ app.use((req, res, next) => {
 
 registerAuthRoutes(app);
 registerOAuthRoutes(app);
+registerBillingRoutes(app);
 
 // ─── Swagger / OpenAPI docs ────
 mountSwagger(app);

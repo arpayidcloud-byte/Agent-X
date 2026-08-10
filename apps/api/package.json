@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@agent-xai/agent-feedback": "workspace:^",
+    "@agent-xai/billing": "workspace:^",
     "@agent-xai/llm-router": "workspace:*",
     "@agent-xai/multi-agent-collaboration": "workspace:^",
     "@agent-xai/observability": "workspace:*",
