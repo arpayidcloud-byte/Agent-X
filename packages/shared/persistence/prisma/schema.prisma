@@ -1,5 +1,5 @@
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
   // Pin the engine binary explicitly: prisma generate can't detect the
   // openssl version during docker builds (no openssl CLI) and would emit a
   // 1.1.x engine that fails at runtime on Debian bookworm (openssl 3).
@@ -12,29 +12,31 @@ datasource db {
 }
 
 model Task {
-  id          String   @id @default(cuid())
-  goal        String
-  status      String
-  priority    String
-  parentTaskId String?
-  rootTaskId  String
+  id                String    @id @default(cuid())
+  goal              String
+  status            String
+  priority          String
+  parentTaskId      String?
+  rootTaskId        String
   assignedAgentRole String?
-  dependsOn   String[]
-  traceId     String
-  metadata    Json
-  context     Json
-  result      Json?
-  error       Json?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  completedAt DateTime?
-  
-  children    Task[]   @relation("TaskHierarchy")
-  parent      Task?    @relation("TaskHierarchy", fields: [parentTaskId], references: [id])
-  events      Event[]
-  
+  dependsOn         String[]
+  traceId           String
+  metadata          Json
+  context           Json
+  result            Json?
+  error             Json?
+  orgId             String? // isolasi per-org (RLS app-level dulu)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  completedAt       DateTime?
+
+  children Task[]  @relation("TaskHierarchy")
+  parent   Task?   @relation("TaskHierarchy", fields: [parentTaskId], references: [id])
+  events   Event[]
+
   @@index([rootTaskId, status])
   @@index([assignedAgentRole, status])
+  @@index([orgId])
 }
 
 model Event {
@@ -43,49 +45,55 @@ model Event {
   payload   Json
   taskId    String?
   createdAt DateTime @default(now())
-  
-  task      Task?    @relation(fields: [taskId], references: [id])
-  
+
+  task Task? @relation(fields: [taskId], references: [id])
+
   @@index([topic, createdAt])
   @@index([taskId])
 }
 
 model Approval {
-  id        String   @id @default(cuid())
-  taskId    String   @unique
-  status    String   @default("PENDING")
-  reason    String?
+  id         String    @id @default(cuid())
+  taskId     String    @unique
+  status     String    @default("PENDING")
+  reason     String?
   approvedBy String?
-  decidedAt DateTime?
-  createdAt DateTime @default(now())
-  
+  decidedAt  DateTime?
+  createdAt  DateTime  @default(now())
+
   @@index([status])
 }
 
 model Memory {
-  id          String   @id @default(cuid())
-  type        String
-  content     String
-  importance  Int      @default(50)
-  sessionId   String?
-  taskId      String?
-  metadata    Json
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  
+  id         String   @id @default(cuid())
+  type       String
+  content    String
+  importance Int      @default(50)
+  sessionId  String?
+  taskId     String?
+  metadata   Json
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
   @@index([type, importance])
   @@index([sessionId])
   @@index([taskId])
 }
 
 model User {
-  id           String   @id @default(cuid())
-  email        String   @unique
-  passwordHash String
-  roles        String[]
-  emailVerified Boolean @default(false)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id                 String   @id @default(cuid())
+  email              String   @unique
+  passwordHash       String
+  roles              String[]
+  emailVerified      Boolean  @default(false)
+  orgId              String? // default org (opsional, primary org)
+  verificationToken  String?
+  stripeCustomerId   String?  @unique
+  midtransCustomerId String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  members OrganizationMember[]
 }
 
 // Email verification tokens — one per user, consumed on verify.
@@ -147,12 +155,12 @@ model AdminAuditLog {
 // CLI sync token (agentx config pull). Only the SHA-256 hash is stored;
 // the plaintext token is shown once at creation and can be revoked.
 model CliToken {
-  id        String   @id @default(cuid())
-  tokenHash String   @unique
-  name      String   @default("default")
-  createdAt DateTime @default(now())
+  id         String    @id @default(cuid())
+  tokenHash  String    @unique
+  name       String    @default("default")
+  createdAt  DateTime  @default(now())
   lastUsedAt DateTime?
-  revokedAt DateTime?
+  revokedAt  DateTime?
 
   @@index([createdAt])
 }
@@ -259,7 +267,7 @@ model PromptTemplate {
   tags        String[]
   version     Int      @default(1)
   usageCount  Int      @default(0)
-  createdBy   String?  // user id or 'system'
+  createdBy   String? // user id or 'system'
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -267,45 +275,49 @@ model PromptTemplate {
   @@index([tags])
   @@index([createdAt])
 }
+
 model CostEntry {
-  id          String   @id @default(cuid())
-  taskId      String?
-  userId      String?
-  provider    String   // e.g. "openai", "deepseek", "anthropic"
-  model       String   // e.g. "gpt-4", "deepseek-v3"
-  inputTokens Int      @default(0)
-  outputTokens Int     @default(0)
-  totalTokens Int      @default(0)
-  costUsd     Float    @default(0)
-  latencyMs   Int      @default(0)
-  cached      Boolean  @default(false)
-  source      String   @default("api") // "api", "cli", "web", "multi-agent"
-  createdAt   DateTime @default(now())
+  id             String   @id @default(cuid())
+  taskId         String?
+  userId         String?
+  orgId          String? // untuk alokasi biaya per-org
+  subscriptionId String?
+  provider       String // e.g. "openai", "deepseek", "anthropic"
+  model          String // e.g. "gpt-4", "deepseek-v3"
+  inputTokens    Int      @default(0)
+  outputTokens   Int      @default(0)
+  totalTokens    Int      @default(0)
+  costUsd        Float    @default(0)
+  latencyMs      Int      @default(0)
+  cached         Boolean  @default(false)
+  source         String   @default("api") // "api", "cli", "web", "multi-agent"
+  createdAt      DateTime @default(now())
 
   @@index([taskId])
   @@index([userId])
   @@index([provider])
   @@index([createdAt])
+  @@index([orgId])
 }
 
 model AgentTemplate {
-  id          String   @id @default(cuid())
-  name        String
-  description String?
-  authorId    String   // user id
-  authorName  String   // display name
+  id           String   @id @default(cuid())
+  name         String
+  description  String?
+  authorId     String // user id
+  authorName   String // display name
   systemPrompt String?
-  tags        String[]
-  category    String?  // "productivity", "coding", "research", "creative"
-  priceUsd    Float    @default(0) // 0 = free
-  installCount Int     @default(0)
-  rating      Float    @default(0)
-  ratingCount Int      @default(0)
-  isPublished Boolean  @default(false)
-  isFeatured  Boolean  @default(false)
-  config      Json?    // extra config (model, provider, params)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  tags         String[]
+  category     String? // "productivity", "coding", "research", "creative"
+  priceUsd     Float    @default(0) // 0 = free
+  installCount Int      @default(0)
+  rating       Float    @default(0)
+  ratingCount  Int      @default(0)
+  isPublished  Boolean  @default(false)
+  isFeatured   Boolean  @default(false)
+  config       Json? // extra config (model, provider, params)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
   @@index([authorId])
   @@index([category])
@@ -322,9 +334,109 @@ model Workflow {
   edges       Json     @default("[]") // React Flow edges array
   isPublished Boolean  @default(false)
   ownerId     String?
+  orgId       String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
   @@index([ownerId])
   @@index([isPublished])
+  @@index([orgId])
+}
+
+model Organization {
+  id            String               @id @default(cuid())
+  name          String
+  slug          String               @unique
+  planId        String? // FK Plan.id
+  plan          Plan?                @relation(fields: [planId], references: [id])
+  status        String               @default("active") // active | suspended | deleted
+  createdAt     DateTime             @default(now())
+  updatedAt     DateTime             @updatedAt
+  members       OrganizationMember[]
+  subscriptions Subscription[]
+  invoices      Invoice[]
+}
+
+model OrganizationMember {
+  id        String       @id @default(cuid())
+  orgId     String
+  userId    String
+  role      String       @default("member") // owner | admin | member | viewer
+  createdAt DateTime     @default(now())
+  org       Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  user      User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([orgId, userId])
+  @@index([userId])
+}
+
+model Plan {
+  id               String   @id @default(cuid())
+  slug             String   @unique // free | pro | team | enterprise | flex
+  name             String
+  priceUsd         Int // cents: 0, 2900, 9900, 49900
+  interval         String   @default("month") // month | year
+  maxTasksPerMonth Int
+  maxMembers       Int      @default(1)
+  features         Json // ["tasks:100","analytics:false",...]
+  isActive         Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  // Opposite relation fields (required by Prisma for Organization.plan / Subscription.plan)
+  organizations Organization[]
+  subscriptions Subscription[]
+}
+
+model Subscription {
+  id                    String       @id @default(cuid())
+  orgId                 String
+  userId                String? // creator
+  planId                String
+  status                String // trialing | active | past_due | canceled | incomplete
+  gateway               String // stripe | midtrans
+  gatewayCustomerId     String?
+  gatewaySubscriptionId String?      @unique
+  currentPeriodStart    DateTime?
+  currentPeriodEnd      DateTime?
+  trialEndsAt           DateTime?
+  cancelAtPeriodEnd     Boolean      @default(false)
+  createdAt             DateTime     @default(now())
+  updatedAt             DateTime     @updatedAt
+  org                   Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  plan                  Plan         @relation(fields: [planId], references: [id])
+
+  @@index([orgId, status])
+  @@index([gatewaySubscriptionId])
+}
+
+model Invoice {
+  id               String       @id @default(cuid())
+  orgId            String
+  subscriptionId   String?
+  gateway          String
+  gatewayInvoiceId String?      @unique
+  amountCents      Int
+  currency         String       @default("usd") // usd | idr
+  status           String // draft | open | paid | void | uncollectible
+  hostedInvoiceUrl String?
+  pdfUrl           String?
+  periodStart      DateTime?
+  periodEnd        DateTime?
+  paidAt           DateTime?
+  createdAt        DateTime     @default(now())
+  org              Organization @relation(fields: [orgId], references: [id])
+
+  @@index([orgId, createdAt])
+}
+
+model Entitlement {
+  id          String   @id @default(cuid())
+  orgId       String   @unique
+  tasksUsed   Int      @default(0)
+  periodStart DateTime
+  periodEnd   DateTime
+  updatedAt   DateTime @updatedAt
+
+  @@index([periodEnd])
 }
