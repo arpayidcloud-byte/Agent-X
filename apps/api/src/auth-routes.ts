@@ -9,6 +9,7 @@ import {
   createPasswordResetToken,
   resetPasswordWithToken,
   getUserById,
+  getUserBackend,
   hasPassword,
   createEmailVerificationToken,
   verifyEmailByToken,
@@ -65,7 +66,12 @@ export function registerAuthRoutes(app: Express): void {
         res.status(400).json({ error: 'Missing field: email' });
         return;
       }
-      const token = await createEmailVerificationToken(email);
+      const normalized = email.trim().toLowerCase();
+      if (!(await (await getUserBackend()).findByEmail(normalized))) {
+        res.json({ ok: true });
+        return;
+      }
+      const token = await createEmailVerificationToken(normalized);
       const webUrl = process.env.OAUTH_WEB_URL ?? 'http://localhost:30500';
       const verifyUrl = `${webUrl}/verify-email?token=${encodeURIComponent(token)}`;
       await sendMail({

@@ -211,6 +211,8 @@ export async function oauthLogin(
       passwordHash: '', // no local password; login via OAuth only
       roles: rolesFor(profile.email),
     });
+    await backend.updateEmailVerified(user.id, true);
+    user.emailVerified = true;
     created = true;
     logger.info('User created via OAuth', { provider, email: profile.email });
   }

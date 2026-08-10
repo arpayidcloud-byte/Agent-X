@@ -338,10 +338,7 @@ export function rolesFor(email: string): string[] {
   return ADMIN_EMAILS.includes(email.toLowerCase()) ? ['admin', 'user'] : ['user'];
 }
 
-export async function register(
-  email: string,
-  password: string,
-): Promise<{ user: AuthUser; tokens: AuthTokens }> {
+export async function register(email: string, password: string): Promise<{ user: AuthUser }> {
   if (!email || typeof email !== 'string' || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     throw new AuthError('Missing or invalid field: email', 400);
   }
@@ -362,7 +359,7 @@ export async function register(
     roles: rolesFor(normalized),
   });
   logger.info('User registered', { email: normalized, roles: user.roles });
-  return { user: toAuthUser(user), tokens: await issueTokens(user) };
+  return { user: toAuthUser(user) };
 }
 
 export async function login(
