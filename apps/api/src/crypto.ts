@@ -14,6 +14,9 @@ function masterKey(): Buffer {
     if (/^[A-Za-z0-9+/]{44}={0,2}$/.test(enc)) return Buffer.from(enc, 'base64');
     return Buffer.from(enc, 'utf8').slice(0, 32);
   }
+  if (!enc && process.env.NODE_ENV === 'production') {
+    throw new Error('LLM_PROVIDER_ENC_KEY must be set in production');
+  }
   const source = process.env.JWT_SECRET ?? 'dev-only-insecure-key';
   return createHash('sha256').update(source).digest();
 }
