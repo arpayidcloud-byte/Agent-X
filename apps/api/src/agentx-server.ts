@@ -22,6 +22,7 @@ import {
   register,
   deleteUser,
   updateUserRoles,
+  type AuthenticatedRequest,
 } from './auth.js';
 import { createHttpServer } from './ws-bridge.js';
 import { PromptTemplateRepository, getPrisma } from '@agent-xai/persistence';
@@ -225,6 +226,7 @@ app.post('/v1/agentx/run', async (req, res): Promise<void> => {
       try {
         await costRepo.create({
           taskId: request.taskId,
+          userId: (req as AuthenticatedRequest).auth?.sub ?? undefined,
           provider: response.provider ?? 'unknown',
           model: response.model ?? 'unknown',
           inputTokens: response.usage?.inputTokens ?? 0,
@@ -390,6 +392,7 @@ app.post('/v1/agentx/run/stream', async (req, res): Promise<void> => {
         try {
           await costRepo.create({
             taskId: request.taskId,
+            userId: (req as AuthenticatedRequest).auth?.sub ?? undefined,
             provider: response.provider ?? 'unknown',
             model: response.model ?? 'unknown',
             inputTokens: response.usage?.inputTokens ?? 0,
@@ -487,6 +490,7 @@ app.post('/v1/agentx/chat', async (req, res): Promise<void> => {
     try {
       await costRepo.create({
         taskId: request.taskId,
+        userId: (req as AuthenticatedRequest).auth?.sub ?? undefined,
         provider: response.provider ?? 'unknown',
         model: response.model ?? 'unknown',
         inputTokens: response.usage?.inputTokens ?? 0,
