@@ -33,6 +33,7 @@
     "vitest": "^3.2.6"
   },
   "dependencies": {
-    "@agent-xai/shared": "workspace:*"
+    "@agent-xai/shared": "workspace:*",
+    "@agent-xai/persistence": "workspace:^"
   }
 }
