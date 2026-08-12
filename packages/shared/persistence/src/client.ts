@@ -42,5 +42,3 @@ export async function disconnectDb(): Promise<void> {
     unavailable = false;
   }
 }
-
-export { tenantIsolation, assertOrgOwned } from './tenant-isolation.js';
