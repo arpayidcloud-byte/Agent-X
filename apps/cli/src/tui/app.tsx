@@ -119,7 +119,7 @@ export default function AgentXTUI(): React.ReactNode {
 
   // ─── Data state ────
   const [health, setHealth] = useState<HealthResponse | null>(null);
-  const [deck, setDeck] = useState<any>(null);
+  const [deck, setDeck] = useState<unknown>(null);
   const [tasks, setTasks] = useState<TaskItem[]>([]);
   const [providers, setProviders] = useState<ProviderInfo[]>([]);
   const [cost, setCost] = useState<CostSummary | null>(null);
@@ -167,7 +167,7 @@ export default function AgentXTUI(): React.ReactNode {
       setCost(c);
       setTaskHistory((prev) => [...prev.slice(-19), t.length]);
       void cloudFetch('/v1/agentx/deck')
-        .then((d: any) => setDeck(d))
+        .then((d: unknown) => setDeck(d))
         .catch(() => {});
     } catch (e) {
       const status = (e as Error & { status?: number }).status;
