@@ -1,5 +1,11 @@
 import express from 'express';
-import { llmMetrics, alertManager, healthChecker, Logger } from '@agent-xai/observability';
+import {
+  llmMetrics,
+  businessMetrics,
+  alertManager,
+  healthChecker,
+  Logger,
+} from '@agent-xai/observability';
 import { LLMRouter, OpenAIMock, DeepSeekMock, AnthropicMock } from '@agent-xai/llm-router';
 import { executeRoute } from './combo-router.js';
 import { createRequestLogger } from './request-logger.js';
@@ -242,6 +248,7 @@ app.post('/v1/agentx/run', requireAuth, quotaMiddleware, async (req, res): Promi
           cached: response.cached ?? false,
           source: 'api',
         });
+        businessMetrics.costEntries.inc({ provider: response.provider ?? 'unknown' });
       } catch {
         /* cost recording is best-effort */
       }
@@ -408,6 +415,7 @@ app.post('/v1/agentx/run/stream', requireAuth, quotaMiddleware, async (req, res)
             cached: response.cached ?? false,
             source: 'api',
           });
+          businessMetrics.costEntries.inc({ provider: response.provider ?? 'unknown' });
         } catch {
           /* cost recording is best-effort */
         }
@@ -1161,6 +1169,7 @@ app.post('/v1/beta/waitlist', async (req, res): Promise<void> => {
       createdAt: new Date().toISOString(),
     };
     await backend.waitlistCreate(entry);
+    businessMetrics.waitlistCreated.inc({ status: 'pending' });
     const { total } = await backend.waitlistStats();
     logger.info('Beta waitlist signup', { id: entry.id, email: normalized });
     void notifySlack(`:tada: New beta waitlist signup: ${normalized}`, [
@@ -1275,6 +1284,7 @@ app.post('/v1/beta/feedback', async (req, res): Promise<void> => {
     };
     const backend = await getBetaBackend();
     await backend.feedbackCreate(entry);
+    businessMetrics.feedbackCreated.inc({ category: cat, rating: String(entry.rating ?? 0) });
     const total = await backend.feedbackCount();
     logger.info('Beta feedback submitted', { id: entry.id, category: cat });
     void notifySlack(
