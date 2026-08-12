@@ -19,6 +19,7 @@ import type { AuthenticatedRequest } from './auth.js';
 import { verifyTurnstile } from './turnstile.js';
 import { sendMail } from './mailer.js';
 import { createTrialOnRegister } from '@agent-xai/billing';
+import { businessMetrics } from '@agent-xai/observability';
 
 export function registerAuthRoutes(app: Express): void {
   // ─── Register ──── (email verify flow — no auto issueTokens)
@@ -103,8 +104,10 @@ export function registerAuthRoutes(app: Express): void {
         return;
       }
       const result = await login(email, password);
+      businessMetrics.authLogin.inc({ method: 'panel', status: 'success' });
       res.json(result);
     } catch (e) {
+      businessMetrics.authLogin.inc({ method: 'panel', status: 'failure' });
       const status = e instanceof Error && 'status' in e ? (e as { status: number }).status : 500;
       res.status(status).json({ error: e instanceof Error ? e.message : String(e) });
     }
@@ -119,8 +122,10 @@ export function registerAuthRoutes(app: Express): void {
         return;
       }
       const result = await login(email, password);
+      businessMetrics.authLogin.inc({ method: 'cli', status: 'success' });
       res.json(result);
     } catch (e) {
+      businessMetrics.authLogin.inc({ method: 'cli', status: 'failure' });
       const status = e instanceof Error && 'status' in e ? (e as { status: number }).status : 500;
       res.status(status).json({ error: e instanceof Error ? e.message : String(e) });
     }
