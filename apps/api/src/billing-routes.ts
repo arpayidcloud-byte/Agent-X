@@ -427,7 +427,9 @@ export function registerBillingRoutes(app: Express): void {
             })
           : { _sum: { costUsd: 0 } };
         // Invoices (admin or owner can read; we restrict to admin for security)
-        const invoices = req.auth?.isAdmin
+        const authExtended = req.auth as unknown as { isAdmin?: boolean };
+        const isAdmin = authExtended?.isAdmin === true;
+        const invoices = isAdmin
           ? await prisma.invoice.findMany({
               where: orgId ? { orgId } : {},
               orderBy: { createdAt: 'desc' },
