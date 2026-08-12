@@ -5,7 +5,6 @@
 // exactly once at creation time, so the panel can show it for copy/paste.
 
 import { createHash, randomBytes } from 'node:crypto';
-import { businessMetrics } from '@agent-xai/observability';
 import { getPrisma } from '@agent-xai/persistence';
 
 export interface CliTokenView {
@@ -100,7 +99,6 @@ export async function createCliToken(
     const r = await prisma.cliToken.create({
       data: { tokenHash: hash, name },
     });
-    businessMetrics.cliTokenCreated.inc();
     return { token, view: mapRow(r) };
   }
   const id = `cli-${++memorySeq}`;
@@ -109,7 +107,6 @@ export async function createCliToken(
   const row: CliTokenRow = { id, name, createdAt: now, lastUsedAt: null, revokedAt: null };
   memoryTokens.set(id, row);
   memoryHashIndex.set(hash, id);
-  businessMetrics.cliTokenCreated.inc();
   return { token, view: row };
 }
 
