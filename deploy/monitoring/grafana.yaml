@@ -318,7 +318,8 @@ spec:
           configMap:
             name: grafana-dashboard
         - name: storage
-          emptyDir: {}
+          persistentVolumeClaim:
+            claimName: grafana-storage
 ---
 apiVersion: v1
 kind: Service
