@@ -16,7 +16,6 @@
   "scripts": {
     "build": "tsc --build",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run",
     "lint": "eslint src/"
   },
   "dependencies": {

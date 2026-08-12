@@ -85,7 +85,13 @@ export function BillingCard() {
   };
 
   useEffect(() => {
-    void load();
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (!cancelled) void load();
+    });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const checkout = async (slug: string) => {
@@ -104,7 +110,7 @@ export function BillingCard() {
       });
       const body = (await r.json()) as { url?: string; error?: string };
       if (!r.ok) throw new Error(body.error ?? 'Checkout failed');
-      if (body.url) window.location.href = body.url;
+      if (body.url) void window.location.assign(body.url);
     } catch (e) {
       setMessage({ ok: false, text: e instanceof Error ? e.message : 'Checkout gagal.' });
     } finally {
