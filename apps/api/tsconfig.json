@@ -7,6 +7,8 @@
   "include": ["src/**/*"],
   "references": [
     { "path": "../../packages/shared/observability" },
+    { "path": "../../packages/shared/tenant" },
+    { "path": "../../packages/shared/persistence" },
     { "path": "../../packages/shared/billing" },
     { "path": "../../packages/provider/llm-router" }
   ]
