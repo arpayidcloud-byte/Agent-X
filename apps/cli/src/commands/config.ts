@@ -1,8 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { configHome } from '../lib/cloud-api.js';
+import { CONFIG_FILE } from '../lib/cloud-api.js';
 
-const CONFIG_FILE = path.join(configHome, 'config.json');
 const DEFAULT_API = 'https://api.id-tech.cloud';
 
 function loadConfig(): Record<string, unknown> {
