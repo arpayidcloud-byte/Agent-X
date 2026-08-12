@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import {
   Cable,
+  CreditCard,
   History,
   LayoutDashboard,
   Layers,
@@ -36,6 +37,7 @@ const NAV_ITEMS = [
   { href: '/workflows', label: 'Workflows', icon: Workflow },
   { href: '/eval', label: 'Evaluation', icon: FlaskConical },
   { href: '/cost', label: 'Cost Tracking', icon: DollarSign },
+  { href: '/billing', label: 'Billing', icon: CreditCard },
   { href: '/activity', label: 'Activity', icon: Activity },
   { href: '/providers', label: 'LLM Providers', icon: Cable },
   { href: '/groups', label: 'Combo Providers', icon: Layers },
