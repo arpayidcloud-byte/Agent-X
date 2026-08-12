@@ -14,6 +14,11 @@ import { watch } from './commands/watch.js';
 import { tui as tuiCommand } from './commands/tui.js';
 import { login } from './commands/login.js';
 import { chat, authWhoami, providersList } from './commands/chat.js';
+import { evalCmd } from './commands/eval.js';
+import { workflowCmd } from './commands/workflow.js';
+import { marketplaceCmd } from './commands/marketplace.js';
+import { membersCmd } from './commands/members.js';
+import { analyticsCmd } from './commands/analytics.js';
 
 const require = createRequire(import.meta.url);
 const pkg = require('../package.json');
@@ -171,6 +176,93 @@ program
     }
   });
 
+program
+  .command('eval')
+  .description('Eval commands: leaderboard, benchmark, experiments')
+  .argument('[subcommand]', 'leaderboard, benchmark, or experiments')
+  .option('--provider <name>', 'Provider name for benchmark')
+  .option('--cases <file>', 'Cases file for benchmark')
+  .action(
+    async (subcommand: string | undefined, options: { provider?: string; cases?: string }) => {
+      try {
+        const args = subcommand ? [subcommand] : [];
+        if (options.provider) args.push('--provider', options.provider);
+        if (options.cases) args.push('--cases', options.cases);
+        await evalCmd(args);
+      } catch (error) {
+        console.error(error instanceof Error ? error.message : String(error));
+        process.exit(1);
+      }
+    },
+  );
+
+program
+  .command('workflow')
+  .description('Workflow commands: list, create, delete, export')
+  .argument('[subcommand]', 'list, create, delete, or export')
+  .argument('[arg]', 'Workflow ID or file path')
+  .action(async (subcommand: string | undefined, arg: string | undefined) => {
+    try {
+      const args = [];
+      if (subcommand) args.push(subcommand);
+      if (arg) args.push(arg);
+      await workflowCmd(args);
+    } catch (error) {
+      console.error(error instanceof Error ? error.message : String(error));
+      process.exit(1);
+    }
+  });
+
+program
+  .command('marketplace')
+  .description('Marketplace commands: list, templates')
+  .argument('[subcommand]', 'list or templates')
+  .action(async (subcommand: string | undefined) => {
+    try {
+      await marketplaceCmd(subcommand ? [subcommand] : []);
+    } catch (error) {
+      console.error(error instanceof Error ? error.message : String(error));
+      process.exit(1);
+    }
+  });
+
+program
+  .command('members')
+  .description('Team member commands: list, add, remove')
+  .argument('[subcommand]', 'list, add, or remove')
+  .argument('[email]', 'Member email')
+  .option('--role <role>', 'Role for add (default: member)')
+  .action(
+    async (
+      subcommand: string | undefined,
+      email: string | undefined,
+      options: { role?: string },
+    ) => {
+      try {
+        const args = [];
+        if (subcommand) args.push(subcommand);
+        if (email) args.push(email);
+        if (options.role) args.push('--role', options.role);
+        await membersCmd(args);
+      } catch (error) {
+        console.error(error instanceof Error ? error.message : String(error));
+        process.exit(1);
+      }
+    },
+  );
+
+program
+  .command('analytics')
+  .description('Show analytics summary')
+  .action(async () => {
+    try {
+      await analyticsCmd([]);
+    } catch (error) {
+      console.error(error instanceof Error ? error.message : String(error));
+      process.exit(1);
+    }
+  });
+
 // ─── Shell Completions ────
 program
   .command('completions')
@@ -178,7 +270,7 @@ program
   .argument('[shell]', 'Shell type: bash, zsh, or fish')
   .action((shell?: string) => {
     const commands =
-      'submit status config cost audit watch tui login chat auth providers completions help';
+      'submit status config cost audit watch tui login chat auth providers eval workflow marketplace members analytics completions help';
 
     if (shell && (shell === 'bash' || shell === 'zsh' || shell === 'fish')) {
       if (shell === 'bash') {

@@ -1,19 +1,68 @@
+/**
+ * cost — AgentX CLI cost analysis (§6.2 refactor).
+ * Fetches from cloud API, falls back to local file only if not cloud-authed.
+ */
 import * as fs from 'fs';
 import * as path from 'path';
-import { configHome } from '../lib/cloud-api.js';
+import { configHome, cloudFetch, isCloudAuthed } from '../lib/cloud-api.js';
 
-const DATA_DIR = configHome;
+const LOCAL_COST_FILE = path.join(configHome, 'costs.json');
+
+interface CloudCostSummary {
+  totalCostUsd: number;
+  byProvider: Array<{ provider: string; costUsd: number; calls: number }>;
+  byModel: Array<{ model: string; costUsd: number; calls: number }>;
+  period: string;
+}
+
+interface CloudCostEntry {
+  provider: string;
+  model: string;
+  inputTokens: number;
+  outputTokens: number;
+  costUsd: number;
+  createdAt: string;
+}
 
 export async function cost(args: string[]): Promise<void> {
-  const graphId = args[0];
-  const costFile = path.join(DATA_DIR, 'costs.json');
+  const filter = args[0];
 
-  if (!fs.existsSync(costFile)) {
-    console.log('No cost records found.');
-    return;
+  if (isCloudAuthed()) {
+    try {
+      if (filter === 'entries') {
+        const data = await cloudFetch<{ entries: CloudCostEntry[] }>('/v1/cost/entries');
+        if (data.entries.length === 0) {
+          console.log('No cost entries.');
+          return;
+        }
+        console.table(data.entries);
+      } else {
+        const data = await cloudFetch<CloudCostSummary>('/v1/cost/summary');
+        console.log(`Cost analysis (${data.period}):`);
+        console.log(`  Total: $${data.totalCostUsd.toFixed(4)}`);
+        if (data.byProvider.length > 0) {
+          console.log('\nBy provider:');
+          console.table(data.byProvider);
+        }
+        if (data.byModel.length > 0) {
+          console.log('By model:');
+          console.table(data.byModel);
+        }
+      }
+      return;
+    } catch (e) {
+      console.warn(
+        `Cloud cost fetch failed (${e instanceof Error ? e.message : e}), falling back to local cache`,
+      );
+    }
   }
 
-  const records = JSON.parse(fs.readFileSync(costFile, 'utf-8')) as Array<{
+  // Fallback to local cache
+  if (!fs.existsSync(LOCAL_COST_FILE)) {
+    console.log('No cost records found (cloud or local).');
+    return;
+  }
+  const records = JSON.parse(fs.readFileSync(LOCAL_COST_FILE, 'utf-8')) as Array<{
     graphId?: string;
     providerId: string;
     model: string;
@@ -22,35 +71,11 @@ export async function cost(args: string[]): Promise<void> {
     costUsd: number;
     timestamp: string;
   }>;
-
-  const filtered = graphId ? records.filter((r) => r.graphId === graphId) : records;
-
+  const filtered =
+    filter && filter !== 'entries' ? records.filter((r) => r.graphId === filter) : records;
   if (filtered.length === 0) {
-    console.log(graphId ? `No cost records for graph ${graphId}.` : 'No cost records found.');
+    console.log(filter ? `No cost records for ${filter}.` : 'No cost records found.');
     return;
   }
-
-  const totalCost = filtered.reduce((sum, r) => sum + r.costUsd, 0);
-  const totalInput = filtered.reduce((sum, r) => sum + r.inputTokens, 0);
-  const totalOutput = filtered.reduce((sum, r) => sum + r.outputTokens, 0);
-
-  console.log(`Cost Report${graphId ? ` — Graph ${graphId}` : ''}`);
-  console.log('================================');
-  console.log(`Total Cost: $${totalCost.toFixed(4)}`);
-  console.log(`Total Tokens: ${totalInput} in / ${totalOutput} out`);
-  console.log(`Records: ${filtered.length}`);
-  console.log('');
-
-  const byProvider = new Map<string, { count: number; cost: number }>();
-  for (const r of filtered) {
-    const existing = byProvider.get(r.providerId) ?? { count: 0, cost: 0 };
-    existing.count++;
-    existing.cost += r.costUsd;
-    byProvider.set(r.providerId, existing);
-  }
-
-  console.log('By Provider:');
-  for (const [provider, data] of byProvider) {
-    console.log(`  ${provider}: $${data.cost.toFixed(4)} (${data.count} calls)`);
-  }
+  console.table(filtered);
 }

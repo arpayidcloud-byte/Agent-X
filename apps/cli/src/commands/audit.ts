@@ -1,19 +1,52 @@
+/**
+ * audit — AgentX CLI audit log command (§6.2 refactor).
+ * Fetches from cloud API (admin), falls back to local file only if not cloud-authed.
+ */
 import * as fs from 'fs';
 import * as path from 'path';
-import { configHome } from '../lib/cloud-api.js';
+import { configHome, cloudFetch, isCloudAuthed } from '../lib/cloud-api.js';
 
-const DATA_DIR = configHome;
+const LOCAL_AUDIT_FILE = path.join(configHome, 'audit.jsonl');
+
+interface AuditLogEntry {
+  id: string;
+  action: string;
+  actor: string;
+  target: string;
+  detail: string;
+  createdAt: string;
+}
 
 export async function audit(args: string[]): Promise<void> {
-  const graphId = args[0];
-  const auditFile = path.join(DATA_DIR, 'audit.jsonl');
+  const filter = args[0];
 
-  if (!fs.existsSync(auditFile)) {
-    console.log('No audit records found.');
-    return;
+  if (isCloudAuthed()) {
+    try {
+      const data = await cloudFetch<{ auditLogs: AuditLogEntry[] }>(
+        '/v1/admin/audit-logs?limit=100',
+      );
+      if (data.auditLogs.length === 0) {
+        console.log('No audit logs found.');
+        return;
+      }
+      const filtered = filter
+        ? data.auditLogs.filter((r) => r.actor.includes(filter) || r.action.includes(filter))
+        : data.auditLogs;
+      console.table(filtered);
+      return;
+    } catch (e) {
+      console.warn(
+        `Cloud audit fetch failed (${e instanceof Error ? e.message : e}), falling back to local cache`,
+      );
+    }
   }
 
-  const content = fs.readFileSync(auditFile, 'utf-8');
+  // Fallback to local cache
+  if (!fs.existsSync(LOCAL_AUDIT_FILE)) {
+    console.log('No audit records found (cloud or local).');
+    return;
+  }
+  const content = fs.readFileSync(LOCAL_AUDIT_FILE, 'utf-8');
   const records: Array<{
     graphId?: string;
     event: string;
@@ -25,21 +58,10 @@ export async function audit(args: string[]): Promise<void> {
     .split('\n')
     .filter(Boolean)
     .map((line) => JSON.parse(line));
-
-  const filtered = graphId ? records.filter((r) => r.graphId === graphId) : records;
-
+  const filtered = filter ? records.filter((r) => r.graphId === filter) : records;
   if (filtered.length === 0) {
-    console.log(graphId ? `No audit records for graph ${graphId}.` : 'No audit records found.');
+    console.log(filter ? `No audit records for ${filter}.` : 'No audit records found.');
     return;
   }
-
-  console.log(`Audit Trail${graphId ? ` — Graph ${graphId}` : ''}`);
-  console.log('================================');
-
-  for (const r of filtered) {
-    const ts = new Date(r.timestamp).toLocaleString();
-    console.log(`[${ts}] ${r.event} | actor: ${r.actor} | ${r.detail}`);
-  }
-
-  console.log(`\nTotal: ${filtered.length} events`);
+  console.table(filtered);
 }

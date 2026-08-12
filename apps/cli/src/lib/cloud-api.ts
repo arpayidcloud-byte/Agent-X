@@ -9,7 +9,7 @@ import * as os from 'os';
 import * as path from 'path';
 
 const AGENTX_HOME = process.env.AGENTX_HOME ?? path.join(os.homedir(), '.agentx');
-const CONFIG_FILE = path.join(AGENTX_HOME, 'config.json');
+export const CONFIG_FILE = path.join(AGENTX_HOME, 'config.json');
 
 /** Config directory — home-based (portable across machines). */
 export const configHome = AGENTX_HOME;
