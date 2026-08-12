@@ -51,6 +51,7 @@ import type {
   ChatMessage,
   ChatMeta,
   Toast,
+  DeckData,
 } from './types.js';
 
 const VERSION = '2.2.0';
@@ -119,7 +120,7 @@ export default function AgentXTUI(): React.ReactNode {
 
   // ─── Data state ────
   const [health, setHealth] = useState<HealthResponse | null>(null);
-  const [deck, setDeck] = useState<unknown>(null);
+  const [deck, setDeck] = useState<DeckData | null>(null);
   const [tasks, setTasks] = useState<TaskItem[]>([]);
   const [providers, setProviders] = useState<ProviderInfo[]>([]);
   const [cost, setCost] = useState<CostSummary | null>(null);
@@ -166,8 +167,8 @@ export default function AgentXTUI(): React.ReactNode {
       setProviders(p);
       setCost(c);
       setTaskHistory((prev) => [...prev.slice(-19), t.length]);
-      void cloudFetch('/v1/agentx/deck')
-        .then((d: unknown) => setDeck(d))
+      void cloudFetch<DeckData>('/v1/agentx/deck')
+        .then(setDeck)
         .catch(() => {});
     } catch (e) {
       const status = (e as Error & { status?: number }).status;
