@@ -383,4 +383,98 @@ export function registerBillingRoutes(app: Express): void {
       }
     },
   );
+
+  // ─── GET /v1/billing/summary ─────────────────────────────────────────────────
+  // Returns plan + subscription + usage + invoices for the panel Billing tab.
+  // Combines /v1/billing/me + /v1/billing/invoices + Entitlement metrics in one payload.
+  app.get(
+    '/v1/billing/summary',
+    requireAuth,
+    async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+      try {
+        const prisma = getPrisma();
+        if (!prisma) {
+          res.status(503).json({ error: 'Database not ready' });
+          return;
+        }
+        const userId = req.auth?.sub;
+        if (!userId) {
+          res.status(401).json({ error: 'Unauthenticated' });
+          return;
+        }
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const orgId =
+          ((req.auth as unknown as Record<string, unknown>)?.orgId as string | undefined) ??
+          (await resolvePrimaryOrgId(userId));
+        // Subscription + Plan
+        const sub = orgId
+          ? await prisma.subscription.findFirst({
+              where: { orgId },
+              orderBy: { createdAt: 'desc' },
+              include: { plan: true },
+            })
+          : null;
+        // Entitlement (task quota)
+        const ent = orgId ? await prisma.entitlement.findUnique({ where: { orgId } }) : null;
+        // Cost this month from CostEntry (filtered by orgId if available)
+        const startOfMonth = new Date();
+        startOfMonth.setDate(1);
+        startOfMonth.setHours(0, 0, 0, 0);
+        const costAgg = orgId
+          ? await prisma.costEntry.aggregate({
+              where: { orgId, createdAt: { gte: startOfMonth } },
+              _sum: { costUsd: true },
+            })
+          : { _sum: { costUsd: 0 } };
+        // Invoices (admin or owner can read; we restrict to admin for security)
+        const invoices = req.auth?.isAdmin
+          ? await prisma.invoice.findMany({
+              where: orgId ? { orgId } : {},
+              orderBy: { createdAt: 'desc' },
+              take: 50,
+            })
+          : [];
+        // Plan: from sub.plan or default to free
+        const plan = sub?.plan ?? {
+          slug: 'free',
+          name: 'Free',
+          priceUsd: 0,
+          interval: 'month',
+        };
+        const tasksUsed = ent?.tasksUsed ?? 0;
+        const tasksLimit = (plan as { maxTasksPerMonth?: number }).maxTasksPerMonth ?? 100;
+        res.json({
+          plan: {
+            slug: plan.slug,
+            name: plan.name,
+            priceUsd: (plan as { priceUsd: number }).priceUsd,
+            interval: (plan as { interval: string }).interval,
+          },
+          subscription: sub
+            ? {
+                status: sub.status,
+                currentPeriodEnd: sub.currentPeriodEnd,
+                trialEndsAt: sub.trialEndsAt,
+                cancelAtPeriodEnd: sub.cancelAtPeriodEnd,
+              }
+            : null,
+          usage: {
+            tasksUsed,
+            tasksLimit,
+            costUsed: costAgg._sum.costUsd ?? 0,
+            costLimit: 100,
+          },
+          invoices: invoices.map((i) => ({
+            id: i.id,
+            amountCents: i.amountCents,
+            currency: i.currency,
+            status: i.status,
+            createdAt: i.createdAt,
+          })),
+        });
+      } catch (e) {
+        res.status(500).json({ error: e instanceof Error ? e.message : String(e) });
+      }
+    },
+  );
 }
