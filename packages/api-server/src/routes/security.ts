@@ -1,7 +1,5 @@
 import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
-import { SASTScanner } from '@agent-xai/shared/security';
-import { SecretPatternDetector } from '@agent-xai/shared/security';
-import { HashChainedAuditLog } from '@agent-xai/shared/security';
+import { SASTScanner, SecretPatternDetector, HashChainedAuditLog } from '@agent-xai/security';
 import { createRBACMiddleware } from '../middleware/rbac.js';
 
 const rbac = createRBACMiddleware();
@@ -18,8 +16,9 @@ export async function createSecurityRoutes(fastify: FastifyInstance) {
     {
       preHandler: [rbac.check('admin.settings')],
     },
-    async (request: FastifyRequest<{ Body: { paths?: string[] } }>, reply: FastifyReply) => {
-      const paths = request.body?.paths || ['packages/*/src/**/*.ts'];
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      const body = request.body as { paths?: string[] } | undefined;
+      const paths = body?.paths || ['packages/*/src/**/*.ts'];
 
       try {
         // Scan codebase (simplified - in production would use glob to read files)
@@ -79,9 +78,10 @@ export async function createSecurityRoutes(fastify: FastifyInstance) {
     {
       preHandler: [rbac.check('audit.read')],
     },
-    async (request: FastifyRequest<{ Querystring: { limit?: number } }>, reply: FastifyReply) => {
+    async (request: FastifyRequest, reply: FastifyReply) => {
       try {
-        const limit = request.query.limit || 50;
+        const query = request.query as { limit?: number };
+        const limit = query.limit || 50;
         const entries = auditLog.getEntries(limit);
         const isValid = auditLog.verify();
 

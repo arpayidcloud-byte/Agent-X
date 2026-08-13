@@ -51,7 +51,7 @@ export async function createTaskRoutes(fastify: FastifyInstance) {
         createdAt: new Date().toISOString(),
       };
 
-      reply.code(201).send(task);
+      void reply.code(201).send(task);
     },
   );
 
@@ -135,11 +135,11 @@ export async function createTaskRoutes(fastify: FastifyInstance) {
       };
 
       if (!task) {
-        reply.code(404).send({ error: 'Task not found' });
+        void reply.code(404).send({ error: 'Task not found' });
         return;
       }
 
-      reply.send(task);
+      void reply.send(task);
     },
   );
 
@@ -170,7 +170,7 @@ export async function createTaskRoutes(fastify: FastifyInstance) {
     async (request, reply) => {
       const { id } = request.params as { id: string };
 
-      reply.send({
+      void reply.send({
         id,
         status: 'CANCELLED',
       });

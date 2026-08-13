@@ -37,6 +37,11 @@ export async function createApiServer(config: ApiServerConfig) {
   });
 
   const rbac = createRBACMiddleware();
+  const authMiddleware = createAuthMiddleware(config.apiKey, config.defaultRole);
+
+  // Authentication must run before the permission matrix. RBAC derives its
+  // role from request.userMetadata, which is populated by this hook.
+  fastify.addHook('onRequest', authMiddleware);
 
   // Permission matrix: route path + method → required permission
   const permissionMatrix: {
@@ -57,7 +62,7 @@ export async function createApiServer(config: ApiServerConfig) {
     const method = request.method.toUpperCase();
 
     // Extract the base path (strip query string)
-    const cleanPath = url.split('?')[0];
+    const cleanPath = url.split('?')[0] ?? '';
 
     for (const entry of permissionMatrix) {
       // Match using a simplified approach: check if the path starts with the route pattern
@@ -144,7 +149,6 @@ export async function createApiServer(config: ApiServerConfig) {
     routePrefix: '/docs',
   });
 
-  fastify.addHook('onRequest', createAuthMiddleware(config.apiKey, config.defaultRole));
   fastify.addHook('onRequest', createRateLimitMiddleware(config.defaultRole));
 
   await fastify.register(createTaskRoutes, { prefix: '/api/v1' });

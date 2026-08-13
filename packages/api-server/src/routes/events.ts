@@ -1,4 +1,4 @@
-import type { FastifyInstance, FastifyReply } from 'fastify';
+import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 
 export async function createEventRoutes(fastify: FastifyInstance) {
   fastify.get(
@@ -28,23 +28,26 @@ export async function createEventRoutes(fastify: FastifyInstance) {
         },
       },
     },
-    async (_request, reply: FastifyReply) => {
-      reply.sse(
-        (async function* () {
-          let id = 0;
-          while (true) {
-            yield {
-              id: String(id++),
-              event: 'heartbeat',
-              data: JSON.stringify({
-                type: 'heartbeat',
-                timestamp: new Date().toISOString(),
-              }),
-            };
-            await new Promise((resolve) => setTimeout(resolve, 5000));
-          }
-        })(),
-      );
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      const response = reply.raw;
+      response.writeHead(200, {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        Connection: 'keep-alive',
+      });
+
+      let id = 0;
+      const heartbeat = () => {
+        response.write(
+          `id: ${id++}\nevent: heartbeat\ndata: ${JSON.stringify({
+            type: 'heartbeat',
+            timestamp: new Date().toISOString(),
+          })}\n\n`,
+        );
+      };
+      heartbeat();
+      const interval = setInterval(heartbeat, 5000);
+      request.raw.on('close', () => clearInterval(interval));
     },
   );
 }

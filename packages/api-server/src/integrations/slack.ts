@@ -38,7 +38,10 @@ export class SlackNotifier {
         throw new Error(`Slack API returned ${response.status}`);
       }
     } catch (error) {
-      this.logger.error('Failed to send Slack notification', error);
+      this.logger.error(
+        'Failed to send Slack notification',
+        error instanceof Error ? error : undefined,
+      );
       throw error;
     }
   }

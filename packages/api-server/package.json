@@ -39,6 +39,7 @@
     "@agent-xai/core-runtime": "workspace:*",
     "@agent-xai/memory-engine": "workspace:*",
     "@agent-xai/observability": "workspace:*",
+    "@agent-xai/security": "workspace:*",
     "@agent-xai/shared": "workspace:*",
     "@fastify/cors": "^10.0.0",
     "@fastify/helmet": "^13.1.0",
