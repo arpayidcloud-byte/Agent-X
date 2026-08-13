@@ -19,7 +19,7 @@ export async function createHealthRoutes(fastify: FastifyInstance) {
       },
     },
     async (_request, reply: FastifyReply) => {
-      reply.send({
+      void reply.send({
         status: 'healthy',
         timestamp: new Date().toISOString(),
       });
@@ -43,7 +43,7 @@ export async function createHealthRoutes(fastify: FastifyInstance) {
       },
     },
     async (_request, reply: FastifyReply) => {
-      reply.send({ status: 'alive' });
+      void reply.send({ status: 'alive' });
     },
   );
 
@@ -65,7 +65,7 @@ export async function createHealthRoutes(fastify: FastifyInstance) {
       },
     },
     async (_request, reply: FastifyReply) => {
-      reply.send({
+      void reply.send({
         status: 'ready',
         ready: true,
       });

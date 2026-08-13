@@ -98,7 +98,7 @@ export async function createGitHubWebhookRoutes(
 
       request.log.info({ event, action: payload.action }, 'GitHub webhook received and verified');
 
-      reply.send({
+      void reply.send({
         received: true,
         event,
       });

@@ -20,7 +20,7 @@ export async function createMetricsRoutes(
     },
     async (_request, reply: FastifyReply) => {
       const metrics = await exporter.getMetrics();
-      reply.header('Content-Type', exporter.getContentType()).send(metrics);
+      void reply.header('Content-Type', exporter.getContentType()).send(metrics);
     },
   );
 }

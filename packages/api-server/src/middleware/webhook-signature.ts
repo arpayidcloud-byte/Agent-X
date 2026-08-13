@@ -41,14 +41,14 @@ export function createWebhookSignatureMiddleware(options: WebhookSignatureMiddle
     const signature = request.headers[GITHUB_SIGNATURE_HEADER] as string;
 
     if (!signature) {
-      reply.code(401).send({ error: 'Missing signature header' });
+      void reply.code(401).send({ error: 'Missing signature header' });
       return;
     }
 
     const rawBody = (request.rawBody as string) || JSON.stringify(request.body);
 
     if (!verifySignature(rawBody, signature, secret)) {
-      reply.code(403).send({ error: 'Invalid signature' });
+      void reply.code(403).send({ error: 'Invalid signature' });
       return;
     }
   };

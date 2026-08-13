@@ -55,7 +55,7 @@ export async function createApprovalRoutes(fastify: FastifyInstance) {
         decidedAt: new Date().toISOString(),
       };
 
-      reply.send(approval);
+      void reply.send(approval);
     },
   );
 }
