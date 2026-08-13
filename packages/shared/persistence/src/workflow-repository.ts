@@ -1,8 +1,9 @@
 /**
  * Workflow repository — visual workflow builder persistence.
  *
- * Stores React Flow workflow definitions (nodes + edges as JSON)
- * for the visual workflow builder.
+ * Every operation is explicitly organization-scoped. The API must provide the
+ * authenticated tenant context; callers cannot read or mutate another org's
+ * workflow by guessing its ID.
  */
 import type { Prisma, PrismaClient } from '@prisma/client';
 import { getPrisma } from './client.js';
@@ -15,6 +16,7 @@ export interface WorkflowRecord {
   edges: Prisma.JsonValue;
   isPublished: boolean;
   ownerId: string | null;
+  orgId: string | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -29,19 +31,19 @@ export interface WorkflowInput {
 }
 
 export interface WorkflowRepository {
-  create(input: WorkflowInput): Promise<WorkflowRecord>;
-  list(limit?: number, offset?: number): Promise<WorkflowRecord[]>;
-  getById(id: string): Promise<WorkflowRecord | null>;
-  update(id: string, input: Partial<WorkflowInput>): Promise<WorkflowRecord | null>;
-  remove(id: string): Promise<boolean>;
-  count(): Promise<number>;
+  create(orgId: string, input: WorkflowInput): Promise<WorkflowRecord>;
+  list(orgId: string, limit?: number, offset?: number): Promise<WorkflowRecord[]>;
+  getById(orgId: string, id: string): Promise<WorkflowRecord | null>;
+  update(orgId: string, id: string, input: Partial<WorkflowInput>): Promise<WorkflowRecord | null>;
+  remove(orgId: string, id: string): Promise<boolean>;
+  count(orgId: string): Promise<number>;
 }
 
 export class PrismaWorkflowRepository implements WorkflowRepository {
-  private prisma: PrismaClient | null;
+  private readonly prisma: PrismaClient | null;
 
-  constructor() {
-    this.prisma = getPrisma();
+  constructor(prisma: PrismaClient | null = getPrisma()) {
+    this.prisma = prisma;
   }
 
   private db(): PrismaClient {
@@ -49,10 +51,10 @@ export class PrismaWorkflowRepository implements WorkflowRepository {
     return this.prisma;
   }
 
-  async create(input: WorkflowInput): Promise<WorkflowRecord> {
-    const db = this.db();
-    return db.workflow.create({
+  async create(orgId: string, input: WorkflowInput): Promise<WorkflowRecord> {
+    return this.db().workflow.create({
       data: {
+        orgId,
         name: input.name,
         description: input.description ?? null,
         nodes: input.nodes ?? [],
@@ -63,45 +65,46 @@ export class PrismaWorkflowRepository implements WorkflowRepository {
     });
   }
 
-  async list(limit = 50, offset = 0): Promise<WorkflowRecord[]> {
-    const db = this.db();
-    return db.workflow.findMany({
+  async list(orgId: string, limit = 50, offset = 0): Promise<WorkflowRecord[]> {
+    return this.db().workflow.findMany({
+      where: { orgId },
       take: Math.min(limit, 200),
       skip: offset,
       orderBy: { updatedAt: 'desc' },
     });
   }
 
-  async getById(id: string): Promise<WorkflowRecord | null> {
-    const db = this.db();
-    return db.workflow.findUnique({ where: { id } });
+  async getById(orgId: string, id: string): Promise<WorkflowRecord | null> {
+    return this.db().workflow.findFirst({ where: { id, orgId } });
   }
 
-  async update(id: string, input: Partial<WorkflowInput>): Promise<WorkflowRecord | null> {
-    const db = this.db();
-    const data: Prisma.WorkflowUpdateInput = {};
+  async update(
+    orgId: string,
+    id: string,
+    input: Partial<WorkflowInput>,
+  ): Promise<WorkflowRecord | null> {
+    const data: Prisma.WorkflowUpdateManyMutationInput = {};
     if (input.name !== undefined) data.name = input.name;
     if (input.description !== undefined) data.description = input.description;
     if (input.nodes !== undefined) data.nodes = input.nodes as Prisma.InputJsonValue;
     if (input.edges !== undefined) data.edges = input.edges as Prisma.InputJsonValue;
     if (input.isPublished !== undefined) data.isPublished = input.isPublished;
     if (input.ownerId !== undefined) data.ownerId = input.ownerId;
-    return db.workflow.update({ where: { id }, data });
+
+    const result = await this.db().workflow.updateMany({
+      where: { id, orgId },
+      data,
+    });
+    return result.count === 0 ? null : this.getById(orgId, id);
   }
 
-  async remove(id: string): Promise<boolean> {
-    const db = this.db();
-    try {
-      await db.workflow.delete({ where: { id } });
-      return true;
-    } catch {
-      return false;
-    }
+  async remove(orgId: string, id: string): Promise<boolean> {
+    const result = await this.db().workflow.deleteMany({ where: { id, orgId } });
+    return result.count > 0;
   }
 
-  async count(): Promise<number> {
-    const db = this.db();
-    return db.workflow.count();
+  async count(orgId: string): Promise<number> {
+    return this.db().workflow.count({ where: { orgId } });
   }
 }
 
@@ -112,4 +115,8 @@ export function getWorkflowRepository(): WorkflowRepository {
     workflowRepo = new PrismaWorkflowRepository();
   }
   return workflowRepo;
+}
+
+export function resetWorkflowRepository(): void {
+  workflowRepo = null;
 }

@@ -31,6 +31,9 @@ export interface JWTPayload {
   sub: string;
   email: string;
   roles: string[];
+  /** Resolved server-side by withOrg; never accepted from request input. */
+  orgId?: string;
+  isAdmin?: boolean;
   iat?: number;
   exp?: number;
 }
