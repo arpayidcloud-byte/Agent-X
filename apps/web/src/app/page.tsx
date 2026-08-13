@@ -1,14 +1,21 @@
+'use client';
+
+import { useEffect, useState } from 'react';
 import TaskStreamView from '@/components/task-stream-view';
 import { StatCard } from '@/components/ui/stat-card';
 import { Badge } from '@/components/ui/badge';
 import { Server, CheckCircle2, Zap, Database, Clock, Wifi } from 'lucide-react';
-import { fetchHealth, fetchStats, fetchTasks } from '@/lib/api';
+import {
+  fetchHealth,
+  fetchStats,
+  fetchTasks,
+  type HealthReport,
+  type StatsResponse,
+  type TasksResponse,
+} from '@/lib/api';
 
-// Always render on the server per request — the dashboard is a live view of the
-// API server, it must never be statically prerendered (avoids build-time fetches).
-export const dynamic = 'force-dynamic';
-export const revalidate = 0;
-
+// Fetch tenant dashboard data in the browser so the authenticated token in
+// localStorage is attached to every tenant-scoped request.
 const STATUS_TONE = {
   success: 'success' as const,
   error: 'danger' as const,
@@ -30,17 +37,29 @@ function formatDuration(ms: number): string {
   return `${Math.floor(ms / 60000)}m ${Math.floor((ms % 60000) / 1000)}s`;
 }
 
-export default async function AgentXDashboard() {
-  let health;
-  let stats;
-  let tasks;
-  let apiError: string | null = null;
+export default function AgentXDashboard() {
+  const [health, setHealth] = useState<HealthReport | undefined>();
+  const [stats, setStats] = useState<StatsResponse | undefined>();
+  const [tasks, setTasks] = useState<TasksResponse | undefined>();
+  const [apiError, setApiError] = useState<string | null>(null);
 
-  try {
-    [health, stats, tasks] = await Promise.all([fetchHealth(), fetchStats(), fetchTasks(50)]);
-  } catch (e) {
-    apiError = e instanceof Error ? e.message : String(e);
-  }
+  useEffect(() => {
+    let cancelled = false;
+    void Promise.all([fetchHealth(), fetchStats(), fetchTasks(50)])
+      .then(([nextHealth, nextStats, nextTasks]) => {
+        if (cancelled) return;
+        setHealth(nextHealth);
+        setStats(nextStats);
+        setTasks(nextTasks);
+        setApiError(null);
+      })
+      .catch((e) => {
+        if (!cancelled) setApiError(e instanceof Error ? e.message : String(e));
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const healthyProviders = health?.providers.filter((p) => p.status === 'healthy').length ?? 0;
   const providerCount = health?.providers.length ?? 0;

@@ -57,7 +57,7 @@ describe('Dashboard API (task store, stats)', () => {
     expect(runBody.provider).toBeTruthy();
     expect(runBody.message).toBeTruthy();
 
-    const tasksRes = await fetch(`${baseUrl}/v1/agentx/tasks`);
+    const tasksRes = await fetch(`${baseUrl}/v1/agentx/tasks`, { headers });
     expect(tasksRes.status).toBe(200);
     const tasksBody = await asJson(tasksRes);
     expect(tasksBody.total).toBe(1);
@@ -76,7 +76,7 @@ describe('Dashboard API (task store, stats)', () => {
         body: JSON.stringify({ prompt: `task ${i}`, taskId: `limit-task-${i}` }),
       });
     }
-    const res = await fetch(`${baseUrl}/v1/agentx/tasks?limit=2`);
+    const res = await fetch(`${baseUrl}/v1/agentx/tasks?limit=2`, { headers });
     const body = await asJson(res);
     expect(body.tasks.length).toBe(2);
     expect(body.total).toBe(5);
@@ -94,8 +94,34 @@ describe('Dashboard API (task store, stats)', () => {
     expect(res.status).toBe(400);
     const body = await asJson(res);
     expect(body.error).toContain('prompt');
-    const tasks = await asJson(await fetch(`${baseUrl}/v1/agentx/tasks`));
+    const tasks = await asJson(await fetch(`${baseUrl}/v1/agentx/tasks`, { headers }));
     expect(tasks.total).toBe(0);
+  });
+
+  it('scopes task list to the authenticated organization and rejects anonymous reads', async () => {
+    const ownerHeaders = await authHeader(baseUrl);
+    const otherHeaders = await authHeader(baseUrl);
+    await fetch(`${baseUrl}/v1/agentx/run`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...ownerHeaders },
+      body: JSON.stringify({ prompt: 'tenant-owned task', taskId: 'tenant-owned-task' }),
+    });
+
+    const anonymous = await fetch(`${baseUrl}/v1/agentx/tasks`);
+    expect(anonymous.status).toBe(401);
+
+    const other = await fetch(`${baseUrl}/v1/agentx/tasks`, { headers: otherHeaders });
+    expect(other.status).toBe(200);
+    expect((await asJson(other)).total).toBe(0);
+
+    const owner = await fetch(`${baseUrl}/v1/agentx/tasks`, { headers: ownerHeaders });
+    expect(owner.status).toBe(200);
+    expect((await asJson(owner)).total).toBe(1);
+  });
+
+  it('requires authentication for tenant dashboard stats', async () => {
+    const anonymous = await fetch(`${baseUrl}/v1/agentx/stats`);
+    expect(anonymous.status).toBe(401);
   });
 
   it('GET /v1/agentx/stats returns metric totals as JSON', async () => {
@@ -106,7 +132,7 @@ describe('Dashboard API (task store, stats)', () => {
       headers: { 'Content-Type': 'application/json', ...headers },
       body: JSON.stringify({ prompt: 'stats probe', taskId: 'stats-task-1' }),
     });
-    const res = await fetch(`${baseUrl}/v1/agentx/stats`);
+    const res = await fetch(`${baseUrl}/v1/agentx/stats`, { headers });
     expect(res.status).toBe(200);
     const body = await asJson(res);
     expect(body.generatedAt).toBeTruthy();

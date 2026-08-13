@@ -47,8 +47,13 @@ export interface RunResponse {
   cost: number;
 }
 
-async function getJson<T>(path: string): Promise<T> {
-  const res = await fetch(`${API_URL}${path}`, { cache: 'no-store' });
+async function getJson<T>(path: string, withAuth = false): Promise<T> {
+  const headers: Record<string, string> = {};
+  if (withAuth) {
+    const token = getToken();
+    if (token) headers.Authorization = `Bearer ${token}`;
+  }
+  const res = await fetch(`${API_URL}${path}`, { headers, cache: 'no-store' });
   if (!res.ok) {
     throw new Error(`GET ${path} failed: ${res.status} ${res.statusText}`);
   }
@@ -60,11 +65,11 @@ export async function fetchHealth(): Promise<HealthReport> {
 }
 
 export async function fetchStats(): Promise<StatsResponse> {
-  return getJson<StatsResponse>('/v1/agentx/stats');
+  return getJson<StatsResponse>('/v1/agentx/stats', true);
 }
 
 export async function fetchTasks(limit = 50): Promise<TasksResponse> {
-  return getJson<TasksResponse>(`/v1/agentx/tasks?limit=${limit}`);
+  return getJson<TasksResponse>(`/v1/agentx/tasks?limit=${limit}`, true);
 }
 
 // ─── Quality scoring ────

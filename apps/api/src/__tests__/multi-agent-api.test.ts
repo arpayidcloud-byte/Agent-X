@@ -97,7 +97,7 @@ describe('Parallel multi-agent API (Web Pro)', () => {
     expect(body.concurrency).toBe(2);
 
     // Poll the run until it completes (mock providers are fast).
-    const detail = await pollUntilDone(baseUrl, body.runId);
+    const detail = await pollUntilDone(baseUrl, body.runId, headers);
     expect(detail.run.status).toBe('completed');
     expect(detail.run.result?.totalGoals).toBe(2);
     expect(detail.run.result?.approvedCount).toBe(2);
@@ -117,12 +117,34 @@ describe('Parallel multi-agent API (Web Pro)', () => {
     });
     const body = (await res.json()) as RunResponse;
     expect(body.concurrency).toBe(4);
-    await pollUntilDone(baseUrl, body.runId);
+    await pollUntilDone(baseUrl, body.runId, headers);
   });
 
   it('returns 404 for unknown runs', async () => {
-    const res = await fetch(`${baseUrl}/v1/agentx/multi-agent/ma-nonexistent`);
+    const headers = await authHeader(baseUrl);
+    const res = await fetch(`${baseUrl}/v1/agentx/multi-agent/ma-nonexistent`, { headers });
     expect(res.status).toBe(404);
+  });
+
+  it('rejects anonymous and cross-tenant run status and event reads', async () => {
+    const ownerHeaders = await authHeader(baseUrl);
+    const otherHeaders = await authHeader(baseUrl);
+    const start = await fetch(`${baseUrl}/v1/agentx/multi-agent/run`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...ownerHeaders },
+      body: JSON.stringify({ goals: ['tenant-owned run'] }),
+    });
+    const { runId } = (await start.json()) as RunResponse;
+
+    expect((await fetch(`${baseUrl}/v1/agentx/multi-agent/${runId}`)).status).toBe(401);
+    expect((await fetch(`${baseUrl}/v1/agentx/multi-agent/${runId}/events`)).status).toBe(401);
+    expect(
+      (await fetch(`${baseUrl}/v1/agentx/multi-agent/${runId}`, { headers: otherHeaders })).status,
+    ).toBe(404);
+    expect(
+      (await fetch(`${baseUrl}/v1/agentx/multi-agent/${runId}/events`, { headers: otherHeaders }))
+        .status,
+    ).toBe(404);
   });
 
   it('SSE events endpoint replays run history', async () => {
@@ -133,11 +155,11 @@ describe('Parallel multi-agent API (Web Pro)', () => {
       body: JSON.stringify({ goals: ['Replay me'] }),
     });
     const body = (await res.json()) as RunResponse;
-    await pollUntilDone(baseUrl, body.runId);
+    await pollUntilDone(baseUrl, body.runId, headers);
 
     const controller = new AbortController();
     const sse = await fetch(`${baseUrl}/v1/agentx/multi-agent/${body.runId}/events`, {
-      headers: { Accept: 'text/event-stream' },
+      headers: { Accept: 'text/event-stream', ...headers },
       signal: controller.signal,
     });
     expect(sse.status).toBe(200);
@@ -165,9 +187,13 @@ describe('Parallel multi-agent API (Web Pro)', () => {
   });
 });
 
-async function pollUntilDone(baseUrl: string, runId: string): Promise<RunDetail> {
+async function pollUntilDone(
+  baseUrl: string,
+  runId: string,
+  headers: Record<string, string>,
+): Promise<RunDetail> {
   for (let i = 0; i < 50; i++) {
-    const res = await fetch(`${baseUrl}/v1/agentx/multi-agent/${runId}`);
+    const res = await fetch(`${baseUrl}/v1/agentx/multi-agent/${runId}`, { headers });
     const detail = (await res.json()) as RunDetail;
     if (detail.run.status !== 'running') return detail;
     await new Promise((resolve) => setTimeout(resolve, 200));
