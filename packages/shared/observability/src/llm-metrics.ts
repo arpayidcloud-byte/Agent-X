@@ -1,5 +1,19 @@
 import { Counter, Histogram, Gauge, Registry, collectDefaultMetrics } from 'prom-client';
 
+export interface MetricSnapshot {
+  name: string;
+  help?: string;
+  type: string;
+  values: Array<{ labels: Record<string, string>; value: number }>;
+  [key: string]: unknown;
+}
+
+const UNSCOPED_ORG = 'unscoped';
+
+function orgLabel(orgId?: string): string {
+  return orgId ?? UNSCOPED_ORG;
+}
+
 export class LLMMetrics {
   private registry: Registry;
 
@@ -28,7 +42,7 @@ export class LLMMetrics {
     this.llmRequestsTotal = new Counter({
       name: 'llm_requests_total',
       help: 'Total number of LLM requests',
-      labelNames: ['provider', 'model', 'complexity', 'status'],
+      labelNames: ['provider', 'model', 'complexity', 'status', 'org_id'],
       registers: [this.registry],
     });
 
@@ -36,7 +50,7 @@ export class LLMMetrics {
     this.llmErrorsTotal = new Counter({
       name: 'llm_errors_total',
       help: 'Total number of LLM errors',
-      labelNames: ['provider', 'model', 'error_type'],
+      labelNames: ['provider', 'model', 'error_type', 'org_id'],
       registers: [this.registry],
     });
 
@@ -44,7 +58,7 @@ export class LLMMetrics {
     this.llmFallbacksTotal = new Counter({
       name: 'llm_fallbacks_total',
       help: 'Total number of provider fallbacks',
-      labelNames: ['from_provider', 'to_provider', 'reason'],
+      labelNames: ['from_provider', 'to_provider', 'reason', 'org_id'],
       registers: [this.registry],
     });
 
@@ -52,7 +66,7 @@ export class LLMMetrics {
     this.llmCacheHitsTotal = new Counter({
       name: 'llm_cache_hits_total',
       help: 'Total number of cache hits',
-      labelNames: ['provider', 'model'],
+      labelNames: ['provider', 'model', 'org_id'],
       registers: [this.registry],
     });
 
@@ -60,7 +74,7 @@ export class LLMMetrics {
     this.llmCostUsdTotal = new Counter({
       name: 'llm_cost_usd_total',
       help: 'Total LLM cost in USD',
-      labelNames: ['provider', 'model'],
+      labelNames: ['provider', 'model', 'org_id'],
       registers: [this.registry],
     });
 
@@ -68,7 +82,7 @@ export class LLMMetrics {
     this.llmLatencyHistogram = new Histogram({
       name: 'llm_request_latency_seconds',
       help: 'LLM request latency in seconds',
-      labelNames: ['provider', 'model'],
+      labelNames: ['provider', 'model', 'org_id'],
       buckets: [0.1, 0.5, 1, 2, 5, 10, 30],
       registers: [this.registry],
     });
@@ -77,7 +91,7 @@ export class LLMMetrics {
     this.llmTokenUsageHistogram = new Histogram({
       name: 'llm_token_usage',
       help: 'LLM token usage per request',
-      labelNames: ['provider', 'model', 'type'], // type: 'input' | 'output'
+      labelNames: ['provider', 'model', 'type', 'org_id'], // type: 'input' | 'output'
       buckets: [10, 50, 100, 500, 1000, 5000, 10000],
       registers: [this.registry],
     });
@@ -86,6 +100,7 @@ export class LLMMetrics {
     this.llmActiveProviders = new Gauge({
       name: 'llm_active_providers',
       help: 'Number of active LLM providers',
+      labelNames: ['org_id'],
       registers: [this.registry],
     });
 
@@ -93,45 +108,62 @@ export class LLMMetrics {
     this.llmProviderHealth = new Gauge({
       name: 'llm_provider_health',
       help: 'Health status of LLM providers (1=healthy, 0=unhealthy)',
-      labelNames: ['provider'],
+      labelNames: ['provider', 'org_id'],
       registers: [this.registry],
     });
   }
 
-  recordRequest(provider: string, model: string, complexity: string, status: 'success' | 'error') {
-    this.llmRequestsTotal.inc({ provider, model, complexity, status });
+  recordRequest(
+    provider: string,
+    model: string,
+    complexity: string,
+    status: 'success' | 'error',
+    orgId?: string,
+  ) {
+    this.llmRequestsTotal.inc({ provider, model, complexity, status, org_id: orgLabel(orgId) });
   }
 
-  recordError(provider: string, model: string, errorType: string) {
-    this.llmErrorsTotal.inc({ provider, model, error_type: errorType });
+  recordError(provider: string, model: string, errorType: string, orgId?: string) {
+    this.llmErrorsTotal.inc({ provider, model, error_type: errorType, org_id: orgLabel(orgId) });
   }
 
-  recordFallback(fromProvider: string, toProvider: string, reason: string) {
-    this.llmFallbacksTotal.inc({ from_provider: fromProvider, to_provider: toProvider, reason });
+  recordFallback(fromProvider: string, toProvider: string, reason: string, orgId?: string) {
+    this.llmFallbacksTotal.inc({
+      from_provider: fromProvider,
+      to_provider: toProvider,
+      reason,
+      org_id: orgLabel(orgId),
+    });
   }
 
-  recordCacheHit(provider: string, model: string) {
-    this.llmCacheHitsTotal.inc({ provider, model });
+  recordCacheHit(provider: string, model: string, orgId?: string) {
+    this.llmCacheHitsTotal.inc({ provider, model, org_id: orgLabel(orgId) });
   }
 
-  recordCost(provider: string, model: string, usd: number) {
-    this.llmCostUsdTotal.inc({ provider, model }, usd);
+  recordCost(provider: string, model: string, usd: number, orgId?: string) {
+    this.llmCostUsdTotal.inc({ provider, model, org_id: orgLabel(orgId) }, usd);
   }
 
-  recordLatency(provider: string, model: string, seconds: number) {
-    this.llmLatencyHistogram.observe({ provider, model }, seconds);
+  recordLatency(provider: string, model: string, seconds: number, orgId?: string) {
+    this.llmLatencyHistogram.observe({ provider, model, org_id: orgLabel(orgId) }, seconds);
   }
 
-  recordTokenUsage(provider: string, model: string, type: 'input' | 'output', tokens: number) {
-    this.llmTokenUsageHistogram.observe({ provider, model, type }, tokens);
+  recordTokenUsage(
+    provider: string,
+    model: string,
+    type: 'input' | 'output',
+    tokens: number,
+    orgId?: string,
+  ) {
+    this.llmTokenUsageHistogram.observe({ provider, model, type, org_id: orgLabel(orgId) }, tokens);
   }
 
-  setActiveProviders(count: number) {
-    this.llmActiveProviders.set(count);
+  setActiveProviders(count: number, orgId?: string) {
+    this.llmActiveProviders.set({ org_id: orgLabel(orgId) }, count);
   }
 
-  setProviderHealth(provider: string, healthy: boolean) {
-    this.llmProviderHealth.set({ provider }, healthy ? 1 : 0);
+  setProviderHealth(provider: string, healthy: boolean, orgId?: string) {
+    this.llmProviderHealth.set({ provider, org_id: orgLabel(orgId) }, healthy ? 1 : 0);
   }
 
   async getMetrics(): Promise<string> {
@@ -146,9 +178,24 @@ export class LLMMetrics {
    * Raw JSON snapshot of the LLM metrics (llm_* series only) for analytics
    * aggregation. Filtering keeps the payload small and scoped.
    */
-  async getSnapshot(): Promise<unknown[]> {
+  async getSnapshot(orgId?: string): Promise<MetricSnapshot[]> {
     const all = await this.registry.getMetricsAsJSON();
-    return all.filter((m) => m.name.startsWith('llm_'));
+    return all
+      .filter((m) => m.name.startsWith('llm_'))
+      .map((metric) => ({
+        name: metric.name,
+        help: metric.help,
+        type: String(metric.type),
+        values: (orgId
+          ? metric.values.filter((value) => value.labels.org_id === orgId)
+          : metric.values
+        ).map((value) => ({
+          labels: Object.fromEntries(
+            Object.entries(value.labels).map(([key, label]) => [key, String(label)]),
+          ),
+          value: Number(value.value),
+        })),
+      }));
   }
 }
 

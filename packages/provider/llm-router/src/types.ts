@@ -12,7 +12,7 @@ export interface RouteRequest {
   budget?: UserBudget;
   latency?: LatencyPreference;
   security?: SecurityLevel;
-  context?: Record<string, unknown>;
+  context?: Record<string, unknown> & { orgId?: string };
   /** Pin a specific registered provider (used by combo groups per attempt). */
   provider?: string;
   /** Pin an exact "provider:model" pair. */

@@ -132,7 +132,7 @@ export class LLMRouter {
     // 1. Check cache first
     const cachedResponse = await this.cacheManager.getCached(req, prompt);
     if (cachedResponse) {
-      llmMetrics.recordCacheHit('cache', 'all');
+      llmMetrics.recordCacheHit('cache', 'all', req.context?.orgId);
       return cachedResponse;
     }
 
@@ -145,6 +145,8 @@ export class LLMRouter {
     const providerName: string = parts[0] as string;
     const modelId: string = parts[1] as string;
     const complexity: string = req.complexity || 'medium';
+    const orgId = req.context?.orgId;
+    llmMetrics.setActiveProviders(this.providers.size, orgId);
 
     const provider = this.providers.get(providerName);
     if (!provider) {
@@ -159,12 +161,24 @@ export class LLMRouter {
       const latency = (performance.now() - startTime) / 1000;
 
       // Record success metrics
-      llmMetrics.recordRequest(providerName, modelId, complexity, 'success');
-      llmMetrics.recordLatency(providerName, modelId, latency);
-      llmMetrics.recordTokenUsage(providerName, modelId, 'input', response.usage.inputTokens);
-      llmMetrics.recordTokenUsage(providerName, modelId, 'output', response.usage.outputTokens);
-      llmMetrics.recordCost(providerName, modelId, response.cost);
-      llmMetrics.setProviderHealth(providerName, true);
+      llmMetrics.recordRequest(providerName, modelId, complexity, 'success', orgId);
+      llmMetrics.recordLatency(providerName, modelId, latency, orgId);
+      llmMetrics.recordTokenUsage(
+        providerName,
+        modelId,
+        'input',
+        response.usage.inputTokens,
+        orgId,
+      );
+      llmMetrics.recordTokenUsage(
+        providerName,
+        modelId,
+        'output',
+        response.usage.outputTokens,
+        orgId,
+      );
+      llmMetrics.recordCost(providerName, modelId, response.cost, orgId);
+      llmMetrics.setProviderHealth(providerName, true, orgId);
 
       // 4. Save to cache
       await this.cacheManager.setCache(req, prompt, response);
@@ -174,9 +188,9 @@ export class LLMRouter {
       const errorMsg = err instanceof Error ? err.message : String(err);
 
       // Record error metric
-      llmMetrics.recordRequest(providerName, modelId, complexity, 'error');
-      llmMetrics.recordError(providerName, modelId, errorMsg.slice(0, 50));
-      llmMetrics.setProviderHealth(providerName, false);
+      llmMetrics.recordRequest(providerName, modelId, complexity, 'error', orgId);
+      llmMetrics.recordError(providerName, modelId, errorMsg.slice(0, 50), orgId);
+      llmMetrics.setProviderHealth(providerName, false, orgId);
       healthChecker.registerProvider(providerName, 'unhealthy');
 
       // Send alert for provider failure
@@ -215,16 +229,16 @@ export class LLMRouter {
           const fbResponse = await fallbackProvider.generate(fbModel, prompt, req);
           const fbLatency = (performance.now() - fbStart) / 1000;
 
-          llmMetrics.recordFallback(providerName, fallbackName, errorMsg.slice(0, 40));
-          llmMetrics.recordRequest(fallbackName, fbModel, complexity, 'success');
-          llmMetrics.recordLatency(fallbackName, fbModel, fbLatency);
-          llmMetrics.setProviderHealth(fallbackName, true);
+          llmMetrics.recordFallback(providerName, fallbackName, errorMsg.slice(0, 40), orgId);
+          llmMetrics.recordRequest(fallbackName, fbModel, complexity, 'success', orgId);
+          llmMetrics.recordLatency(fallbackName, fbModel, fbLatency, orgId);
+          llmMetrics.setProviderHealth(fallbackName, true, orgId);
 
           await this.cacheManager.setCache(req, prompt, fbResponse);
           return fbResponse;
         } catch {
-          llmMetrics.recordError(fallbackName, fbModel, 'fallback_failed');
-          llmMetrics.setProviderHealth(fallbackName, false);
+          llmMetrics.recordError(fallbackName, fbModel, 'fallback_failed', orgId);
+          llmMetrics.setProviderHealth(fallbackName, false, orgId);
           continue;
         }
       }
