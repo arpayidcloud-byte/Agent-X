@@ -93,6 +93,7 @@ describe('Chat API (Web Pro)', () => {
 
     const controller = new AbortController();
     const res = await fetch(`${baseUrl}/v1/agentx/chat/${chatId}/events`, {
+      headers,
       signal: controller.signal,
     });
     expect(res.headers.get('content-type')).toContain('text/event-stream');
@@ -123,6 +124,7 @@ describe('Chat API (Web Pro)', () => {
 
     const types = events.map((e) => e.type);
     expect(types[0]).toBe('start');
+    expect(events.some((e) => e.type === 'complete')).toBe(true);
     expect(types).toContain('chunk');
     expect(types[types.length - 1]).toBe('complete');
     const chunkCount = events.filter((e) => e.type === 'chunk').length;

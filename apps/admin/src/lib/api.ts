@@ -437,15 +437,11 @@ export interface TasksResponse {
 }
 
 export async function fetchTasks(limit = 50): Promise<TasksResponse> {
-  const res = await fetch(`${API_URL}/v1/agentx/tasks?limit=${limit}`, { cache: 'no-store' });
-  if (!res.ok) throw new Error(`GET /v1/agentx/tasks failed: ${res.status}`);
-  return (await res.json()) as TasksResponse;
+  return authJson<TasksResponse>(`/v1/agentx/tasks?limit=${limit}`, {}, true);
 }
 
 export async function fetchStats(): Promise<{ stats: Record<string, number> }> {
-  const res = await fetch(`${API_URL}/v1/agentx/stats`, { cache: 'no-store' });
-  if (!res.ok) throw new Error(`GET /v1/agentx/stats failed: ${res.status}`);
-  return (await res.json()) as { stats: Record<string, number> };
+  return authJson<{ stats: Record<string, number> }>('/v1/agentx/stats', {}, true);
 }
 
 // ─── Agents (public endpoints) ────

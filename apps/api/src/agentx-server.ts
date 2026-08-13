@@ -121,6 +121,7 @@ const PORT = process.env.PORT || 4000;
 // ─── In-memory task store (dashboard API) ────
 export interface TaskRecord {
   id: string;
+  orgId: string;
   prompt: string;
   description: string;
   status: 'pending' | 'success' | 'error';
@@ -140,6 +141,7 @@ export interface TaskRecord {
 }
 
 export const taskStore = new Map<string, TaskRecord>();
+const chatOrgStore = new Map<string, string>();
 
 function recordTask(task: TaskRecord): void {
   taskStore.set(task.id, task);
@@ -223,6 +225,7 @@ app.post(
       const startedAt = new Date().toISOString();
       recordTask({
         id: request.taskId,
+        orgId: (req as AuthenticatedRequest).auth!.orgId!,
         prompt,
         description: request.description,
         status: 'pending',
@@ -308,6 +311,7 @@ app.post(
       const startedAt = new Date().toISOString();
       recordTask({
         id: request.taskId,
+        orgId: (req as AuthenticatedRequest).auth!.orgId!,
         prompt,
         description: request.description,
         status: 'pending',
@@ -460,9 +464,14 @@ app.post(
 // ─── SSE event stream for a task (Web Pro) ────
 // Replays buffered history first, then streams live events until the client
 // disconnects. Heartbeat comments keep proxies from killing idle connections.
-app.get('/v1/agentx/tasks/:id/events', (req, res) => {
+app.get('/v1/agentx/tasks/:id/events', requireAuth, withOrg, (req, res) => {
   const { id } = req.params;
   const taskId = typeof id === 'string' ? id : '';
+  const orgId = (req as AuthenticatedRequest).auth!.orgId!;
+  if (taskStore.get(taskId)?.orgId !== orgId) {
+    res.status(404).json({ error: 'Task not found' });
+    return;
+  }
 
   res.set({
     'Content-Type': 'text/event-stream',
@@ -569,6 +578,7 @@ app.post(
       }
       const last = parsed[parsed.length - 1]!;
       const chatId = `chat-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+      chatOrgStore.set(chatId, (req as AuthenticatedRequest).auth!.orgId!);
       const request = {
         taskId: taskId ?? chatId,
         description: last.content.slice(0, 120),
@@ -645,9 +655,14 @@ app.post(
 );
 
 // ─── Chat SSE event stream (Web Pro) ────
-app.get('/v1/agentx/chat/:id/events', (req, res) => {
+app.get('/v1/agentx/chat/:id/events', requireAuth, withOrg, (req, res) => {
   const { id } = req.params;
   const chatId = typeof id === 'string' ? id : '';
+  const orgId = (req as AuthenticatedRequest).auth!.orgId!;
+  if (chatOrgStore.get(chatId) !== orgId) {
+    res.status(404).json({ error: 'Chat not found' });
+    return;
+  }
 
   res.set({
     'Content-Type': 'text/event-stream',
@@ -821,6 +836,7 @@ app.delete('/v1/prompt-templates/:id', maybeRequireAdmin, async (req, res) => {
 app.post(
   '/v1/agentx/multi-agent/run',
   requireAuth,
+  withOrg,
   quotaMiddleware,
   async (req, res): Promise<void> => {
     try {
@@ -843,6 +859,7 @@ app.post(
       const run = startParallelRun({
         goals: goals.map((g: string) => g.trim()),
         concurrency: parsedConcurrency,
+        orgId: (req as AuthenticatedRequest).auth!.orgId!,
       });
       res.status(202).json({ runId: run.runId, status: run.status, concurrency: run.concurrency });
     } catch (e) {
@@ -853,10 +870,15 @@ app.post(
 );
 
 // SSE stream for a parallel run: replay history, then live events.
-app.get('/v1/agentx/multi-agent/:runId/events', (req, res) => {
+app.get('/v1/agentx/multi-agent/:runId/events', requireAuth, withOrg, (req, res) => {
   const { runId } = req.params;
   const id = typeof runId === 'string' ? runId : '';
-
+  const orgId = (req as AuthenticatedRequest).auth!.orgId!;
+  const run = getMultiAgentRun(id);
+  if (!run || run.orgId !== orgId) {
+    res.status(404).json({ error: 'Run not found' });
+    return;
+  }
   res.set({
     'Content-Type': 'text/event-stream',
     'Cache-Control': 'no-cache, no-transform',
@@ -883,11 +905,12 @@ app.get('/v1/agentx/multi-agent/:runId/events', (req, res) => {
 });
 
 // Run status + result (JSON, for polling clients).
-app.get('/v1/agentx/multi-agent/:runId', (req, res) => {
+app.get('/v1/agentx/multi-agent/:runId', requireAuth, withOrg, (req, res) => {
   const { runId } = req.params;
   const id = typeof runId === 'string' ? runId : '';
+  const orgId = (req as AuthenticatedRequest).auth!.orgId!;
   const run = getMultiAgentRun(id);
-  if (!run) {
+  if (!run || run.orgId !== orgId) {
     res.status(404).json({ error: `Run not found: ${id}` });
     return;
   }
@@ -1155,25 +1178,25 @@ app.patch('/v1/agents/:id', maybeRequireAdmin, (req, res) => {
 });
 
 // ─── Task list endpoint (dashboard) ────
-app.get('/v1/agentx/tasks', async (_req, res) => {
+app.get('/v1/agentx/tasks', requireAuth, withOrg, async (req, res) => {
   try {
-    const limitRaw = Number(_req.query.limit ?? 50);
+    const orgId = (req as AuthenticatedRequest).auth!.orgId!;
+    const limitRaw = Number(req.query.limit ?? 50);
     const limit =
       Number.isFinite(limitRaw) && limitRaw > 0 ? Math.min(Math.floor(limitRaw), 200) : 50;
-    const tasks = [...taskStore.values()]
-      .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1))
-      .slice(0, limit);
-    res.json({ tasks, total: taskStore.size });
+    const scopedTasks = [...taskStore.values()].filter((task) => task.orgId === orgId);
+    const tasks = scopedTasks.sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1)).slice(0, limit);
+    res.json({ tasks, total: scopedTasks.length });
   } catch (e) {
     res.status(500).json({ error: String(e) });
   }
 });
 
 // ─── Compact stats endpoint (dashboard) ────
-app.get('/v1/agentx/stats', async (_req, res) => {
+app.get('/v1/agentx/stats', requireAuth, withOrg, async (req, res) => {
   try {
-    const registry = llmMetrics.getRegistry();
-    const json = await registry.getMetricsAsJSON();
+    const orgId = (req as AuthenticatedRequest).auth!.orgId!;
+    const json = await llmMetrics.getSnapshot(orgId);
     const stats: Record<string, number> = {};
     for (const metric of json) {
       const total = metric.values.reduce((acc, v) => acc + (Number(v.value) || 0), 0);

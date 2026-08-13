@@ -66,6 +66,7 @@ describe('Task stream (Web Pro SSE)', () => {
 
     const controller = new AbortController();
     const res = await fetch(`${baseUrl}/v1/agentx/tasks/${taskId}/events`, {
+      headers,
       signal: controller.signal,
     });
     expect(res.status).toBe(200);

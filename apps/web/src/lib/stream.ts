@@ -1,94 +1,72 @@
-// Real-time stream client with automatic WebSocket fallback (Web Pro).
-//
-// SSE (EventSource) is tried first: it is the primary transport with native
-// auto-reconnect. If it errors out (proxies that buffer SSE, blocked
-// EventSource, etc.) the client transparently reconnects over WebSocket to
-import { API_URL } from '@/lib/api';
+// Authenticated real-time stream client for Web Pro.
+// Browser EventSource cannot send Authorization headers, so tenant SSE streams
+// use fetch() with a bearer token and an AbortController instead.
+import { API_URL, getToken } from '@/lib/api';
 
 export interface StreamHandle {
   close: () => void;
 }
 
-// Channel prefix → SSE route segment (the server routes differ per channel).
 const SSE_ROUTES: Record<string, string> = {
   'task:': 'tasks',
   'chat:': 'chat',
   'ma:': 'multi-agent',
 };
 
-function wsUrlFor(channel: string): string {
-  const base = API_URL.replace(/^http/, 'ws');
-  return `${base}/ws?channel=${encodeURIComponent(channel)}`;
-}
-
-/**
- * Open a stream for `channel` (e.g. `task:<id>`, `chat:<id>` or `ma:<id>`),
- * delivering parsed JSON events to `onEvent`. Returns a handle; call close()
- * to stop.
- */
+/** Open an authenticated SSE stream and deliver parsed JSON events. */
 export function openEventStream(channel: string, onEvent: (ev: unknown) => void): StreamHandle {
-  let closed = false;
-  let source: EventSource | null = null;
-  let ws: WebSocket | null = null;
-  let useWs = false;
-
-  function onData(data: unknown) {
-    if (closed) return;
-    try {
-      onEvent(JSON.parse(String(data)));
-    } catch {
-      // Ignore malformed frames (heartbeats etc.)
-    }
-  }
-
-  function connectWs() {
-    if (closed) return;
-    useWs = true;
-    ws = new WebSocket(wsUrlFor(channel));
-    ws.onmessage = (msg) => onData(msg.data);
-    ws.onerror = () => {
-      // No retry loop here: the page-level UI surfaces failures; a page
-      // refresh re-establishes the stream.
-      ws?.close();
-    };
-    ws.onclose = () => {
-      if (!closed) onClose();
-    };
-  }
-
-  function onClose() {
-    if (!closed && !useWs) {
-      // SSE failed — fall back to WebSocket once.
-      connectWs();
-    }
-  }
-
+  const controller = new AbortController();
   const prefix = Object.keys(SSE_ROUTES).find((p) => channel.startsWith(p));
   const route = prefix ? SSE_ROUTES[prefix] : undefined;
   const id = prefix ? channel.slice(prefix.length) : '';
+  const token = getToken();
 
-  try {
-    if (route) {
-      source = new EventSource(`${API_URL}/v1/agentx/${route}/${id}/events`);
-      source.onmessage = (msg) => onData(msg.data);
-      source.onerror = () => {
-        source?.close();
-        onClose();
-      };
-    } else {
-      // Unknown channel — no SSE route; go straight to WS.
-      connectWs();
-    }
-  } catch {
-    // EventSource unavailable (very old browsers) — straight to WS.
-    connectWs();
+  if (!route || !token) {
+    queueMicrotask(() => onEvent({ type: 'error', error: 'Authentication required for stream' }));
+    return { close: () => controller.abort() };
   }
 
-  return {
-    close: () => {
-      closed = true;
-      source?.close();
-      ws?.close();
-    },
-  };
+  void (async () => {
+    try {
+      const response = await fetch(`${API_URL}/v1/agentx/${route}/${id}/events`, {
+        headers: { Authorization: `Bearer ${token}` },
+        signal: controller.signal,
+        cache: 'no-store',
+      });
+      if (!response.ok || !response.body) {
+        onEvent({ type: 'error', error: `Stream failed: ${response.status}` });
+        return;
+      }
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+      while (!controller.signal.aborted) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const frames = buffer.split('\n\n');
+        buffer = frames.pop() ?? '';
+        for (const frame of frames) {
+          const data = frame
+            .split('\n')
+            .filter((line) => line.startsWith('data: '))
+            .map((line) => line.slice(6))
+            .join('\n');
+          if (!data) continue;
+          try {
+            onEvent(JSON.parse(data));
+          } catch {
+            // Ignore malformed frames and heartbeat comments.
+          }
+        }
+      }
+    } catch (error) {
+      if (!controller.signal.aborted) {
+        onEvent({ type: 'error', error: error instanceof Error ? error.message : String(error) });
+      }
+    }
+  })();
+
+  return { close: () => controller.abort() };
 }

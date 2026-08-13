@@ -19,6 +19,7 @@ import { publishMultiAgentEvent, type MultiAgentStreamEvent } from './multi-agen
 
 export interface MultiAgentRun {
   runId: string;
+  orgId: string;
   status: 'running' | 'completed' | 'error';
   concurrency: number;
   goals: Array<{ goalId: string; description: string }>;
@@ -90,7 +91,11 @@ function makeRouterExecutor(): PhaseExecutor {
   };
 }
 
-export function startParallelRun(input: { goals: string[]; concurrency: number }): MultiAgentRun {
+export function startParallelRun(input: {
+  goals: string[];
+  concurrency: number;
+  orgId: string;
+}): MultiAgentRun {
   const runId = `ma-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   const startedAt = new Date().toISOString();
   const goalInputs = input.goals.map((description, i) => ({
@@ -100,6 +105,7 @@ export function startParallelRun(input: { goals: string[]; concurrency: number }
 
   const run: MultiAgentRun = {
     runId,
+    orgId: input.orgId,
     status: 'running',
     concurrency: input.concurrency,
     goals: goalInputs,
