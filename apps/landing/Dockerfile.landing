@@ -16,6 +16,5 @@ ENV NODE_ENV=production
 ENV PORT=3000
 COPY --from=build /app/apps/landing/.next/standalone ./
 COPY --from=build /app/apps/landing/.next/static ./apps/landing/.next/static
-COPY --from=build /app/apps/landing/public ./apps/landing/public
 EXPOSE 3000
 CMD ["node", "apps/landing/server.js"]
