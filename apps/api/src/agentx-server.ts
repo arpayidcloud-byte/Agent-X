@@ -51,6 +51,7 @@ import { registerProviderGroupRoutes } from './provider-group-routes.js';
 import { registerDeckRoutes } from './deck.js';
 import { registerBillingRoutes } from './billing-routes.js';
 import { quotaMiddleware } from './middleware/quota.js';
+import { withOrg } from './middleware/withOrg.js';
 import { registerTrialCronRoutes } from './trial-cron.js';
 import { syncProvidersFromDb } from './llm-providers.js';
 import {
@@ -195,214 +196,52 @@ app.get('/health', async (_req, res) => {
 });
 
 // ─── LLM run endpoint (wired to router) ────
-app.post('/v1/agentx/run', requireAuth, quotaMiddleware, async (req, res): Promise<void> => {
-  try {
-    const { prompt, taskId, description, complexity, type, budget, provider } = req.body ?? {};
-
-    if (!prompt || typeof prompt !== 'string') {
-      res.status(400).json({ error: 'Missing required field: prompt (string)' });
-      return;
-    }
-
-    const request = {
-      taskId: taskId ?? `api-${Date.now()}`,
-      description: description ?? prompt.slice(0, 120),
-      complexity: complexity ?? 'medium',
-      type: type ?? 'reasoning',
-      budget: budget ?? 'medium',
-      provider: typeof provider === 'string' ? provider : undefined,
-    };
-
-    const startedAt = new Date().toISOString();
-    recordTask({
-      id: request.taskId,
-      prompt,
-      description: request.description,
-      status: 'pending',
-      createdAt: startedAt,
-    });
-
+app.post(
+  '/v1/agentx/run',
+  requireAuth,
+  withOrg,
+  quotaMiddleware,
+  async (req, res): Promise<void> => {
     try {
-      const response = await executeRoute(router, request, prompt);
-      const completed = taskStore.get(request.taskId);
-      if (completed) {
-        completed.status = 'success';
-        completed.completedAt = new Date().toISOString();
-        completed.provider = response.provider;
-        completed.model = response.model;
-        completed.response = response.message;
+      const { prompt, taskId, description, complexity, type, budget, provider } = req.body ?? {};
+
+      if (!prompt || typeof prompt !== 'string') {
+        res.status(400).json({ error: 'Missing required field: prompt (string)' });
+        return;
       }
 
-      // Record cost entry for persistent tracking
+      const request = {
+        taskId: taskId ?? `api-${Date.now()}`,
+        description: description ?? prompt.slice(0, 120),
+        complexity: complexity ?? 'medium',
+        type: type ?? 'reasoning',
+        budget: budget ?? 'medium',
+        provider: typeof provider === 'string' ? provider : undefined,
+      };
+
+      const startedAt = new Date().toISOString();
+      recordTask({
+        id: request.taskId,
+        prompt,
+        description: request.description,
+        status: 'pending',
+        createdAt: startedAt,
+      });
+
       try {
-        await costRepo.create({
-          taskId: request.taskId,
-          userId: (req as AuthenticatedRequest).auth?.sub ?? undefined,
-          provider: response.provider ?? 'unknown',
-          model: response.model ?? 'unknown',
-          inputTokens: response.usage?.inputTokens ?? 0,
-          outputTokens: response.usage?.outputTokens ?? 0,
-          totalTokens: response.usage?.totalTokens ?? 0,
-          costUsd: response.cost ?? 0,
-          latencyMs: response.latencyMs ?? 0,
-          cached: response.cached ?? false,
-          source: 'api',
-        });
-        businessMetrics.costEntries.inc({ provider: response.provider ?? 'unknown' });
-      } catch {
-        /* cost recording is best-effort */
-      }
-
-      res.json(response);
-    } catch (runErr) {
-      const err = runErr instanceof Error ? runErr.message : String(runErr);
-      const failed = taskStore.get(request.taskId);
-      if (failed) {
-        failed.status = 'error';
-        failed.completedAt = new Date().toISOString();
-        failed.error = err;
-      }
-      res.status(500).json({ error: err });
-    }
-  } catch (e) {
-    const err = e instanceof Error ? e.message : String(e);
-    res.status(500).json({ error: err });
-  }
-});
-
-// ─── Async stream run (Web Pro: SSE real-time task execution) ────
-// POST returns 202 + taskId immediately; the task runs in the background and
-// emits lifecycle events consumed via GET /v1/agentx/tasks/:id/events.
-app.post('/v1/agentx/run/stream', requireAuth, quotaMiddleware, async (req, res): Promise<void> => {
-  try {
-    const { prompt, taskId, description, complexity, type, budget, provider } = req.body ?? {};
-
-    if (!prompt || typeof prompt !== 'string') {
-      res.status(400).json({ error: 'Missing required field: prompt (string)' });
-      return;
-    }
-
-    const request = {
-      taskId: taskId ?? `stream-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-      description: description ?? prompt.slice(0, 120),
-      complexity: complexity ?? 'medium',
-      type: type ?? 'reasoning',
-      budget: budget ?? 'medium',
-      provider: typeof provider === 'string' ? provider : undefined,
-    };
-
-    const startedAt = new Date().toISOString();
-    recordTask({
-      id: request.taskId,
-      prompt,
-      description: request.description,
-      status: 'pending',
-      createdAt: startedAt,
-      progress: 10,
-    });
-
-    publishEvent({ type: 'accepted', taskId: request.taskId, at: startedAt });
-    res.status(202).json({ taskId: request.taskId, status: 'accepted' });
-
-    // Background worker: stage transitions -> execute -> complete/error.
-    void (async () => {
-      try {
-        await delay(STAGE_DELAY_MS);
-        const genAt = new Date().toISOString();
-        publishEvent({
-          type: 'generating',
-          taskId: request.taskId,
-          at: genAt,
-        });
-        const store = taskStore.get(request.taskId);
-        if (store) store.progress = 50;
         const response = await executeRoute(router, request, prompt);
-        const task = taskStore.get(request.taskId);
-        if (task) {
-          task.status = 'success';
-          task.completedAt = new Date().toISOString();
-          task.provider = response.provider;
-          task.model = response.model;
-          task.response = response.message;
-          task.progress = 100;
-          task.tokensIn = response.usage?.inputTokens ?? 0;
-          task.tokensOut = response.usage?.outputTokens ?? 0;
-          task.files = { modified: 0, created: 0 };
+        const completed = taskStore.get(request.taskId);
+        if (completed) {
+          completed.status = 'success';
+          completed.completedAt = new Date().toISOString();
+          completed.provider = response.provider;
+          completed.model = response.model;
+          completed.response = response.message;
         }
-        // Auto-score successful task outputs (quality scoring — Phase 2).
-        void (async () => {
-          try {
-            const scored = await new QualityScorer().score({
-              prompt,
-              response: response.message,
-              provider: response.provider,
-              model: response.model,
-              taskId: request.taskId,
-            });
-            const backend = await getQualityBackend();
-            await backend.create({
-              id: scored.id,
-              prompt: scored.prompt,
-              response: scored.response,
-              provider: scored.provider,
-              model: scored.model,
-              taskId: scored.taskId,
-              dimensions: { dimensions: scored.dimensions, overall: scored.overall },
-              overall: scored.overall,
-              grade: scored.grade,
-              evaluator: scored.evaluator,
-              createdAt: scored.createdAt,
-            });
-            logger.info('Quality score recorded', {
-              taskId: request.taskId,
-              overall: scored.overall,
-            });
-            // Agent feedback loop: low-scoring outputs get actionable feedback
-            // (weak dimensions + revision prompt) so the next run can improve.
-            // Gate threshold configurable via QUALITY_GATE_THRESHOLD (#117).
-            const gateThreshold = Number(process.env.QUALITY_GATE_THRESHOLD ?? 70);
-            if (scored.overall < gateThreshold) {
-              const feedback = generateFeedback(scored);
-              const fbBackend = await getFeedbackBackend();
-              await fbBackend.create({
-                id: feedback.id,
-                scoreId: feedback.scoreId,
-                taskId: feedback.taskId,
-                prompt: feedback.prompt,
-                response: feedback.response,
-                overall: feedback.overall,
-                grade: feedback.grade,
-                weakDimensions: feedback.weakDimensions,
-                priorityAdvice: feedback.priorityAdvice,
-                improvementPrompt: feedback.improvementPrompt,
-                createdAt: feedback.createdAt,
-              });
-              logger.info('Agent feedback generated', {
-                taskId: request.taskId,
-                feedbackId: feedback.id,
-                overall: feedback.overall,
-              });
-            }
-          } catch (scoreErr) {
-            logger.warn('Quality auto-score failed', {
-              taskId: request.taskId,
-              error: scoreErr instanceof Error ? scoreErr.message : String(scoreErr),
-            });
-          }
-        })();
-        publishEvent({
-          type: 'complete',
-          taskId: request.taskId,
-          status: 'success',
-          provider: response.provider,
-          model: response.model,
-          response: response.message,
-          at: new Date().toISOString(),
-        });
 
         // Record cost entry for persistent tracking
         try {
-          await costRepo.create({
+          await costRepo.create((req as AuthenticatedRequest).auth!.orgId!, {
             taskId: request.taskId,
             userId: (req as AuthenticatedRequest).auth?.sub ?? undefined,
             provider: response.provider ?? 'unknown',
@@ -419,28 +258,202 @@ app.post('/v1/agentx/run/stream', requireAuth, quotaMiddleware, async (req, res)
         } catch {
           /* cost recording is best-effort */
         }
+
+        res.json(response);
       } catch (runErr) {
         const err = runErr instanceof Error ? runErr.message : String(runErr);
-        const task = taskStore.get(request.taskId);
-        if (task) {
-          task.status = 'error';
-          task.completedAt = new Date().toISOString();
-          task.error = err;
+        const failed = taskStore.get(request.taskId);
+        if (failed) {
+          failed.status = 'error';
+          failed.completedAt = new Date().toISOString();
+          failed.error = err;
         }
-        publishEvent({
-          type: 'complete',
-          taskId: request.taskId,
-          status: 'error',
-          error: err,
-          at: new Date().toISOString(),
-        });
+        res.status(500).json({ error: err });
       }
-    })();
-  } catch (e) {
-    const err = e instanceof Error ? e.message : String(e);
-    res.status(500).json({ error: err });
-  }
-});
+    } catch (e) {
+      const err = e instanceof Error ? e.message : String(e);
+      res.status(500).json({ error: err });
+    }
+  },
+);
+
+// ─── Async stream run (Web Pro: SSE real-time task execution) ────
+// POST returns 202 + taskId immediately; the task runs in the background and
+// emits lifecycle events consumed via GET /v1/agentx/tasks/:id/events.
+app.post(
+  '/v1/agentx/run/stream',
+  requireAuth,
+  withOrg,
+  quotaMiddleware,
+  async (req, res): Promise<void> => {
+    try {
+      const { prompt, taskId, description, complexity, type, budget, provider } = req.body ?? {};
+
+      if (!prompt || typeof prompt !== 'string') {
+        res.status(400).json({ error: 'Missing required field: prompt (string)' });
+        return;
+      }
+
+      const request = {
+        taskId: taskId ?? `stream-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        description: description ?? prompt.slice(0, 120),
+        complexity: complexity ?? 'medium',
+        type: type ?? 'reasoning',
+        budget: budget ?? 'medium',
+        provider: typeof provider === 'string' ? provider : undefined,
+      };
+
+      const startedAt = new Date().toISOString();
+      recordTask({
+        id: request.taskId,
+        prompt,
+        description: request.description,
+        status: 'pending',
+        createdAt: startedAt,
+        progress: 10,
+      });
+
+      publishEvent({ type: 'accepted', taskId: request.taskId, at: startedAt });
+      res.status(202).json({ taskId: request.taskId, status: 'accepted' });
+
+      // Background worker: stage transitions -> execute -> complete/error.
+      void (async () => {
+        try {
+          await delay(STAGE_DELAY_MS);
+          const genAt = new Date().toISOString();
+          publishEvent({
+            type: 'generating',
+            taskId: request.taskId,
+            at: genAt,
+          });
+          const store = taskStore.get(request.taskId);
+          if (store) store.progress = 50;
+          const response = await executeRoute(router, request, prompt);
+          const task = taskStore.get(request.taskId);
+          if (task) {
+            task.status = 'success';
+            task.completedAt = new Date().toISOString();
+            task.provider = response.provider;
+            task.model = response.model;
+            task.response = response.message;
+            task.progress = 100;
+            task.tokensIn = response.usage?.inputTokens ?? 0;
+            task.tokensOut = response.usage?.outputTokens ?? 0;
+            task.files = { modified: 0, created: 0 };
+          }
+          // Auto-score successful task outputs (quality scoring — Phase 2).
+          void (async () => {
+            try {
+              const scored = await new QualityScorer().score({
+                prompt,
+                response: response.message,
+                provider: response.provider,
+                model: response.model,
+                taskId: request.taskId,
+              });
+              const backend = await getQualityBackend();
+              await backend.create({
+                id: scored.id,
+                prompt: scored.prompt,
+                response: scored.response,
+                provider: scored.provider,
+                model: scored.model,
+                taskId: scored.taskId,
+                dimensions: { dimensions: scored.dimensions, overall: scored.overall },
+                overall: scored.overall,
+                grade: scored.grade,
+                evaluator: scored.evaluator,
+                createdAt: scored.createdAt,
+              });
+              logger.info('Quality score recorded', {
+                taskId: request.taskId,
+                overall: scored.overall,
+              });
+              // Agent feedback loop: low-scoring outputs get actionable feedback
+              // (weak dimensions + revision prompt) so the next run can improve.
+              // Gate threshold configurable via QUALITY_GATE_THRESHOLD (#117).
+              const gateThreshold = Number(process.env.QUALITY_GATE_THRESHOLD ?? 70);
+              if (scored.overall < gateThreshold) {
+                const feedback = generateFeedback(scored);
+                const fbBackend = await getFeedbackBackend();
+                await fbBackend.create({
+                  id: feedback.id,
+                  scoreId: feedback.scoreId,
+                  taskId: feedback.taskId,
+                  prompt: feedback.prompt,
+                  response: feedback.response,
+                  overall: feedback.overall,
+                  grade: feedback.grade,
+                  weakDimensions: feedback.weakDimensions,
+                  priorityAdvice: feedback.priorityAdvice,
+                  improvementPrompt: feedback.improvementPrompt,
+                  createdAt: feedback.createdAt,
+                });
+                logger.info('Agent feedback generated', {
+                  taskId: request.taskId,
+                  feedbackId: feedback.id,
+                  overall: feedback.overall,
+                });
+              }
+            } catch (scoreErr) {
+              logger.warn('Quality auto-score failed', {
+                taskId: request.taskId,
+                error: scoreErr instanceof Error ? scoreErr.message : String(scoreErr),
+              });
+            }
+          })();
+          publishEvent({
+            type: 'complete',
+            taskId: request.taskId,
+            status: 'success',
+            provider: response.provider,
+            model: response.model,
+            response: response.message,
+            at: new Date().toISOString(),
+          });
+
+          // Record cost entry for persistent tracking
+          try {
+            await costRepo.create((req as AuthenticatedRequest).auth!.orgId!, {
+              taskId: request.taskId,
+              userId: (req as AuthenticatedRequest).auth?.sub ?? undefined,
+              provider: response.provider ?? 'unknown',
+              model: response.model ?? 'unknown',
+              inputTokens: response.usage?.inputTokens ?? 0,
+              outputTokens: response.usage?.outputTokens ?? 0,
+              totalTokens: response.usage?.totalTokens ?? 0,
+              costUsd: response.cost ?? 0,
+              latencyMs: response.latencyMs ?? 0,
+              cached: response.cached ?? false,
+              source: 'api',
+            });
+            businessMetrics.costEntries.inc({ provider: response.provider ?? 'unknown' });
+          } catch {
+            /* cost recording is best-effort */
+          }
+        } catch (runErr) {
+          const err = runErr instanceof Error ? runErr.message : String(runErr);
+          const task = taskStore.get(request.taskId);
+          if (task) {
+            task.status = 'error';
+            task.completedAt = new Date().toISOString();
+            task.error = err;
+          }
+          publishEvent({
+            type: 'complete',
+            taskId: request.taskId,
+            status: 'error',
+            error: err,
+            at: new Date().toISOString(),
+          });
+        }
+      })();
+    } catch (e) {
+      const err = e instanceof Error ? e.message : String(e);
+      res.status(500).json({ error: err });
+    }
+  },
+);
 
 // ─── SSE event stream for a task (Web Pro) ────
 // Replays buffered history first, then streams live events until the client
@@ -477,54 +490,60 @@ app.get('/v1/agentx/tasks/:id/events', (req, res) => {
 // ─── Chat (Web Pro): single-turn with transcript context ────
 // Builds a bounded transcript prompt from the conversation, then routes it
 // through the LLM router like any other task.
-app.post('/v1/agentx/chat', requireAuth, quotaMiddleware, async (req, res): Promise<void> => {
-  try {
-    const { messages, taskId, complexity, type, budget, provider } = req.body ?? {};
-    const parsed = parseChatMessages(messages);
-    if (!parsed) {
-      res.status(400).json({
-        error:
-          'Missing or invalid field: messages (non-empty array of {role: user|assistant, content: string})',
-      });
-      return;
-    }
-    const last = parsed[parsed.length - 1]!;
-    const request = {
-      taskId: taskId ?? `chat-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-      description: last.content.slice(0, 120),
-      complexity: complexity ?? 'medium',
-      type: type ?? 'reasoning',
-      budget: budget ?? 'medium',
-      provider: typeof provider === 'string' ? provider : undefined,
-    };
-    const response = await executeRoute(router, request, buildChatPrompt(parsed));
-
-    // Record cost entry for persistent tracking
+app.post(
+  '/v1/agentx/chat',
+  requireAuth,
+  withOrg,
+  quotaMiddleware,
+  async (req, res): Promise<void> => {
     try {
-      await costRepo.create({
-        taskId: request.taskId,
-        userId: (req as AuthenticatedRequest).auth?.sub ?? undefined,
-        provider: response.provider ?? 'unknown',
-        model: response.model ?? 'unknown',
-        inputTokens: response.usage?.inputTokens ?? 0,
-        outputTokens: response.usage?.outputTokens ?? 0,
-        totalTokens: response.usage?.totalTokens ?? 0,
-        costUsd: response.cost ?? 0,
-        latencyMs: response.latencyMs ?? 0,
-        cached: response.cached ?? false,
-        source: 'web',
-      });
-      businessMetrics.costEntries.inc({ provider: response.provider ?? 'unknown' });
-    } catch {
-      /* cost recording is best-effort */
-    }
+      const { messages, taskId, complexity, type, budget, provider } = req.body ?? {};
+      const parsed = parseChatMessages(messages);
+      if (!parsed) {
+        res.status(400).json({
+          error:
+            'Missing or invalid field: messages (non-empty array of {role: user|assistant, content: string})',
+        });
+        return;
+      }
+      const last = parsed[parsed.length - 1]!;
+      const request = {
+        taskId: taskId ?? `chat-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        description: last.content.slice(0, 120),
+        complexity: complexity ?? 'medium',
+        type: type ?? 'reasoning',
+        budget: budget ?? 'medium',
+        provider: typeof provider === 'string' ? provider : undefined,
+      };
+      const response = await executeRoute(router, request, buildChatPrompt(parsed));
 
-    res.json({ ...response, taskId: request.taskId });
-  } catch (e) {
-    const err = e instanceof Error ? e.message : String(e);
-    res.status(500).json({ error: err });
-  }
-});
+      // Record cost entry for persistent tracking
+      try {
+        await costRepo.create((req as AuthenticatedRequest).auth!.orgId!, {
+          taskId: request.taskId,
+          userId: (req as AuthenticatedRequest).auth?.sub ?? undefined,
+          provider: response.provider ?? 'unknown',
+          model: response.model ?? 'unknown',
+          inputTokens: response.usage?.inputTokens ?? 0,
+          outputTokens: response.usage?.outputTokens ?? 0,
+          totalTokens: response.usage?.totalTokens ?? 0,
+          costUsd: response.cost ?? 0,
+          latencyMs: response.latencyMs ?? 0,
+          cached: response.cached ?? false,
+          source: 'web',
+        });
+        businessMetrics.costEntries.inc({ provider: response.provider ?? 'unknown' });
+      } catch {
+        /* cost recording is best-effort */
+      }
+
+      res.json({ ...response, taskId: request.taskId });
+    } catch (e) {
+      const err = e instanceof Error ? e.message : String(e);
+      res.status(500).json({ error: err });
+    }
+  },
+);
 
 // ─── Chat streaming (Web Pro): SSE token stream ────
 // POST returns 202 + chatId; events (start -> chunk* -> complete/error) are
@@ -585,6 +604,24 @@ app.post(
             latencyMs: response.latencyMs,
             at: new Date().toISOString(),
           });
+          try {
+            await costRepo.create((req as AuthenticatedRequest).auth!.orgId!, {
+              taskId: request.taskId,
+              userId: (req as AuthenticatedRequest).auth?.sub ?? undefined,
+              provider: response.provider ?? 'unknown',
+              model: response.model ?? 'unknown',
+              inputTokens: response.usage?.inputTokens ?? 0,
+              outputTokens: response.usage?.outputTokens ?? 0,
+              totalTokens: response.usage?.totalTokens ?? 0,
+              costUsd: response.cost ?? 0,
+              latencyMs: response.latencyMs ?? 0,
+              cached: response.cached ?? false,
+              source: 'web',
+            });
+            businessMetrics.costEntries.inc({ provider: response.provider ?? 'unknown' });
+          } catch {
+            /* cost recording is best-effort */
+          }
         } catch (runErr) {
           const err = runErr instanceof Error ? runErr.message : String(runErr);
           publishChatEvent({
@@ -1031,10 +1068,10 @@ app.post('/v1/feedback/:id/revision', async (req, res): Promise<void> => {
 // ─── Cost tracking: summary ────
 // Persistent cost data from CostEntry table (historical).
 // Wrapped in { overview, byProvider, byModel } to match admin panel format.
-app.get('/v1/cost/summary', maybeRequireAdmin, async (req, res) => {
+app.get('/v1/cost/summary', requireAuth, withOrg, maybeRequireAdmin, async (req, res) => {
   try {
     const days = Number(req.query.days) || 30;
-    const s = await costRepo.getSummary(days);
+    const s = await costRepo.getSummary((req as AuthenticatedRequest).auth!.orgId!, days);
     const totalCostUsd = s.totalCostUsd;
     const totalTokens = s.totalTokens;
     const totalRequests = s.totalRequests;
@@ -1064,11 +1101,11 @@ app.get('/v1/cost/summary', maybeRequireAdmin, async (req, res) => {
 });
 
 // ─── Cost tracking: entries list ────
-app.get('/v1/cost/entries', maybeRequireAdmin, async (req, res) => {
+app.get('/v1/cost/entries', requireAuth, withOrg, maybeRequireAdmin, async (req, res) => {
   try {
     const limit = Math.min(Number(req.query.limit) || 50, 200);
     const offset = Number(req.query.offset) || 0;
-    const entries = await costRepo.list(limit, offset);
+    const entries = await costRepo.list((req as AuthenticatedRequest).auth!.orgId!, limit, offset);
     res.json({ entries, total: entries.length });
   } catch (e) {
     res.status(500).json({ error: String(e) });

@@ -222,6 +222,7 @@ export async function oauthLogin(
       email: user.email,
       roles: user.roles,
       emailVerified: user.emailVerified,
+      orgId: user.orgId,
       createdAt: user.createdAt,
     },
     tokens: await issueTokens(user),

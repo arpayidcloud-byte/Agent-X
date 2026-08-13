@@ -6,6 +6,7 @@ export interface UserRecord {
   passwordHash: string;
   roles: string[];
   emailVerified: boolean;
+  orgId: string | null;
   createdAt: string;
 }
 
@@ -15,6 +16,7 @@ function toRecord(row: {
   passwordHash: string;
   roles: string[];
   emailVerified: boolean;
+  orgId: string | null;
   createdAt: Date;
 }): UserRecord {
   return {
@@ -23,6 +25,7 @@ function toRecord(row: {
     passwordHash: row.passwordHash,
     roles: row.roles,
     emailVerified: row.emailVerified,
+    orgId: row.orgId,
     createdAt: row.createdAt.toISOString(),
   };
 }
@@ -35,6 +38,7 @@ export class PrismaUserRepository {
     email: string;
     passwordHash: string;
     roles: string[];
+    orgId?: string | null;
   }): Promise<UserRecord> {
     const row = await this.prisma.user.create({ data: record });
     return toRecord(row);

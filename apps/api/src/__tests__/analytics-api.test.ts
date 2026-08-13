@@ -1,9 +1,11 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import type { Server } from 'node:http';
+import jwt from 'jsonwebtoken';
 
 const ADMIN_EMAIL = `analytics-admin-${Date.now()}@agentx.dev`;
 process.env.ENABLE_MOCK_PROVIDER = 'true';
 process.env.AUTH_ENABLED = 'true';
+process.env.JWT_SECRET = 'test-secret';
 process.env.ADMIN_EMAILS = ADMIN_EMAIL;
 const { app } = await import('../agentx-server.js');
 
@@ -76,5 +78,21 @@ describe('Analytics API (Web Pro)', () => {
   it('GET /v1/analytics/summary requires auth (401 without token)', async () => {
     const res = await fetch(`${baseUrl}/v1/analytics/summary`);
     expect(res.status).toBe(401);
+  });
+
+  it('rejects authenticated LLM execution without an organization before provider execution', async () => {
+    const noOrgToken = jwt.sign(
+      { sub: 'missing-user', email: 'missing@agentx.dev', roles: ['user'] },
+      'test-secret',
+    );
+    const res = await fetch(`${baseUrl}/v1/agentx/run`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${noOrgToken}` },
+      body: JSON.stringify({ prompt: 'tenant boundary proof' }),
+    });
+    expect(res.status).toBe(403);
+    await expect(res.json()).resolves.toMatchObject({
+      error: expect.stringContaining('organization'),
+    });
   });
 });
