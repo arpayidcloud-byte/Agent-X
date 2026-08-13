@@ -217,6 +217,7 @@ app.post(
         type: type ?? 'reasoning',
         budget: budget ?? 'medium',
         provider: typeof provider === 'string' ? provider : undefined,
+        context: { orgId: (req as AuthenticatedRequest).auth!.orgId! },
       };
 
       const startedAt = new Date().toISOString();
@@ -301,6 +302,7 @@ app.post(
         type: type ?? 'reasoning',
         budget: budget ?? 'medium',
         provider: typeof provider === 'string' ? provider : undefined,
+        context: { orgId: (req as AuthenticatedRequest).auth!.orgId! },
       };
 
       const startedAt = new Date().toISOString();
@@ -514,6 +516,7 @@ app.post(
         type: type ?? 'reasoning',
         budget: budget ?? 'medium',
         provider: typeof provider === 'string' ? provider : undefined,
+        context: { orgId: (req as AuthenticatedRequest).auth!.orgId! },
       };
       const response = await executeRoute(router, request, buildChatPrompt(parsed));
 
@@ -551,6 +554,7 @@ app.post(
 app.post(
   '/v1/agentx/chat/stream',
   requireAuth,
+  withOrg,
   quotaMiddleware,
   async (req, res): Promise<void> => {
     try {
@@ -572,6 +576,7 @@ app.post(
         type: type ?? 'reasoning',
         budget: budget ?? 'medium',
         provider: typeof provider === 'string' ? provider : undefined,
+        context: { orgId: (req as AuthenticatedRequest).auth!.orgId! },
       };
 
       res.status(202).json({ chatId, status: 'accepted' });
@@ -1114,9 +1119,10 @@ app.get('/v1/cost/entries', requireAuth, withOrg, maybeRequireAdmin, async (req,
 
 // ─── Analytics summary (Web Pro) ────
 // Aggregates the LLM metrics registry into a dashboard-friendly summary.
-app.get('/v1/analytics/summary', requireAuth, async (_req, res) => {
+app.get('/v1/analytics/summary', requireAuth, withOrg, async (req, res) => {
   try {
-    const snapshot = await llmMetrics.getSnapshot();
+    const orgId = (req as AuthenticatedRequest).auth!.orgId!;
+    const snapshot = await llmMetrics.getSnapshot(orgId);
     res.json(computeAnalyticsSummary(snapshot));
   } catch (e) {
     res.status(500).json({ error: String(e) });
