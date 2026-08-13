@@ -4,14 +4,17 @@
  * populates req.auth.orgId + runs request inside AsyncLocalStorage tenant context.
  */
 import type { Response, NextFunction } from 'express';
-import { verifyToken, AuthError } from '../auth.js';
+import { verifyToken, AuthError, getUserById } from '../auth.js';
 import { getPrisma } from '@agent-xai/persistence';
 import { runWithTenant } from '@agent-xai/tenant';
 import type { AuthenticatedRequest } from '../auth.js';
 
 async function resolveOrgId(userId: string): Promise<string | null> {
   const prisma = getPrisma();
-  if (!prisma) return null;
+  if (!prisma) {
+    const user = await getUserById(userId);
+    return user?.orgId ?? null;
+  }
   const member = await prisma.organizationMember.findFirst({ where: { userId } });
   if (member) return member.orgId;
   const user = await prisma.user.findUnique({ where: { id: userId } });
@@ -47,7 +50,7 @@ export async function withOrg(
     req.auth = enriched;
 
     // Set AsyncLocalStorage tenant context
-    runWithTenant(
+    void runWithTenant(
       {
         orgId,
         userId,

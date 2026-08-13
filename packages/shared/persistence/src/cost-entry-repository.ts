@@ -1,8 +1,8 @@
 /**
  * CostEntry repository — persistent cost tracking.
  *
- * Records every LLM request with token usage and cost for historical
- * analytics, per-provider breakdowns, and per-user cost allocation.
+ * Every read and write is explicitly organization-scoped. Cost data is a
+ * tenant security boundary, not merely an analytics convenience.
  */
 import type { PrismaClient } from '@prisma/client';
 import { getPrisma } from './client.js';
@@ -11,6 +11,7 @@ export interface CostEntryRecord {
   id: string;
   taskId: string | null;
   userId: string | null;
+  orgId: string | null;
   provider: string;
   model: string;
   inputTokens: number;
@@ -63,10 +64,10 @@ export interface CostSummary {
 }
 
 export class CostEntryRepository {
-  private prisma: PrismaClient | null;
+  private readonly prisma: PrismaClient | null;
 
-  constructor() {
-    this.prisma = getPrisma();
+  constructor(prisma: PrismaClient | null = getPrisma()) {
+    this.prisma = prisma;
   }
 
   private requireDb(): PrismaClient {
@@ -74,9 +75,10 @@ export class CostEntryRepository {
     return this.prisma;
   }
 
-  async create(input: CreateCostEntryInput): Promise<CostEntryRecord> {
+  async create(orgId: string, input: CreateCostEntryInput): Promise<CostEntryRecord> {
     return this.requireDb().costEntry.create({
       data: {
+        orgId,
         taskId: input.taskId ?? null,
         userId: input.userId ?? null,
         provider: input.provider,
@@ -92,20 +94,21 @@ export class CostEntryRepository {
     }) as Promise<CostEntryRecord>;
   }
 
-  async list(limit = 100, offset = 0): Promise<CostEntryRecord[]> {
+  async list(orgId: string, limit = 100, offset = 0): Promise<CostEntryRecord[]> {
     return this.requireDb().costEntry.findMany({
+      where: { orgId },
       orderBy: { createdAt: 'desc' },
       take: limit,
       skip: offset,
     }) as Promise<CostEntryRecord[]>;
   }
 
-  async getSummary(days = 30): Promise<CostSummary> {
+  async getSummary(orgId: string, days = 30): Promise<CostSummary> {
     const since = new Date();
     since.setDate(since.getDate() - days);
 
     const entries = (await this.requireDb().costEntry.findMany({
-      where: { createdAt: { gte: since } },
+      where: { orgId, createdAt: { gte: since } },
       orderBy: { createdAt: 'desc' },
     })) as CostEntryRecord[];
 
@@ -117,7 +120,6 @@ export class CostEntryRepository {
     const avgLatencyMs =
       totalRequests > 0 ? entries.reduce((sum, e) => sum + e.latencyMs, 0) / totalRequests : 0;
 
-    // By provider
     const providerMap = new Map<string, { requests: number; costUsd: number; tokens: number }>();
     for (const e of entries) {
       const existing = providerMap.get(e.provider) ?? { requests: 0, costUsd: 0, tokens: 0 };
@@ -131,7 +133,6 @@ export class CostEntryRepository {
       ...data,
     }));
 
-    // By model
     const modelMap = new Map<string, { requests: number; costUsd: number }>();
     for (const e of entries) {
       const key = `${e.provider}/${e.model}`;
@@ -145,7 +146,6 @@ export class CostEntryRepository {
       ...data,
     }));
 
-    // By day
     const dayMap = new Map<string, { costUsd: number; requests: number }>();
     for (const e of entries) {
       const day = e.createdAt.toISOString().slice(0, 10);

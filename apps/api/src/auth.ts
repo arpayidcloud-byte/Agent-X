@@ -18,6 +18,7 @@ export interface AuthUser {
   email: string;
   roles: string[];
   emailVerified: boolean;
+  orgId: string | null;
   createdAt: string;
 }
 
@@ -76,6 +77,7 @@ interface UserBackend {
     email: string;
     passwordHash: string;
     roles: string[];
+    orgId?: string | null;
   }): Promise<UserRecord>;
   findByEmail(email: string): Promise<UserRecord | undefined>;
   findById(id: string): Promise<UserRecord | undefined>;
@@ -91,6 +93,9 @@ const memoryUserBackend: UserBackend = {
     const user: UserRecord = {
       ...record,
       emailVerified: false,
+      // The DB-less backend still needs a real tenant context for integration
+      // tests and local development. Each in-memory user gets its own org.
+      orgId: record.orgId ?? `memory-org-${record.id}`,
       createdAt: new Date().toISOString(),
     };
     userStore.set(user.id, user);
@@ -563,6 +568,7 @@ export async function updateUserRoles(
     email: user.email,
     roles: user.roles,
     emailVerified: user.emailVerified,
+    orgId: user.orgId,
     createdAt: user.createdAt,
   };
 }
