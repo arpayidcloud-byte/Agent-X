@@ -15,6 +15,7 @@ import {
   verifyMidtransWebhook,
 } from '@agent-xai/billing';
 import { requireAuth, maybeRequireAdmin, type AuthenticatedRequest } from './auth.js';
+import { withOrg } from './middleware/withOrg.js';
 
 /** Static fallback when Plan table empty / no DB (matches PLAN seed cents). */
 const FALLBACK_PLANS = [
@@ -65,18 +66,6 @@ const FALLBACK_PLANS = [
   },
 ];
 
-async function resolvePrimaryOrgId(userId: string): Promise<string | null> {
-  const prisma = getPrisma();
-  if (!prisma) return null;
-  const member = await prisma.organizationMember.findFirst({
-    where: { userId },
-    orderBy: { createdAt: 'asc' },
-  });
-  if (member) return member.orgId;
-  const user = await prisma.user.findUnique({ where: { id: userId } });
-  return user?.orgId ?? null;
-}
-
 export function registerBillingRoutes(app: Express): void {
   // ─── GET /v1/billing/plans (public) ──────────────────────────────────────
   app.get('/v1/billing/plans', async (_req: Request, res: Response): Promise<void> => {
@@ -102,6 +91,7 @@ export function registerBillingRoutes(app: Express): void {
   app.post(
     '/v1/billing/checkout',
     requireAuth,
+    withOrg,
     async (req: AuthenticatedRequest, res: Response): Promise<void> => {
       try {
         const { planSlug, gateway } = req.body ?? {};
@@ -115,7 +105,11 @@ export function registerBillingRoutes(app: Express): void {
           res.status(401).json({ error: 'Unauthorized' });
           return;
         }
-        const orgId = (await resolvePrimaryOrgId(userId)) ?? `pending-${userId}`;
+        const orgId = req.auth?.orgId;
+        if (!orgId) {
+          res.status(403).json({ error: 'Organization context required' });
+          return;
+        }
         if (gw === 'midtrans') {
           const snap = await createSnapTransaction(orgId, planSlug);
           res.json({ gateway: 'midtrans', token: snap.token, redirectUrl: snap.redirectUrl });
@@ -175,6 +169,7 @@ export function registerBillingRoutes(app: Express): void {
   app.get(
     '/v1/billing/me',
     requireAuth,
+    withOrg,
     async (req: AuthenticatedRequest, res: Response): Promise<void> => {
       try {
         const userId = req.auth?.sub;
@@ -182,15 +177,9 @@ export function registerBillingRoutes(app: Express): void {
           res.status(401).json({ error: 'Unauthorized' });
           return;
         }
-        const orgId = await resolvePrimaryOrgId(userId);
+        const orgId = req.auth?.orgId;
         if (!orgId) {
-          res.json({
-            orgId: null,
-            subscription: null,
-            entitlement: null,
-            trialEndsAt: null,
-            daysLeft: null,
-          });
+          res.status(403).json({ error: 'Organization context required' });
           return;
         }
         const prisma = getPrisma();
@@ -233,6 +222,7 @@ export function registerBillingRoutes(app: Express): void {
   app.post(
     '/v1/billing/portal',
     requireAuth,
+    withOrg,
     async (req: AuthenticatedRequest, res: Response): Promise<void> => {
       try {
         const userId = req.auth?.sub;
@@ -261,6 +251,7 @@ export function registerBillingRoutes(app: Express): void {
   app.post(
     '/v1/billing/cancel',
     requireAuth,
+    withOrg,
     async (req: AuthenticatedRequest, res: Response): Promise<void> => {
       try {
         const userId = req.auth?.sub;
@@ -268,9 +259,9 @@ export function registerBillingRoutes(app: Express): void {
           res.status(401).json({ error: 'Unauthorized' });
           return;
         }
-        const orgId = await resolvePrimaryOrgId(userId);
+        const orgId = req.auth?.orgId;
         if (!orgId) {
-          res.status(400).json({ error: 'No organization' });
+          res.status(403).json({ error: 'Organization context required' });
           return;
         }
         const prisma = getPrisma();
@@ -301,6 +292,7 @@ export function registerBillingRoutes(app: Express): void {
   app.get(
     '/v1/billing/invoices',
     requireAuth,
+    withOrg,
     async (req: AuthenticatedRequest, res: Response): Promise<void> => {
       try {
         const userId = req.auth?.sub;
@@ -308,9 +300,9 @@ export function registerBillingRoutes(app: Express): void {
           res.status(401).json({ error: 'Unauthorized' });
           return;
         }
-        const orgId = await resolvePrimaryOrgId(userId);
+        const orgId = req.auth?.orgId;
         if (!orgId) {
-          res.json({ invoices: [] });
+          res.status(403).json({ error: 'Organization context required' });
           return;
         }
         const prisma = getPrisma();
@@ -390,6 +382,7 @@ export function registerBillingRoutes(app: Express): void {
   app.get(
     '/v1/billing/summary',
     requireAuth,
+    withOrg,
     async (req: AuthenticatedRequest, res: Response): Promise<void> => {
       try {
         const prisma = getPrisma();
@@ -402,10 +395,11 @@ export function registerBillingRoutes(app: Express): void {
           res.status(401).json({ error: 'Unauthenticated' });
           return;
         }
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const orgId =
-          ((req.auth as unknown as Record<string, unknown>)?.orgId as string | undefined) ??
-          (await resolvePrimaryOrgId(userId));
+        const orgId = req.auth?.orgId;
+        if (!orgId) {
+          res.status(403).json({ error: 'Organization context required' });
+          return;
+        }
         // Subscription + Plan
         const sub = orgId
           ? await prisma.subscription.findFirst({
