@@ -1,0 +1,38 @@
+{
+  "name": "@agent-xai/ui-tokens",
+  "version": "1.0.0",
+  "description": "Shared design tokens for Agent-X apps (color palette, surfaces, radii, shadows, motion). Used by apps/web, apps/landing, apps/admin.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/arpayidcloud-byte/Agentx.git",
+    "directory": "packages/ui/ui-tokens"
+  },
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    },
+    "./styles": "./src/tokens.css",
+    "./tailwind.css": "./src/tokens.css"
+  },
+  "files": [
+    "dist",
+    "src",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc --build",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "lint": "eslint src/"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.5",
+    "vitest": "^3.2.6"
+  }
+}
