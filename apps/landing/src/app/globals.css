@@ -139,6 +139,7 @@
   body {
     background-color: var(--color-surface-0);
     color: var(--color-slate-200);
+    font-feature-settings: "cv01", "ss03";
     font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
