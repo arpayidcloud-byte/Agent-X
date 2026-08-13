@@ -80,6 +80,24 @@ web:
       cpu: 500m
       memory: 512Mi
 
+# Public marketing landing (id-tech.cloud).
+landing:
+  replicaCount: 1
+  image:
+    repository: agentx-landing
+    tag: dev
+    pullPolicy: IfNotPresent
+  service:
+    type: NodePort
+    port: 3000
+    nodePort: 30520
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
 # Admin panel (Next.js standalone, panel.id-tech.cloud).
 admin:
   replicaCount: 1
