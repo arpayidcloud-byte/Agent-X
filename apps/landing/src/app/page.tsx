@@ -1,4 +1,9 @@
 import Link from 'next/link';
+import HowItWorks from '@/components/how-it-works';
+import Pricing from '@/components/pricing';
+import UseCases from '@/components/use-cases';
+import Faq from '@/components/faq';
+import SiteFooter from '@/components/site-footer';
 import {
   ArrowRight,
   Cable,
@@ -293,27 +298,6 @@ function Cta() {
   );
 }
 
-function Footer() {
-  return (
-    <footer className="border-t border-white/[0.04]">
-      <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-4 px-6 py-8 sm:flex-row">
-        <Brand />
-        <div className="flex items-center gap-5 text-[11px] text-slate-500">
-          <a href="https://app.id-tech.cloud" className="transition-colors hover:text-slate-300">
-            app.id-tech.cloud
-          </a>
-          <a href="https://panel.id-tech.cloud" className="transition-colors hover:text-slate-300">
-            panel.id-tech.cloud
-          </a>
-          <a href="https://api.id-tech.cloud" className="transition-colors hover:text-slate-300">
-            api.id-tech.cloud
-          </a>
-        </div>
-        <p className="text-[11px] text-slate-600">id-tech.cloud © 2026</p>
-      </div>
-    </footer>
-  );
-}
 
 export default function LandingPage() {
   return (
@@ -321,9 +305,13 @@ export default function LandingPage() {
       <Navbar />
       <Hero />
       <Features />
+      <HowItWorks />
+      <UseCases />
       <Stats />
+      <Pricing />
+      <Faq />
       <Cta />
-      <Footer />
+      <SiteFooter />
     </main>
   );
 }

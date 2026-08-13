@@ -1,5 +1,15 @@
 @import "tailwindcss";
 
+/* Marketing surface: Decide/Learn. Keep the public site editorial and
+   information-led; the member workspace remains action/density-led. */
+@theme {
+  --color-linear-bg: #08090a;
+  --color-linear-panel: #0f1011;
+  --color-linear-surface: #191a1b;
+  --color-linear-accent: #5e6ad2;
+  --color-linear-accent-bright: #7170ff;
+}
+
 /* ═══════════════════════════════════════════════════════════
  * AGENTX — "Obsidian" Design System v2 (2026 Premium)
  * OLED dark · Ambient gradients · Refined glassmorphism
@@ -205,6 +215,74 @@
 
 /* ── Component layer ───────────────────────────────────────── */
 @layer components {
+
+  .eyebrow {
+    color: #7170ff;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    line-height: 1.4;
+    text-transform: uppercase;
+  }
+
+  .section-title {
+    color: #f7f8f8;
+    font-size: clamp(1.75rem, 4vw, 3rem);
+    font-weight: 510;
+    letter-spacing: -0.055em;
+    line-height: 1.05;
+    text-wrap: balance;
+  }
+
+  .section-copy {
+    color: #8a8f98;
+    font-size: 1.0625rem;
+    line-height: 1.6;
+    max-width: 42rem;
+  }
+
+  .linear-card {
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    transition: border-color 160ms ease, background 160ms ease, transform 160ms ease;
+  }
+
+  .linear-card:hover {
+    background: rgba(255, 255, 255, 0.04);
+    border-color: rgba(113, 112, 255, 0.45);
+    transform: translateY(-2px);
+  }
+
+  .linear-card-featured {
+    border-color: rgba(113, 112, 255, 0.62);
+    box-shadow: 0 0 0 1px rgba(94, 106, 210, 0.12), 0 18px 50px -30px rgba(113, 112, 255, 0.6);
+  }
+
+  .linear-badge {
+    border: 1px solid rgba(113, 112, 255, 0.42);
+    border-radius: 999px;
+    color: #aeb5ff;
+    font-size: 0.6875rem;
+    padding: 0.25rem 0.5rem;
+  }
+
+  .footer-heading {
+    color: #d0d6e0;
+    font-size: 0.75rem;
+    font-weight: 600;
+    margin-bottom: 0.75rem;
+  }
+
+  .footer-links {
+    display: grid;
+    gap: 0.6rem;
+    color: #62666d;
+    font-size: 0.8125rem;
+  }
+
+  .footer-links a { transition: color 160ms ease; }
+  .footer-links a:hover { color: #f7f8f8; }
 
   /* ═══ Card System ════════════════════════════════════════ */
 
