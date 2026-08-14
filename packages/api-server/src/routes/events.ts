@@ -5,29 +5,14 @@ export async function createEventRoutes(fastify: FastifyInstance) {
     '/events',
     {
       schema: {
-        description: 'Stream events via SSE',
+        description:
+          'Deprecated: legacy tenantless event API is permanently disabled. Migrate to the tenant-aware Agent-X API.',
+        deprecated: true,
         tags: ['events'],
         response: {
           410: {
             type: 'object',
             properties: { error: { type: 'string' } },
-          },
-          200: {
-            type: 'object',
-            properties: {
-              events: {
-                type: 'array',
-                items: {
-                  type: 'object',
-                  properties: {
-                    id: { type: 'string' },
-                    type: { type: 'string' },
-                    data: { type: 'object' },
-                    timestamp: { type: 'string', format: 'date-time' },
-                  },
-                },
-              },
-            },
           },
         },
       },
