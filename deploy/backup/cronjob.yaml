@@ -34,7 +34,7 @@ spec:
                   # PostgreSQL libpq accepts the URL, but pg_dump rejects
                   # Prisma's `schema` query parameter. Remove only that
                   # parameter without exposing credentials in logs.
-                  CLEAN_DATABASE_URL=$(printf '%s' "$DATABASE_URL" | sed -E 's/([?&])schema=[^&]*&?/\1/g; s/\?&/?/; s/[?&]$//')
+                  CLEAN_DATABASE_URL=$(printf '%s' "$DATABASE_URL" | sed -E 's/([?&])schema=[^&]*&?/\1/g; s/[?&]$//')
                   test -n "$CLEAN_DATABASE_URL"
 
                   pg_dump --no-owner --no-privileges "$CLEAN_DATABASE_URL" > "${TEMP_FILE}.sql"
