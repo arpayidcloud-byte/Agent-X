@@ -2,6 +2,7 @@ import type { PrismaClient } from '@prisma/client';
 
 export interface QualityScoreRecord {
   id: string;
+  orgId?: string;
   taskId?: string;
   prompt: string;
   response: string;
@@ -24,6 +25,7 @@ export interface QualityScoreStats {
 
 function toRecord(row: {
   id: string;
+  orgId: string | null;
   taskId: string | null;
   prompt: string;
   response: string;
@@ -37,6 +39,7 @@ function toRecord(row: {
 }): QualityScoreRecord {
   return {
     id: row.id,
+    orgId: row.orgId ?? undefined,
     taskId: row.taskId ?? undefined,
     prompt: row.prompt,
     response: row.response,
@@ -54,9 +57,12 @@ export class PrismaQualityScoreRepository {
   constructor(private prisma: PrismaClient) {}
 
   async create(record: QualityScoreRecord): Promise<QualityScoreRecord> {
+    if (!record.orgId?.trim())
+      throw new Error('Organization context required for quality score persistence');
     const row = await this.prisma.qualityScore.create({
       data: {
         id: record.id,
+        orgId: record.orgId,
         taskId: record.taskId ?? null,
         prompt: record.prompt,
         response: record.response,
@@ -71,16 +77,22 @@ export class PrismaQualityScoreRepository {
     return toRecord(row);
   }
 
-  async findAll(limit: number): Promise<QualityScoreRecord[]> {
+  async findAll(orgId: string, limit: number): Promise<QualityScoreRecord[]> {
+    if (!orgId.trim())
+      throw new Error('Organization context required for quality score persistence');
     const rows = await this.prisma.qualityScore.findMany({
+      where: { orgId },
       orderBy: { createdAt: 'desc' },
       take: limit,
     });
     return rows.map(toRecord);
   }
 
-  async stats(): Promise<QualityScoreStats> {
+  async stats(orgId: string): Promise<QualityScoreStats> {
+    if (!orgId.trim())
+      throw new Error('Organization context required for quality score persistence');
     const rows = await this.prisma.qualityScore.findMany({
+      where: { orgId },
       select: { overall: true, grade: true, provider: true, evaluator: true },
     });
     const byGrade: Record<string, number> = {};

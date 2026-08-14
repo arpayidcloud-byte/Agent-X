@@ -2,7 +2,8 @@ import type { Express, Request, Response } from 'express';
 import type { QualityBackend } from './quality-store.js';
 import { getQualityBackend } from './quality-store.js';
 import { EvalExperimentRepository } from '@agent-xai/persistence';
-import { maybeRequireAdmin, requireAuth } from './auth.js';
+import { maybeRequireAdmin, requireAuth, type AuthenticatedRequest } from './auth.js';
+import { withOrg } from './middleware/withOrg.js';
 
 /**
  * Evaluation benchmark suite — Phase 8 (#114).
@@ -54,7 +55,8 @@ export function registerEvalRoutes(app: Express): void {
   // ─── Jalankan benchmark ────
   app.post(
     '/v1/eval/benchmark',
-    maybeRequireAdmin,
+    requireAuth,
+    withOrg,
     async (req: Request, res: Response): Promise<void> => {
       try {
         const { name, cases, providers } = req.body ?? {};
@@ -74,6 +76,7 @@ export function registerEvalRoutes(app: Express): void {
         const { QualityScorer } = await import('@agent-xai/quality-scoring');
         const scorer = new QualityScorer();
         const backend: QualityBackend = await getQualityBackend();
+        const orgId = (req as AuthenticatedRequest).auth!.orgId!;
 
         const results: BenchmarkResult[] = [];
         let totalCases = 0;
@@ -96,6 +99,7 @@ export function registerEvalRoutes(app: Express): void {
                 response: scored.response,
                 provider: scored.provider,
                 model: scored.model,
+                orgId,
                 taskId: scored.taskId,
                 dimensions: { dimensions: scored.dimensions, overall: scored.overall },
                 overall: scored.overall,
@@ -146,10 +150,12 @@ export function registerEvalRoutes(app: Express): void {
   app.get(
     '/v1/eval/benchmarks',
     requireAuth,
-    async (_req: Request, res: Response): Promise<void> => {
+    withOrg,
+    async (req: Request, res: Response): Promise<void> => {
       try {
         const backend: QualityBackend = await getQualityBackend();
-        const scores = await backend.findAll(200);
+        const orgId = (req as AuthenticatedRequest).auth!.orgId!;
+        const scores = await backend.findAll(orgId, 200);
         const benchmarkRuns = scores.filter(
           (s) => typeof s.taskId === 'string' && s.taskId.startsWith('benchmark:'),
         );
@@ -180,11 +186,13 @@ export function registerEvalRoutes(app: Express): void {
   app.get(
     '/v1/eval/leaderboard',
     requireAuth,
+    withOrg,
     async (req: Request, res: Response): Promise<void> => {
       try {
         const backend: QualityBackend = await getQualityBackend();
+        const orgId = (req as AuthenticatedRequest).auth!.orgId!;
         const limit = Math.min(Number(req.query.limit) || 20, 100);
-        const scores = await backend.findAll(200);
+        const scores = await backend.findAll(orgId, 200);
         const byProvider = new Map<string, { sum: number; count: number; grades: string[] }>();
         for (const s of scores) {
           const key = `${s.provider ?? 'unknown'} / ${s.model ?? 'unknown'}`;
@@ -308,38 +316,43 @@ export function registerEvalRoutes(app: Express): void {
   });
 
   // ─── Quality gates status (#117) ────
-  app.get('/v1/eval/gates', requireAuth, async (_req: Request, res: Response): Promise<void> => {
-    try {
-      const threshold = Number(process.env.QUALITY_GATE_THRESHOLD ?? 70);
-      const backend: QualityBackend = await getQualityBackend();
-      const scores = await backend.findAll(200);
-      const below = scores.filter((s) => s.overall < threshold);
-      const above = scores.filter((s) => s.overall >= threshold);
-      const avgOverall =
-        scores.length > 0
-          ? Number((scores.reduce((acc, s) => acc + s.overall, 0) / scores.length).toFixed(1))
-          : 0;
-      const { getFeedbackBackend } = await import('./feedback-store.js');
-      const fbBackend = await getFeedbackBackend();
-      const feedback = await fbBackend.findAll(200);
-      res.json({
-        gate: {
-          threshold,
-          configurableVia: 'QUALITY_GATE_THRESHOLD',
-          totalScores: scores.length,
-          belowThreshold: below.length,
-          aboveThreshold: above.length,
-          avgOverall,
-          autoFeedbackGenerated: feedback.length,
-          passingRate:
-            scores.length > 0 ? Number(((above.length / scores.length) * 100).toFixed(1)) : 0,
-        },
-      });
-    } catch (e) {
-      const err = e instanceof Error ? e.message : String(e);
-      res.status(500).json({ error: err });
-    }
-  });
+  app.get(
+    '/v1/eval/gates',
+    requireAuth,
+    withOrg,
+    async (req: Request, res: Response): Promise<void> => {
+      try {
+        const threshold = Number(process.env.QUALITY_GATE_THRESHOLD ?? 70);
+        const orgId = (req as AuthenticatedRequest).auth!.orgId!;
+        const backend: QualityBackend = await getQualityBackend();
+        const scores = await backend.findAll(orgId, 200);
+        const below = scores.filter((s) => s.overall < threshold);
+        const above = scores.filter((s) => s.overall >= threshold);
+        const avgOverall =
+          scores.length > 0
+            ? Number((scores.reduce((acc, s) => acc + s.overall, 0) / scores.length).toFixed(1))
+            : 0;
+        const { getFeedbackBackend } = await import('./feedback-store.js');
+        const feedback = await (await getFeedbackBackend()).findMany(orgId, 200);
+        res.json({
+          gate: {
+            threshold,
+            configurableVia: 'QUALITY_GATE_THRESHOLD',
+            totalScores: scores.length,
+            belowThreshold: below.length,
+            aboveThreshold: above.length,
+            avgOverall,
+            autoFeedbackGenerated: feedback.length,
+            passingRate:
+              scores.length > 0 ? Number(((above.length / scores.length) * 100).toFixed(1)) : 0,
+          },
+        });
+      } catch (e) {
+        const err = e instanceof Error ? e.message : String(e);
+        res.status(500).json({ error: err });
+      }
+    },
+  );
 }
 
 function summarize(results: BenchmarkResult[]): BenchmarkSummary[] {

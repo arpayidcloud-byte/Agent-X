@@ -206,6 +206,7 @@ model FeedbackEntry {
 model QualityScore {
   id         String   @id
   taskId     String?
+  orgId      String?
   prompt     String
   response   String
   provider   String?
@@ -245,6 +246,7 @@ model AgentFeedback {
   id                String   @id
   scoreId           String   @unique
   taskId            String?
+  orgId             String?
   prompt            String
   response          String
   overall           Int

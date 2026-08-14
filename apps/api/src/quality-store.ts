@@ -19,8 +19,8 @@ function capStore(): void {
 
 export interface QualityBackend {
   create(record: QualityScoreRecord): Promise<QualityScoreRecord>;
-  findAll(limit: number): Promise<QualityScoreRecord[]>;
-  stats(): Promise<QualityScoreStats>;
+  findAll(orgId: string, limit: number): Promise<QualityScoreRecord[]>;
+  stats(orgId: string): Promise<QualityScoreStats>;
 }
 
 const memoryBackend: QualityBackend = {
@@ -29,13 +29,14 @@ const memoryBackend: QualityBackend = {
     capStore();
     return record;
   },
-  async findAll(limit) {
+  async findAll(orgId, limit) {
     return [...qualityStore.values()]
+      .filter((entry) => entry.orgId === orgId)
       .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1))
       .slice(0, limit);
   },
-  async stats() {
-    const entries = [...qualityStore.values()];
+  async stats(orgId) {
+    const entries = [...qualityStore.values()].filter((entry) => entry.orgId === orgId);
     const byGrade: Record<string, number> = {};
     const byProvider: Record<string, number> = {};
     const byEvaluator: Record<string, number> = {};
@@ -62,11 +63,11 @@ function prismaBackend(prisma: NonNullable<ReturnType<typeof getPrisma>>): Quali
     async create(record) {
       return repo.create(record);
     },
-    async findAll(limit) {
-      return repo.findAll(limit);
+    async findAll(orgId, limit) {
+      return repo.findAll(orgId, limit);
     },
-    async stats() {
-      return repo.stats();
+    async stats(orgId) {
+      return repo.stats(orgId);
     },
   };
 }
