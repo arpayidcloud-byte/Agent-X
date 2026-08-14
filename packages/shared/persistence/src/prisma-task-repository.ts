@@ -14,6 +14,7 @@ export class PrismaTaskRepository implements ITaskRepository {
   constructor(private prisma: PrismaClient) {}
 
   async save(task: TaskModel): Promise<void> {
+    if (!task.orgId?.trim()) throw new Error('Organization context required for task persistence');
     const data: Prisma.TaskUncheckedCreateInput = {
       id: task.id,
       goal: task.goal,
@@ -28,6 +29,7 @@ export class PrismaTaskRepository implements ITaskRepository {
       context: task.context as unknown as Prisma.InputJsonValue,
       result: (task.result ?? null) as unknown as Prisma.InputJsonValue,
       error: (task.error ?? null) as unknown as Prisma.InputJsonValue,
+      orgId: task.orgId,
       createdAt: task.createdAt,
       updatedAt: task.updatedAt,
     };
@@ -64,6 +66,7 @@ export class PrismaTaskRepository implements ITaskRepository {
 
   private toTaskModel(prismaTask: Record<string, unknown>): TaskModel {
     return {
+      orgId: prismaTask.orgId as string | undefined,
       id: prismaTask.id as string,
       goal: prismaTask.goal as string,
       status: prismaTask.status as TaskStatus,

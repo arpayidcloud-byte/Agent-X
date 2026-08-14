@@ -1,0 +1,47 @@
+import { describe, expect, it, vi } from 'vitest';
+import { PrismaTaskRepository } from './prisma-task-repository.js';
+import { TaskPriority, TaskStatus, type TaskModel } from '@agent-xai/core-runtime';
+
+function task(overrides: Partial<TaskModel> = {}): TaskModel {
+  return {
+    id: 'task-1',
+    orgId: 'org-a',
+    goal: 'test task',
+    status: TaskStatus.CREATED,
+    priority: TaskPriority.NORMAL,
+    rootTaskId: 'task-1',
+    dependsOn: [],
+    traceId: 'trace-1',
+    metadata: { retryCount: 0 },
+    context: { variables: {}, history: [] },
+    createdAt: new Date('2026-01-01T00:00:00.000Z'),
+    updatedAt: new Date('2026-01-01T00:00:00.000Z'),
+    ...overrides,
+  };
+}
+
+describe('PrismaTaskRepository tenant guard', () => {
+  it('rejects a task without organization context before database access', async () => {
+    const upsert = vi.fn();
+    const repo = new PrismaTaskRepository({ task: { upsert } } as never);
+
+    await expect(repo.save(task({ orgId: undefined }))).rejects.toThrow(
+      'Organization context required for task persistence',
+    );
+    expect(upsert).not.toHaveBeenCalled();
+  });
+
+  it('writes the server-side organization onto persistent tasks', async () => {
+    const upsert = vi.fn().mockResolvedValue({});
+    const repo = new PrismaTaskRepository({ task: { upsert } } as never);
+
+    await repo.save(task({ orgId: 'org-a' }));
+
+    expect(upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        create: expect.objectContaining({ orgId: 'org-a' }),
+        update: expect.objectContaining({ orgId: 'org-a' }),
+      }),
+    );
+  });
+});
