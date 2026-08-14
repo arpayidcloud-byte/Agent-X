@@ -4,6 +4,7 @@ import type { AgentFeedback } from '@agent-xai/agent-feedback';
 export interface AgentFeedbackRecord {
   id: string;
   scoreId: string;
+  orgId?: string;
   taskId?: string | null;
   prompt: string;
   response: string;
@@ -17,18 +18,21 @@ export interface AgentFeedbackRecord {
 
 export interface AgentFeedbackRepository {
   create(record: AgentFeedbackRecord): Promise<AgentFeedbackRecord>;
-  findMany(limit?: number): Promise<AgentFeedbackRecord[]>;
-  findByScoreId(scoreId: string): Promise<AgentFeedbackRecord | null>;
-  stats(): Promise<{ total: number; byGrade: Record<string, number> }>;
+  findMany(orgId: string, limit?: number): Promise<AgentFeedbackRecord[]>;
+  findByScoreId(orgId: string, scoreId: string): Promise<AgentFeedbackRecord | null>;
+  stats(orgId: string): Promise<{ total: number; byGrade: Record<string, number> }>;
 }
 
 export class PrismaAgentFeedbackRepository implements AgentFeedbackRepository {
   constructor(private readonly prisma: PrismaClient) {}
 
   async create(record: AgentFeedbackRecord): Promise<AgentFeedbackRecord> {
+    if (!record.orgId?.trim())
+      throw new Error('Organization context required for agent feedback persistence');
     const row = await this.prisma.agentFeedback.create({
       data: {
         id: record.id,
+        orgId: record.orgId,
         scoreId: record.scoreId,
         taskId: record.taskId ?? null,
         prompt: record.prompt,
@@ -43,23 +47,34 @@ export class PrismaAgentFeedbackRepository implements AgentFeedbackRepository {
     return this.toRecord(row);
   }
 
-  async findMany(limit = 20): Promise<AgentFeedbackRecord[]> {
+  async findMany(orgId: string, limit = 20): Promise<AgentFeedbackRecord[]> {
+    if (!orgId.trim())
+      throw new Error('Organization context required for agent feedback persistence');
     const rows = await this.prisma.agentFeedback.findMany({
+      where: { orgId },
       orderBy: { createdAt: 'desc' },
       take: limit,
     });
     return rows.map((r) => this.toRecord(r));
   }
 
-  async findByScoreId(scoreId: string): Promise<AgentFeedbackRecord | null> {
-    const row = await this.prisma.agentFeedback.findUnique({ where: { scoreId } });
+  async findByScoreId(orgId: string, scoreId: string): Promise<AgentFeedbackRecord | null> {
+    if (!orgId.trim())
+      throw new Error('Organization context required for agent feedback persistence');
+    const row = await this.prisma.agentFeedback.findFirst({ where: { scoreId, orgId } });
     return row ? this.toRecord(row) : null;
   }
 
-  async stats(): Promise<{ total: number; byGrade: Record<string, number> }> {
+  async stats(orgId: string): Promise<{ total: number; byGrade: Record<string, number> }> {
+    if (!orgId.trim())
+      throw new Error('Organization context required for agent feedback persistence');
     const [total, grouped] = await Promise.all([
-      this.prisma.agentFeedback.count(),
-      this.prisma.agentFeedback.groupBy({ by: ['grade'], _count: { grade: true } }),
+      this.prisma.agentFeedback.count({ where: { orgId } }),
+      this.prisma.agentFeedback.groupBy({
+        where: { orgId },
+        by: ['grade'],
+        _count: { grade: true },
+      }),
     ]);
     const byGrade: Record<string, number> = {};
     for (const g of grouped) byGrade[g.grade] = g._count.grade;
@@ -69,6 +84,7 @@ export class PrismaAgentFeedbackRepository implements AgentFeedbackRepository {
   private toRecord(row: {
     id: string;
     scoreId: string;
+    orgId: string | null;
     taskId: string | null;
     prompt: string;
     response: string;
@@ -82,6 +98,7 @@ export class PrismaAgentFeedbackRepository implements AgentFeedbackRepository {
     return {
       id: row.id,
       scoreId: row.scoreId,
+      orgId: row.orgId ?? undefined,
       taskId: row.taskId ?? undefined,
       prompt: row.prompt,
       response: row.response,

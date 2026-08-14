@@ -3,6 +3,8 @@ import type { Server } from 'node:http';
 
 // Mock providers make the router executor work without API keys.
 process.env.ENABLE_MOCK_PROVIDER = 'true';
+process.env.AUTH_ENABLED = 'true';
+process.env.JWT_SECRET = 'test-secret';
 // Tests are DB-less: force in-memory backends regardless of DATABASE_URL.
 delete process.env.DATABASE_URL;
 const { app, resetQualityStore, resetAgentFeedbackStore } = await import('../agentx-server.js');
@@ -19,12 +21,29 @@ const SHORT_RESPONSE =
 describe('Agent feedback loop API (Web Pro)', () => {
   let server: Server;
   let baseUrl: string;
+  let authHeaders: Record<string, string>;
 
   beforeAll(async () => {
     server = app.listen(0);
     const address = server.address();
     if (!address || typeof address === 'string') throw new Error('no port');
     baseUrl = `http://127.0.0.1:${address.port}`;
+    const email = `feedback-${Date.now()}@agentx.dev`;
+    await fetch(`${baseUrl}/v1/auth/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password: 'password123' }),
+    });
+    const login = await fetch(`${baseUrl}/v1/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password: 'password123' }),
+    });
+    const body = await asJson<{ tokens: { accessToken: string } }>(login);
+    authHeaders = {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${body.tokens.accessToken}`,
+    };
   });
 
   afterAll(async () => {
@@ -39,7 +58,7 @@ describe('Agent feedback loop API (Web Pro)', () => {
   it('rejects generate without scoreId (400)', async () => {
     const res = await fetch(`${baseUrl}/v1/feedback/generate`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: authHeaders,
       body: JSON.stringify({}),
     });
     expect(res.status).toBe(400);
@@ -48,7 +67,7 @@ describe('Agent feedback loop API (Web Pro)', () => {
   it('returns 404 for an unknown scoreId', async () => {
     const res = await fetch(`${baseUrl}/v1/feedback/generate`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: authHeaders,
       body: JSON.stringify({ scoreId: 'qs_nope' }),
     });
     expect(res.status).toBe(404);
@@ -57,7 +76,7 @@ describe('Agent feedback loop API (Web Pro)', () => {
   it('generates feedback from a scored output (201) with weak dimensions + improvement prompt', async () => {
     const scoreRes = await fetch(`${baseUrl}/v1/quality/score`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: authHeaders,
       body: JSON.stringify({
         prompt: PROMPT,
         response: SHORT_RESPONSE,
@@ -71,7 +90,7 @@ describe('Agent feedback loop API (Web Pro)', () => {
 
     const res = await fetch(`${baseUrl}/v1/feedback/generate`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: authHeaders,
       body: JSON.stringify({ scoreId: score.id }),
     });
     expect(res.status).toBe(201);
@@ -95,21 +114,21 @@ describe('Agent feedback loop API (Web Pro)', () => {
   it('reuses existing feedback for the same scoreId', async () => {
     const scoreRes = await fetch(`${baseUrl}/v1/quality/score`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: authHeaders,
       body: JSON.stringify({ prompt: PROMPT, response: SHORT_RESPONSE }),
     });
     const { score } = await asJson<{ score: { id: string } }>(scoreRes);
 
     const first = await fetch(`${baseUrl}/v1/feedback/generate`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: authHeaders,
       body: JSON.stringify({ scoreId: score.id }),
     });
     expect(first.status).toBe(201);
 
     const second = await fetch(`${baseUrl}/v1/feedback/generate`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: authHeaders,
       body: JSON.stringify({ scoreId: score.id }),
     });
     expect(second.status).toBe(200);
@@ -120,22 +139,26 @@ describe('Agent feedback loop API (Web Pro)', () => {
   it('lists feedback and aggregates stats', async () => {
     const scoreRes = await fetch(`${baseUrl}/v1/quality/score`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: authHeaders,
       body: JSON.stringify({ prompt: PROMPT, response: SHORT_RESPONSE }),
     });
     const { score } = await asJson<{ score: { id: string } }>(scoreRes);
     await fetch(`${baseUrl}/v1/feedback/generate`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: authHeaders,
       body: JSON.stringify({ scoreId: score.id }),
     });
 
-    const list = await fetch(`${baseUrl}/v1/feedback?limit=10`);
+    const list = await fetch(`${baseUrl}/v1/feedback?limit=10`, {
+      headers: { ...authHeaders },
+    });
     const { feedback, total } = await asJson<{ feedback: unknown[]; total: number }>(list);
     expect(total).toBe(1);
     expect(feedback.length).toBe(1);
 
-    const statsRes = await fetch(`${baseUrl}/v1/feedback/stats`);
+    const statsRes = await fetch(`${baseUrl}/v1/feedback/stats`, {
+      headers: { ...authHeaders },
+    });
     const { stats } = await asJson<{ stats: { total: number; byGrade: Record<string, number> } }>(
       statsRes,
     );
@@ -146,20 +169,20 @@ describe('Agent feedback loop API (Web Pro)', () => {
   it('builds a revision prompt for a follow-up run', async () => {
     const scoreRes = await fetch(`${baseUrl}/v1/quality/score`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: authHeaders,
       body: JSON.stringify({ prompt: PROMPT, response: SHORT_RESPONSE }),
     });
     const { score } = await asJson<{ score: { id: string } }>(scoreRes);
     const gen = await fetch(`${baseUrl}/v1/feedback/generate`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: authHeaders,
       body: JSON.stringify({ scoreId: score.id }),
     });
     const { feedback } = await asJson<{ feedback: { id: string } }>(gen);
 
     const rev = await fetch(`${baseUrl}/v1/feedback/${feedback.id}/revision`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: authHeaders,
       body: JSON.stringify({ prompt: 'Build a production-grade rate limiter' }),
     });
     expect(rev.status).toBe(200);
@@ -171,7 +194,7 @@ describe('Agent feedback loop API (Web Pro)', () => {
   it('returns 404 for revision of unknown feedback', async () => {
     const res = await fetch(`${baseUrl}/v1/feedback/af_nope/revision`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: authHeaders,
       body: JSON.stringify({ prompt: 'x' }),
     });
     expect(res.status).toBe(404);

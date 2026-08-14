@@ -18,9 +18,9 @@ function capStore(): void {
 
 export interface FeedbackBackend {
   create(record: AgentFeedbackRecord): Promise<AgentFeedbackRecord>;
-  findAll(limit: number): Promise<AgentFeedbackRecord[]>;
-  findByScoreId(scoreId: string): Promise<AgentFeedbackRecord | null>;
-  stats(): Promise<{ total: number; byGrade: Record<string, number> }>;
+  findMany(orgId: string, limit: number): Promise<AgentFeedbackRecord[]>;
+  findByScoreId(orgId: string, scoreId: string): Promise<AgentFeedbackRecord | null>;
+  stats(orgId: string): Promise<{ total: number; byGrade: Record<string, number> }>;
 }
 
 const memoryBackend: FeedbackBackend = {
@@ -29,19 +29,20 @@ const memoryBackend: FeedbackBackend = {
     capStore();
     return record;
   },
-  async findAll(limit) {
+  async findMany(orgId, limit) {
     return [...agentFeedbackStore.values()]
+      .filter((entry) => entry.orgId === orgId)
       .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1))
       .slice(0, limit);
   },
-  async findByScoreId(scoreId) {
+  async findByScoreId(orgId, scoreId) {
     for (const entry of agentFeedbackStore.values()) {
-      if (entry.scoreId === scoreId) return entry;
+      if (entry.orgId === orgId && entry.scoreId === scoreId) return entry;
     }
     return null;
   },
-  async stats() {
-    const entries = [...agentFeedbackStore.values()];
+  async stats(orgId) {
+    const entries = [...agentFeedbackStore.values()].filter((entry) => entry.orgId === orgId);
     const byGrade: Record<string, number> = {};
     for (const e of entries) byGrade[e.grade] = (byGrade[e.grade] ?? 0) + 1;
     return { total: entries.length, byGrade };
@@ -54,14 +55,14 @@ function prismaBackend(prisma: NonNullable<ReturnType<typeof getPrisma>>): Feedb
     async create(record) {
       return repo.create(record);
     },
-    async findAll(limit) {
-      return repo.findMany(limit);
+    async findMany(orgId, limit) {
+      return repo.findMany(orgId, limit);
     },
-    async findByScoreId(scoreId) {
-      return repo.findByScoreId(scoreId);
+    async findByScoreId(orgId, scoreId) {
+      return repo.findByScoreId(orgId, scoreId);
     },
-    async stats() {
-      return repo.stats();
+    async stats(orgId) {
+      return repo.stats(orgId);
     },
   };
 }

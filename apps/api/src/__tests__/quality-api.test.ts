@@ -3,6 +3,8 @@ import type { Server } from 'node:http';
 
 // Mock providers make the router executor work without API keys.
 process.env.ENABLE_MOCK_PROVIDER = 'true';
+process.env.AUTH_ENABLED = 'true';
+process.env.JWT_SECRET = 'test-secret';
 // Tests are DB-less: force the in-memory quality backend regardless of DATABASE_URL.
 delete process.env.DATABASE_URL;
 const { app, resetQualityStore } = await import('../agentx-server.js');
@@ -23,12 +25,29 @@ const GOOD_RESPONSE =
 describe('Quality scoring API (Web Pro)', () => {
   let server: Server;
   let baseUrl: string;
+  let authHeaders: Record<string, string>;
 
   beforeAll(async () => {
     server = app.listen(0);
     const address = server.address();
     if (!address || typeof address === 'string') throw new Error('no port');
     baseUrl = `http://127.0.0.1:${address.port}`;
+    const email = `quality-${Date.now()}@agentx.dev`;
+    await fetch(`${baseUrl}/v1/auth/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password: 'password123' }),
+    });
+    const login = await fetch(`${baseUrl}/v1/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password: 'password123' }),
+    });
+    const body = await asJson<{ tokens: { accessToken: string } }>(login);
+    authHeaders = {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${body.tokens.accessToken}`,
+    };
   });
 
   afterAll(async () => {
@@ -42,7 +61,7 @@ describe('Quality scoring API (Web Pro)', () => {
   it('rejects missing fields with 400', async () => {
     const res = await fetch(`${baseUrl}/v1/quality/score`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: authHeaders,
       body: JSON.stringify({ prompt: 'hi' }),
     });
     expect(res.status).toBe(400);
@@ -51,7 +70,7 @@ describe('Quality scoring API (Web Pro)', () => {
   it('scores a prompt+response and persists the result (201)', async () => {
     const res = await fetch(`${baseUrl}/v1/quality/score`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: authHeaders,
       body: JSON.stringify({
         prompt: GOOD_PROMPT,
         response: GOOD_RESPONSE,
@@ -84,7 +103,7 @@ describe('Quality scoring API (Web Pro)', () => {
   it('scores poorly when the response is empty', async () => {
     const res = await fetch(`${baseUrl}/v1/quality/score`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: authHeaders,
       body: JSON.stringify({ prompt: GOOD_PROMPT, response: '' }),
     });
     expect(res.status).toBe(201);
@@ -96,10 +115,12 @@ describe('Quality scoring API (Web Pro)', () => {
   it('lists recent scores via GET /v1/quality/scores', async () => {
     await fetch(`${baseUrl}/v1/quality/score`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: authHeaders,
       body: JSON.stringify({ prompt: GOOD_PROMPT, response: GOOD_RESPONSE }),
     });
-    const res = await fetch(`${baseUrl}/v1/quality/scores?limit=10`);
+    const res = await fetch(`${baseUrl}/v1/quality/scores?limit=10`, {
+      headers: { ...authHeaders },
+    });
     expect(res.status).toBe(200);
     const body = await asJson<{ scores: unknown[]; total: number }>(res);
     expect(body.scores.length).toBeGreaterThanOrEqual(1);
@@ -109,10 +130,12 @@ describe('Quality scoring API (Web Pro)', () => {
   it('aggregates stats via GET /v1/quality/stats', async () => {
     await fetch(`${baseUrl}/v1/quality/score`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: authHeaders,
       body: JSON.stringify({ prompt: GOOD_PROMPT, response: GOOD_RESPONSE }),
     });
-    const res = await fetch(`${baseUrl}/v1/quality/stats`);
+    const res = await fetch(`${baseUrl}/v1/quality/stats`, {
+      headers: { ...authHeaders },
+    });
     expect(res.status).toBe(200);
     const body = await asJson<{
       stats: {

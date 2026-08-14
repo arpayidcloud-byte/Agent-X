@@ -298,6 +298,7 @@ app.post(
         return;
       }
 
+      const orgId = (req as AuthenticatedRequest).auth!.orgId!;
       const request = {
         taskId: taskId ?? `stream-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
         description: description ?? prompt.slice(0, 120),
@@ -364,6 +365,7 @@ app.post(
                 response: scored.response,
                 provider: scored.provider,
                 model: scored.model,
+                orgId,
                 taskId: scored.taskId,
                 dimensions: { dimensions: scored.dimensions, overall: scored.overall },
                 overall: scored.overall,
@@ -384,6 +386,7 @@ app.post(
                 const fbBackend = await getFeedbackBackend();
                 await fbBackend.create({
                   id: feedback.id,
+                  orgId,
                   scoreId: feedback.scoreId,
                   taskId: feedback.taskId,
                   prompt: feedback.prompt,
@@ -921,13 +924,14 @@ app.get('/v1/agentx/multi-agent/:runId', requireAuth, withOrg, (req, res) => {
 // Scores a prompt+response pair with the deterministic heuristic engine and
 // persists the result. GET lists recent scores; GET stats aggregates them.
 // Task completions are also auto-scored server-side (see /v1/agentx/run).
-app.post('/v1/quality/score', async (req, res): Promise<void> => {
+app.post('/v1/quality/score', requireAuth, withOrg, async (req, res): Promise<void> => {
   try {
     const { prompt, response, provider, model, taskId } = req.body ?? {};
     if (typeof prompt !== 'string' || typeof response !== 'string') {
       res.status(400).json({ error: 'Missing or invalid field: prompt, response (strings)' });
       return;
     }
+    const orgId = (req as AuthenticatedRequest).auth!.orgId!;
     const scorer = new QualityScorer();
     const scored = await scorer.score({
       prompt,
@@ -939,6 +943,7 @@ app.post('/v1/quality/score', async (req, res): Promise<void> => {
     const backend = await getQualityBackend();
     const result = await backend.create({
       id: scored.id,
+      orgId,
       prompt: scored.prompt,
       response: scored.response,
       provider: scored.provider,
@@ -960,13 +965,14 @@ app.post('/v1/quality/score', async (req, res): Promise<void> => {
   }
 });
 
-app.get('/v1/quality/scores', async (_req, res): Promise<void> => {
+app.get('/v1/quality/scores', requireAuth, withOrg, async (req, res): Promise<void> => {
   try {
+    const orgId = (req as AuthenticatedRequest).auth!.orgId!;
     const backend = await getQualityBackend();
-    const limitRaw = Number(_req.query.limit ?? 50);
+    const limitRaw = Number(req.query.limit ?? 50);
     const limit =
       Number.isFinite(limitRaw) && limitRaw > 0 ? Math.min(Math.floor(limitRaw), 200) : 50;
-    const scores = await backend.findAll(limit);
+    const scores = await backend.findAll(orgId, limit);
     res.json({ scores, total: scores.length });
   } catch (e) {
     const err = e instanceof Error ? e.message : String(e);
@@ -974,10 +980,11 @@ app.get('/v1/quality/scores', async (_req, res): Promise<void> => {
   }
 });
 
-app.get('/v1/quality/stats', async (_req, res): Promise<void> => {
+app.get('/v1/quality/stats', requireAuth, withOrg, async (req, res): Promise<void> => {
   try {
+    const orgId = (req as AuthenticatedRequest).auth!.orgId!;
     const backend = await getQualityBackend();
-    const stats = await backend.stats();
+    const stats = await backend.stats(orgId);
     res.json({ stats, generatedAt: new Date().toISOString() });
   } catch (e) {
     const err = e instanceof Error ? e.message : String(e);
@@ -989,22 +996,23 @@ app.get('/v1/quality/stats', async (_req, res): Promise<void> => {
 // Generates actionable feedback from a quality score (weak dimensions +
 // revision prompt), lists feedback history, and builds revision prompts for
 // follow-up runs. Low-scoring task outputs are auto-feedbacked server-side.
-app.post('/v1/feedback/generate', async (req, res): Promise<void> => {
+app.post('/v1/feedback/generate', requireAuth, withOrg, async (req, res): Promise<void> => {
   try {
     const { scoreId } = req.body ?? {};
     if (typeof scoreId !== 'string' || scoreId.length === 0) {
       res.status(400).json({ error: 'Missing or invalid field: scoreId (string)' });
       return;
     }
+    const orgId = (req as AuthenticatedRequest).auth!.orgId!;
     const qBackend = await getQualityBackend();
-    const scores = await qBackend.findAll(200);
+    const scores = await qBackend.findAll(orgId, 200);
     const score = scores.find((s) => s.id === scoreId);
     if (!score) {
       res.status(404).json({ error: `Score not found: ${scoreId}` });
       return;
     }
     const fbBackend = await getFeedbackBackend();
-    const existing = await fbBackend.findByScoreId(scoreId);
+    const existing = await fbBackend.findByScoreId(orgId, scoreId);
     if (existing) {
       res.json({ feedback: existing, reused: true });
       return;
@@ -1024,6 +1032,7 @@ app.post('/v1/feedback/generate', async (req, res): Promise<void> => {
     });
     const created = await fbBackend.create({
       id: feedback.id,
+      orgId,
       scoreId: feedback.scoreId,
       taskId: feedback.taskId,
       prompt: feedback.prompt,
@@ -1042,13 +1051,14 @@ app.post('/v1/feedback/generate', async (req, res): Promise<void> => {
   }
 });
 
-app.get('/v1/feedback', async (req, res): Promise<void> => {
+app.get('/v1/feedback', requireAuth, withOrg, async (req, res): Promise<void> => {
   try {
     const backend = await getFeedbackBackend();
     const limitRaw = Number(req.query.limit ?? 20);
     const limit =
       Number.isFinite(limitRaw) && limitRaw > 0 ? Math.min(Math.floor(limitRaw), 200) : 20;
-    const feedback = await backend.findAll(limit);
+    const orgId = (req as AuthenticatedRequest).auth!.orgId!;
+    const feedback = await backend.findMany(orgId, limit);
     res.json({ feedback, total: feedback.length });
   } catch (e) {
     const err = e instanceof Error ? e.message : String(e);
@@ -1056,10 +1066,11 @@ app.get('/v1/feedback', async (req, res): Promise<void> => {
   }
 });
 
-app.get('/v1/feedback/stats', async (_req, res): Promise<void> => {
+app.get('/v1/feedback/stats', requireAuth, withOrg, async (req, res): Promise<void> => {
   try {
+    const orgId = (req as AuthenticatedRequest).auth!.orgId!;
     const backend = await getFeedbackBackend();
-    const stats = await backend.stats();
+    const stats = await backend.stats(orgId);
     res.json({ stats, generatedAt: new Date().toISOString() });
   } catch (e) {
     const err = e instanceof Error ? e.message : String(e);
@@ -1067,7 +1078,7 @@ app.get('/v1/feedback/stats', async (_req, res): Promise<void> => {
   }
 });
 
-app.post('/v1/feedback/:id/revision', async (req, res): Promise<void> => {
+app.post('/v1/feedback/:id/revision', requireAuth, withOrg, async (req, res): Promise<void> => {
   try {
     const { id } = req.params;
     const { prompt } = req.body ?? {};
@@ -1076,7 +1087,8 @@ app.post('/v1/feedback/:id/revision', async (req, res): Promise<void> => {
       return;
     }
     const backend = await getFeedbackBackend();
-    const all = await backend.findAll(200);
+    const orgId = (req as AuthenticatedRequest).auth!.orgId!;
+    const all = await backend.findMany(orgId, 200);
     const feedback = all.find((f) => f.id === id);
     if (!feedback) {
       res.status(404).json({ error: `Feedback not found: ${id}` });
