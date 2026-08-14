@@ -48,11 +48,12 @@ export type CostEvidenceRow = {
   subscriptionCreatedAt?: string | Date | null;
   membershipEvidence?: Array<{ orgId: string; createdAt: string | Date }>;
   eventEvidence?: Array<{ orgId: string; createdAt: string | Date }>;
+  corroboratingRecords?: Array<{ source: string; id: string; taskId: string }>;
   createdAt?: string | Date;
   taskExists: boolean;
   userExists: boolean;
   subscriptionExists?: boolean;
-  corroboratingTaskIds: string[];
+  corroboratingTaskIds?: string[];
 };
 
 type EvidenceInventoryRow = {
@@ -77,7 +78,7 @@ function isAtOrBefore(
   value: string | Date | null | undefined,
   boundary: string | Date | null | undefined,
 ): boolean {
-  if (!value || !boundary) return true;
+  if (!value || !boundary) return false;
   return new Date(value).getTime() <= new Date(boundary).getTime();
 }
 
@@ -108,7 +109,7 @@ function classifyUser(row: UserEvidenceRow): EvidenceInventoryRow {
       strength: 'conflicting',
       orgId: null,
       referenceId: null,
-      detail: 'multiple organization memberships',
+      detail: `multiple organization memberships: ${row.memberOrgIds.join(', ')}`,
     });
   }
   if (row.historicalCostEntryIds.length > 0) {
@@ -219,13 +220,21 @@ function classifyCostEntry(row: CostEvidenceRow): EvidenceInventoryRow {
       evidence.push(corroborative(event.orgId, 'event organization', 'Event.payload.orgId'));
     else evidence.push(temporalConflict(row.id, 'event evidence was created after CostEntry'));
   }
-  for (const taskId of row.corroboratingTaskIds)
+  for (const taskId of row.corroboratingTaskIds ?? [])
     evidence.push({
       kind: 'historical task link',
       strength: 'corroborative',
       orgId: null,
       referenceId: taskId,
       detail: 'related historical record has matching task identifier but no organization owner',
+    });
+  for (const record of row.corroboratingRecords ?? [])
+    evidence.push({
+      kind: 'historical task link',
+      strength: 'corroborative',
+      orgId: null,
+      referenceId: record.id,
+      detail: `${record.source} ${record.id} references task ${record.taskId} but has no organization owner`,
     });
   const directOrgIds = [
     ...new Set(
