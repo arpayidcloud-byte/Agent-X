@@ -79,6 +79,36 @@ import { verifyTurnstile } from './turnstile.js';
 const costRepo = new CostEntryRepository();
 const templateRepo = new AgentTemplateRepository();
 
+type PublicAgentTemplate = {
+  id: string;
+  name: string;
+  description: string | null;
+  authorName: string;
+  tags: string[];
+  category: string | null;
+  installCount: number;
+  rating: number;
+  ratingCount: number;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+function toPublicAgentTemplate(template: PublicAgentTemplate): PublicAgentTemplate {
+  return {
+    id: template.id,
+    name: template.name,
+    description: template.description,
+    authorName: template.authorName,
+    tags: template.tags,
+    category: template.category,
+    installCount: template.installCount,
+    rating: template.rating,
+    ratingCount: template.ratingCount,
+    createdAt: template.createdAt,
+    updatedAt: template.updatedAt,
+  };
+}
+
 export { waitlistStore, feedbackStore, resetBetaStores } from './beta-store.js';
 export { qualityStore, resetQualityStore } from './quality-store.js';
 export { agentFeedbackStore, resetAgentFeedbackStore } from './feedback-store.js';
@@ -1532,12 +1562,12 @@ if (process.env.NODE_ENV !== 'test') {
   // Get single template
   app.get('/v1/marketplace/templates/:id', async (req, res) => {
     try {
-      const template = await templateRepo.getById(req.params.id);
+      const template = await templateRepo.getPublishedById(req.params.id);
       if (!template) {
         res.status(404).json({ error: 'Template not found' });
         return;
       }
-      res.json(template);
+      res.json(toPublicAgentTemplate(template));
     } catch (e) {
       res.status(500).json({ error: String(e) });
     }
