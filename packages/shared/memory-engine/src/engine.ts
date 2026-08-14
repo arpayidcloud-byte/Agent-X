@@ -56,7 +56,7 @@ export class MemoryEngine implements IMemoryEngine {
     this.addToLRUCache(memory);
     void this.updateMetrics();
 
-    await this.eventBus.publish('memory.created', memory, `trace_${memory.id}`);
+    await this.eventBus.publish('system', 'memory.created', memory, `trace_${memory.id}`);
     return memory;
   }
 
@@ -83,7 +83,7 @@ export class MemoryEngine implements IMemoryEngine {
     await this.memoryStore.delete(memoryId);
     this.removeFromLRUCache(memoryId);
     void this.updateMetrics();
-    await this.eventBus.publish('memory.deleted', { id: memoryId }, `trace_${memoryId}`);
+    await this.eventBus.publish('system', 'memory.deleted', { id: memoryId }, `trace_${memoryId}`);
   }
 
   public async compact(): Promise<void> {
@@ -225,7 +225,7 @@ export class MemoryEngine implements IMemoryEngine {
         await this.memoryStore.delete(mem.id);
         this.removeFromLRUCache(mem.id);
         this.metrics.expiredCount++;
-        await this.eventBus.publish('memory.expired', { id: mem.id }, `trace_${mem.id}`);
+        await this.eventBus.publish('system', 'memory.expired', { id: mem.id }, `trace_${mem.id}`);
       }
     }
     void this.updateMetrics();

@@ -47,6 +47,7 @@ export class ParallelRunner {
     const agent = this.pool.acquire(role);
     try {
       this.bus.publish({
+        orgId: task.orgId ?? '',
         id: `msg-${Date.now()}-${agent.id}`,
         topic: 'TaskAssigned',
         senderId: 'orchestrator',
@@ -60,6 +61,7 @@ export class ParallelRunner {
       results[agent.id] = result;
 
       this.bus.publish({
+        orgId: task.orgId ?? '',
         id: `msg-${Date.now()}-${agent.id}-done`,
         topic: 'TaskCompleted',
         senderId: agent.id,
@@ -71,6 +73,7 @@ export class ParallelRunner {
       errors[agent.id] = e instanceof Error ? e : new Error(String(e));
 
       this.bus.publish({
+        orgId: task.orgId ?? '',
         id: `msg-${Date.now()}-${agent.id}-err`,
         topic: 'TaskFailed',
         senderId: agent.id,

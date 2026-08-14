@@ -23,6 +23,13 @@ export class MessageBus {
   }
 
   public async broadcastToGlobalBus(message: AgentMessage): Promise<void> {
-    await this.globalEventBus.publish<AgentMessage>(`agent.${message.topic}`, message, 'trace-bus');
+    const orgId = message.orgId;
+    if (!orgId) throw new Error('Organization context required for global agent broadcast');
+    await this.globalEventBus.publish<AgentMessage>(
+      orgId,
+      `agent.${message.topic}`,
+      message,
+      'trace-bus',
+    );
   }
 }

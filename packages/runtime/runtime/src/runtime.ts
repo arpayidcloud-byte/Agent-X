@@ -98,7 +98,12 @@ export class Runtime {
       if (currentState === 'RUNNING') {
         this.lifecycle.transition('COMPLETED');
       }
-      await this.eventBus.publish('runtime.finished', { sessionId, result }, session.traceId);
+      await this.eventBus.publish(
+        'system',
+        'runtime.finished',
+        { sessionId, result },
+        session.traceId,
+      );
       return result;
     } catch (error) {
       const currentState = this.lifecycle.getState();

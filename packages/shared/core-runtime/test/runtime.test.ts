@@ -213,8 +213,8 @@ describe('InMemoryEventBus', () => {
     const bus = new InMemoryEventBus();
     const mockHandler = vi.fn();
 
-    await bus.subscribe('test.topic', mockHandler);
-    await bus.publish('test.topic', { message: 'hello' }, 'trace-1');
+    await bus.subscribe('org-test', 'test.topic', mockHandler);
+    await bus.publish('org-test', 'test.topic', { message: 'hello' }, 'trace-1');
 
     await new Promise((r) => setTimeout(r, 10));
     expect(mockHandler).toHaveBeenCalledTimes(1);
@@ -222,11 +222,12 @@ describe('InMemoryEventBus', () => {
     expect(mockHandler.mock.calls[0][0].payload.message).toBe('hello');
 
     // Request/Reply
-    void bus.reply('service.greet', async (event) => {
+    void bus.reply('org-test', 'service.greet', async (event) => {
       return { reply: `Hello, ${String((event.payload as Record<string, unknown>).name)}` };
     });
 
     const replyEvent = await bus.request<Record<string, unknown>, Record<string, unknown>>(
+      'org-test',
       'service.greet',
       { name: 'Claude' },
       'trace-2',
@@ -234,7 +235,7 @@ describe('InMemoryEventBus', () => {
     expect((replyEvent.payload as Record<string, unknown>).reply).toBe('Hello, Claude');
 
     // Duplicate event deduplication
-    await bus.subscribe('dup.topic', mockHandler);
+    await bus.subscribe('org-test', 'dup.topic', mockHandler);
     const eventEnv = {
       id: 'dup-1',
       topic: 'dup.topic',
@@ -246,20 +247,20 @@ describe('InMemoryEventBus', () => {
     };
     await (
       bus as unknown as { dispatch: (topic: string, event: unknown) => Promise<void> }
-    ).dispatch('dup.topic', eventEnv);
+    ).dispatch('org-test:dup.topic', eventEnv);
     await (
       bus as unknown as { dispatch: (topic: string, event: unknown) => Promise<void> }
-    ).dispatch('dup.topic', eventEnv); // Redundant dispatch
+    ).dispatch('org-test:dup.topic', eventEnv); // Redundant dispatch
     expect(mockHandler).toHaveBeenCalledTimes(2);
   });
 
   it('catches and logs handler exceptions safely', async () => {
     const bus = new InMemoryEventBus();
     const mockConsole = vi.spyOn(console, 'error').mockImplementation(() => {});
-    await bus.subscribe('error.topic', async () => {
+    await bus.subscribe('org-test', 'error.topic', async () => {
       throw new Error('Handler crashed');
     });
-    await bus.publish('error.topic', {}, 'tr');
+    await bus.publish('org-test', 'error.topic', {}, 'tr');
     await new Promise((r) => setTimeout(r, 5));
     expect(mockConsole).toHaveBeenCalled();
     mockConsole.mockRestore();
@@ -268,8 +269,8 @@ describe('InMemoryEventBus', () => {
   it('broadcasts messages successfully', async () => {
     const bus = new InMemoryEventBus();
     const mockHandler = vi.fn();
-    await bus.subscribe('test.broadcast', mockHandler);
-    await bus.broadcast('test.broadcast', { message: 'hello' }, 'trace-1');
+    await bus.subscribe('org-test', 'test.broadcast', mockHandler);
+    await bus.broadcast('org-test', 'test.broadcast', { message: 'hello' }, 'trace-1');
     await new Promise((r) => setTimeout(r, 10));
     expect(mockHandler).toHaveBeenCalledTimes(1);
   });
@@ -278,10 +279,10 @@ describe('InMemoryEventBus', () => {
 describe('BullMQEventBus', () => {
   it('publishes and subscribes using mocked BullMQ infrastructure', async () => {
     const bus = new BullMQEventBus();
-    await bus.publish('topic-a', { test: 1 }, 'tr-1');
+    await bus.publish('org-test', 'topic-a', { test: 1 }, 'tr-1');
 
     let received: unknown;
-    await bus.subscribe('topic-a', async (event) => {
+    await bus.subscribe('org-test', 'topic-a', async (event) => {
       received = event;
     });
 
@@ -299,7 +300,7 @@ describe('BullMQEventBus', () => {
     await handler(mockJob);
 
     // Test unsubscribe
-    await bus.unsubscribe('topic-a');
+    await bus.unsubscribe('org-test', 'topic-a');
 
     // Test close
     await bus.close();
@@ -310,6 +311,7 @@ describe('BullMQEventBus', () => {
 
     // Setup request/reply loop
     const _requestPromise = bus.request<Record<string, unknown>, Record<string, unknown>>(
+      'org-test',
       'service.test',
       { val: 42 },
       'tr-1',
@@ -333,7 +335,7 @@ describe('BullMQEventBus', () => {
       },
     };
 
-    await bus.reply('service.test', async (event) => {
+    await bus.reply('org-test', 'service.test', async (event) => {
       return { val: ((event.payload as Record<string, unknown>).val as number) + 1 };
     });
 
@@ -345,7 +347,7 @@ describe('BullMQEventBus', () => {
 
     // Trigger error path in reply handler to cover catch block
     const mockConsole = vi.spyOn(console, 'error').mockImplementation(() => {});
-    await bus.reply('service.error', async () => {
+    await bus.reply('org-test', 'service.error', async () => {
       throw new Error('fail');
     });
     const errWorkerHandler = mockWorkerConstructor.mock.calls[3][1] as (
@@ -367,16 +369,16 @@ describe('BullMQEventBus', () => {
     mockConsole.mockRestore();
 
     // Trigger request timeout path
-    await expect(bus.request('service.timeout', {}, 'tr-1', 1)).rejects.toThrow(
+    await expect(bus.request('org-test', 'service.timeout', {}, 'tr-1', 1)).rejects.toThrow(
       'Request timed out for topic service.timeout',
     );
 
     // Trigger broadcast
-    await bus.broadcast('test.broadcast', { message: 'hello' }, 'trace-1');
+    await bus.broadcast('org-test', 'test.broadcast', { message: 'hello' }, 'trace-1');
 
     // Trigger double subscribe error
-    await bus.subscribe('topic-dup', async () => {});
-    await expect(bus.subscribe('topic-dup', async () => {})).rejects.toThrow(
+    await bus.subscribe('org-test', 'topic-dup', async () => {});
+    await expect(bus.subscribe('org-test', 'topic-dup', async () => {})).rejects.toThrow(
       'Already subscribed to topic topic-dup',
     );
 
@@ -505,7 +507,7 @@ describe('Scheduler', () => {
 
   it('does not leak lifecycle events to another organization', async () => {
     const received: string[] = [];
-    await bus.subscribe(EventTopic.TASK_COMPLETED, async (envelope) => {
+    await bus.subscribe('org-1', EventTopic.TASK_COMPLETED, async (envelope) => {
       received.push((envelope.payload as TaskModel).orgId ?? 'none');
     });
 
