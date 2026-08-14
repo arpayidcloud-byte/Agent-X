@@ -4,7 +4,7 @@ import { TaskStatus } from '../interfaces/task.js';
 import type { IEventBus } from '../interfaces/events.js';
 import { EventTopic } from '../interfaces/events.js';
 import { TaskStateMachine } from '../state-machine/index.js';
-import { TaskNotFoundError } from '../errors.js';
+import { TaskNotFoundError, TenantContextError } from '../errors.js';
 import { Tracer, Metrics } from '@agent-xai/observability';
 import { AgentXLoggerFactory } from '@agent-xai/shared';
 import type { AgentRegistry } from '../registry/agent-registry.js';
@@ -20,12 +20,34 @@ export interface SchedulerConfig {
 }
 
 /**
+ * Builds the tenant-scoped key used for all internal scheduler bookkeeping.
+ * Keying by organization prevents a task ID from one organization colliding
+ * with — or being controlled through — another organization's context.
+ */
+const tenantKey = (orgId: string, taskId: string): string => `${orgId}:${taskId}`;
+
+/**
+ * Asserts that an authenticated organization context is present.
+ * @throws TenantContextError when the organization context is missing
+ */
+const assertOrgContext = (orgId: string): string => {
+  const trimmed = (orgId ?? '').trim();
+  if (!trimmed) throw new TenantContextError('Organization context required');
+  return trimmed;
+};
+
+/**
  * Scheduler manages task execution lifecycle and agent dispatch.
  * Handles task queuing, state transitions, and concurrent execution limits.
+ *
+ * All public operations require an authenticated organization context, which
+ * must be resolved server-side. Task payloads are never trusted as the source
+ * of tenant identity.
+ *
  * @example
  * ```ts
  * const scheduler = new Scheduler(eventBus, taskRepo, { maxParallelAgents: 10 });
- * await scheduler.enqueue(task);
+ * await scheduler.enqueue('org-1', task);
  * ```
  */
 export class Scheduler implements IScheduler {
@@ -66,28 +88,36 @@ export class Scheduler implements IScheduler {
   /**
    * Enqueues a task for execution if it's in a valid initial state.
    * Transitions task to QUEUED status and triggers dispatch.
+   * @param orgId - Authenticated organization context
    * @param task - Task to enqueue
+   * @throws TenantContextError if the organization context is missing or the
+   *   task already belongs to a different organization
    * @throws Error if task save or event publishing fails
    * @example
    * ```ts
-   * await scheduler.enqueue({ id: 'task-1', status: TaskStatus.CREATED, ... });
+   * await scheduler.enqueue('org-1', { id: 'task-1', status: TaskStatus.CREATED, ... });
    * ```
    */
-  public async enqueue(task: TaskModel): Promise<void> {
+  public async enqueue(orgId: string, task: TaskModel): Promise<void> {
+    const org = assertOrgContext(orgId);
     const span = this.tracer.startSpan('scheduler-enqueue');
     span.setAttribute('task.id', task.id);
     span.setAttribute('task.status', task.status);
     try {
+      if (task.orgId && task.orgId !== org) {
+        throw new TenantContextError('Task organization mismatch');
+      }
+
       if (
         task.status === TaskStatus.CREATED ||
         task.status === TaskStatus.FAILED ||
         task.status === TaskStatus.RETRYING
       ) {
-        task = TaskStateMachine.transition(task, TaskStatus.QUEUED);
-        await this.taskRepo.save(task);
+        task = { ...TaskStateMachine.transition(task, TaskStatus.QUEUED), orgId: org };
+        await this.taskRepo.save(org, task);
         await this.eventBus.publish(EventTopic.TASK_QUEUED, task, task.traceId, task.id);
 
-        this.inFlightTasks.set(task.id, task);
+        this.inFlightTasks.set(tenantKey(org, task.id), task);
         this.metrics.counter('tasks_enqueued', 1, { status: task.status });
         await this.dispatch();
       }
@@ -103,20 +133,22 @@ export class Scheduler implements IScheduler {
 
   /**
    * Pauses a running task, transitioning it to WAITING_APPROVAL status.
+   * @param orgId - Authenticated organization context
    * @param taskId - ID of the task to pause
-   * @throws TaskNotFoundError if task doesn't exist
+   * @throws TaskNotFoundError if the task doesn't exist in this organization
    */
   public async pause(orgId: string, taskId: string): Promise<void> {
+    const org = assertOrgContext(orgId);
     const span = this.tracer.startSpan('scheduler-pause');
     span.setAttribute('task.id', taskId);
     try {
-      const task = await this.taskRepo.findById(orgId, taskId);
+      const task = await this.taskRepo.findById(org, taskId);
       if (!task) throw new TaskNotFoundError(taskId);
 
-      this.pausedTasks.add(taskId);
+      this.pausedTasks.add(tenantKey(org, taskId));
       if (task.status === TaskStatus.RUNNING) {
         task.status = TaskStatus.WAITING_APPROVAL;
-        await this.taskRepo.save(task);
+        await this.taskRepo.save(org, task);
         await this.eventBus.publish(EventTopic.TASK_WAITING_APPROVAL, task, task.traceId, task.id);
       }
       span.setStatus({ code: 0 });
@@ -131,22 +163,25 @@ export class Scheduler implements IScheduler {
 
   /**
    * Resumes a paused task, transitioning it back to RUNNING status.
+   * @param orgId - Authenticated organization context
    * @param taskId - ID of the task to resume
-   * @throws TaskNotFoundError if task doesn't exist
+   * @throws TaskNotFoundError if the task doesn't exist in this organization
    */
   public async resume(orgId: string, taskId: string): Promise<void> {
+    const org = assertOrgContext(orgId);
     const span = this.tracer.startSpan('scheduler-resume');
     span.setAttribute('task.id', taskId);
     try {
-      if (!this.pausedTasks.has(taskId)) return;
-      this.pausedTasks.delete(taskId);
+      const key = tenantKey(org, taskId);
+      if (!this.pausedTasks.has(key)) return;
+      this.pausedTasks.delete(key);
 
-      const task = await this.taskRepo.findById(orgId, taskId);
+      const task = await this.taskRepo.findById(org, taskId);
       if (!task) throw new TaskNotFoundError(taskId);
 
       if (task.status === TaskStatus.WAITING_APPROVAL) {
         task.status = TaskStatus.RUNNING;
-        await this.taskRepo.save(task);
+        await this.taskRepo.save(org, task);
         await this.eventBus.publish(EventTopic.TASK_STARTED, task, task.traceId, task.id);
         await this.dispatch();
       }
@@ -162,15 +197,17 @@ export class Scheduler implements IScheduler {
 
   /**
    * Cancels a task with the given reason.
+   * @param orgId - Authenticated organization context
    * @param taskId - ID of the task to cancel
    * @param reason - Reason for cancellation
-   * @throws TaskNotFoundError if task doesn't exist
+   * @throws TaskNotFoundError if the task doesn't exist in this organization
    */
   public async cancel(orgId: string, taskId: string, reason: string): Promise<void> {
+    const org = assertOrgContext(orgId);
     const span = this.tracer.startSpan('scheduler-cancel');
     span.setAttribute('task.id', taskId);
     try {
-      const task = await this.taskRepo.findById(orgId, taskId);
+      const task = await this.taskRepo.findById(org, taskId);
       if (!task) throw new TaskNotFoundError(taskId);
 
       task.cancellation = {
@@ -180,11 +217,12 @@ export class Scheduler implements IScheduler {
       };
       task.status = TaskStatus.CANCELLED;
       task.updatedAt = new Date();
-      await this.taskRepo.save(task);
+      await this.taskRepo.save(org, task);
       await this.eventBus.publish(EventTopic.TASK_CANCELLED, task, task.traceId, task.id);
 
-      this.inFlightTasks.delete(taskId);
-      this.pausedTasks.delete(taskId);
+      const key = tenantKey(org, taskId);
+      this.inFlightTasks.delete(key);
+      this.pausedTasks.delete(key);
 
       if (this.activeCount > 0) this.activeCount--;
       await this.dispatch();
@@ -199,27 +237,27 @@ export class Scheduler implements IScheduler {
   }
 
   private async dispatch(): Promise<void> {
-    for (const [taskId, task] of this.inFlightTasks.entries() as IterableIterator<
+    for (const [key, task] of this.inFlightTasks.entries() as IterableIterator<
       [string, TaskModel]
     >) {
       if (this.activeCount >= this.maxParallel) break;
-      if (this.pausedTasks.has(taskId as string)) continue;
+      if (this.pausedTasks.has(key)) continue;
 
-      if ((task as TaskModel).status === TaskStatus.QUEUED) {
-        (task as TaskModel).status = TaskStatus.RUNNING;
+      const org = task.orgId;
+      if (!org) continue;
+
+      if (task.status === TaskStatus.QUEUED) {
+        task.status = TaskStatus.RUNNING;
         this.activeCount++;
-        await this.taskRepo.save(task as TaskModel);
-        await this.eventBus.publish(
-          EventTopic.TASK_STARTED,
-          task as TaskModel,
-          (task as TaskModel).traceId,
-          (task as TaskModel).id,
-        );
+        await this.taskRepo.save(org, task);
+        await this.eventBus.publish(EventTopic.TASK_STARTED, task, task.traceId, task.id);
 
         // Execute agent if registry is configured
         if (this.agentRegistry && task.assignedAgentRole) {
           this.executeAgent(task).catch((err) => {
-            this.failTask(taskId, err).catch((e) => this.logger.error('Failed to fail task', e));
+            this.failTask(org, task.id, err).catch((e) =>
+              this.logger.error('Failed to fail task', e),
+            );
           });
         }
       }
@@ -236,10 +274,11 @@ export class Scheduler implements IScheduler {
         throw new Error('Agent registry not configured');
       }
 
+      const org = assertOrgContext(task.orgId ?? '');
       const role = task.assignedAgentRole || 'coder';
       const result = await this.agentRegistry.executeByRole(role, task, task.context);
 
-      await this.completeTask(task.id, result);
+      await this.completeTask(org, task.id, result);
       this.metrics.counter('agent_executions', 1, { role, status: 'success' });
       span.setStatus({ code: 0 });
     } catch (e: unknown) {
@@ -254,22 +293,25 @@ export class Scheduler implements IScheduler {
 
   /**
    * Marks a task as completed with the given result.
+   * @param orgId - Authenticated organization context
    * @param taskId - ID of the completed task
    * @param result - Task execution result
    */
-  public async completeTask(taskId: string, result: unknown): Promise<void> {
+  public async completeTask(orgId: string, taskId: string, result: unknown): Promise<void> {
+    const org = assertOrgContext(orgId);
     const span = this.tracer.startSpan('scheduler-complete');
     span.setAttribute('task.id', taskId);
     try {
-      const task = this.inFlightTasks.get(taskId);
+      const key = tenantKey(org, taskId);
+      const task = this.inFlightTasks.get(key);
       if (!task) return;
       task.result = result as TaskModel['result'];
       task.status = TaskStatus.COMPLETED;
       task.updatedAt = new Date();
-      await this.taskRepo.save(task);
+      await this.taskRepo.save(org, task);
       await this.eventBus.publish(EventTopic.TASK_COMPLETED, task, task.traceId, task.id);
 
-      this.inFlightTasks.delete(taskId);
+      this.inFlightTasks.delete(key);
       this.activeCount--;
       this.metrics.counter('tasks_completed', 1);
       await this.dispatch();
@@ -285,43 +327,49 @@ export class Scheduler implements IScheduler {
 
   /**
    * Marks a task as failed with the given error.
+   * @param orgId - Authenticated organization context
    * @param taskId - ID of the failed task
    * @param error - Error that caused the failure
    */
-  public async failTask(taskId: string, error: unknown): Promise<void> {
+  public async failTask(orgId: string, taskId: string, error: unknown): Promise<void> {
+    const org = assertOrgContext(orgId);
     const span = this.tracer.startSpan('scheduler-fail');
     span.setAttribute('task.id', taskId);
     try {
-      const task = this.inFlightTasks.get(taskId);
+      const key = tenantKey(org, taskId);
+      const task = this.inFlightTasks.get(key);
       if (!task) return;
       task.error = error as TaskModel['error'];
       task.status = TaskStatus.FAILED;
       task.updatedAt = new Date();
-      await this.taskRepo.save(task);
+      await this.taskRepo.save(org, task);
       await this.eventBus.publish(EventTopic.TASK_FAILED, task, task.traceId, task.id);
 
-      this.inFlightTasks.delete(taskId);
+      this.inFlightTasks.delete(key);
       this.activeCount--;
       this.metrics.counter('tasks_failed', 1);
       await this.dispatch();
       span.setStatus({ code: 0 });
     } catch (e: unknown) {
-      const error = e instanceof Error ? e : new Error(String(e));
-      span.setStatus({ code: 1, message: error.message });
-      throw error;
+      const err = e instanceof Error ? e : new Error(String(e));
+      span.setStatus({ code: 1, message: err.message });
+      throw err;
     } finally {
       span.end();
     }
   }
 
   /**
-   * Retrieves a task by ID from in-flight tasks or repository.
+   * Retrieves a task by ID from in-flight tasks or repository, scoped to the
+   * authenticated organization.
+   * @param orgId - Authenticated organization context
    * @param taskId - ID of the task to retrieve
-   * @returns Task model if found, undefined otherwise
+   * @returns Task model if found in this organization, undefined otherwise
    */
   public async getTask(orgId: string, taskId: string): Promise<TaskModel | undefined> {
-    const task = this.inFlightTasks.get(taskId);
-    if (task) return task.orgId === orgId ? task : undefined;
-    return this.taskRepo.findById(orgId, taskId);
+    const org = assertOrgContext(orgId);
+    const task = this.inFlightTasks.get(tenantKey(org, taskId));
+    if (task) return task.orgId === org ? task : undefined;
+    return this.taskRepo.findById(org, taskId);
   }
 }

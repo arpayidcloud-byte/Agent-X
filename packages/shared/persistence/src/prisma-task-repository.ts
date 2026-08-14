@@ -13,14 +13,15 @@ import type { Prisma, PrismaClient } from '@prisma/client';
 export class PrismaTaskRepository implements ITaskRepository {
   constructor(private prisma: PrismaClient) {}
 
-  async save(task: TaskModel): Promise<void> {
-    if (!task.orgId?.trim()) throw new Error('Organization context required for task persistence');
+  async save(orgId: string, task: TaskModel): Promise<void> {
+    if (!orgId?.trim()) throw new Error('Organization context required for task persistence');
+    if (task.orgId && task.orgId !== orgId) throw new Error('Task organization mismatch');
 
     const existing = await this.prisma.task.findUnique({
       where: { id: task.id },
       select: { orgId: true },
     });
-    if (existing && existing.orgId !== task.orgId) {
+    if (existing && existing.orgId !== orgId) {
       throw new Error('Task organization mismatch');
     }
 
@@ -38,7 +39,7 @@ export class PrismaTaskRepository implements ITaskRepository {
       context: task.context as unknown as Prisma.InputJsonValue,
       result: (task.result ?? null) as unknown as Prisma.InputJsonValue,
       error: (task.error ?? null) as unknown as Prisma.InputJsonValue,
-      orgId: task.orgId,
+      orgId: orgId,
       createdAt: task.createdAt,
       updatedAt: task.updatedAt,
     };

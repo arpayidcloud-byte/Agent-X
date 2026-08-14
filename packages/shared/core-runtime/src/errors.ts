@@ -80,6 +80,24 @@ export class DuplicateTaskError extends CoreRuntimeError {
 }
 
 /**
+ * Thrown when tenant (organization) context is missing or does not match the
+ * organization that owns the task.
+ *
+ * @example
+ * ```ts
+ * throw new TenantContextError('Organization context required');
+ * ```
+ */
+export class TenantContextError extends CoreRuntimeError {
+  /**
+   * @param message - Description of the tenant context violation
+   */
+  constructor(message: string) {
+    super(message, 'TENANT_CONTEXT_VIOLATION');
+  }
+}
+
+/**
  * Thrown when an event bus operation fails.
  *
  * @example

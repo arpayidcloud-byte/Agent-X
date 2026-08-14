@@ -96,8 +96,8 @@ describe('Validation Day 1 - E2E Basics', () => {
       updatedAt: new Date(),
     };
 
-    await scheduler.enqueue(task);
-    const saved = await taskRepo.findById('validation-task-1');
+    await scheduler.enqueue('org-validation', task);
+    const saved = await taskRepo.findById('org-validation', 'validation-task-1');
 
     expect(saved).toBeDefined();
     // Scheduler may auto-dispatch to RUNNING if agent available

@@ -65,13 +65,15 @@ export interface IScheduler {
   /**
    * Add a task to the execution queue.
    *
+   * @param orgId - Authenticated organization context
    * @param task - The task to enqueue
    */
-  enqueue(task: TaskModel): Promise<void>;
+  enqueue(orgId: string, task: TaskModel): Promise<void>;
 
   /**
    * Pause a running or queued task.
    *
+   * @param orgId - Authenticated organization context
    * @param taskId - ID of the task to pause
    */
   pause(orgId: string, taskId: string): Promise<void>;
@@ -79,6 +81,7 @@ export interface IScheduler {
   /**
    * Resume a paused task.
    *
+   * @param orgId - Authenticated organization context
    * @param taskId - ID of the task to resume
    */
   resume(orgId: string, taskId: string): Promise<void>;
@@ -86,6 +89,7 @@ export interface IScheduler {
   /**
    * Cancel a task.
    *
+   * @param orgId - Authenticated organization context
    * @param taskId - ID of the task to cancel
    * @param reason - Reason for cancellation
    */
@@ -106,30 +110,34 @@ export interface ITaskRepository {
   /**
    * Persist a task (create or update).
    *
+   * @param orgId - Authenticated organization context
    * @param task - The task to save
    */
-  save(task: TaskModel): Promise<void>;
+  save(orgId: string, task: TaskModel): Promise<void>;
 
   /**
-   * Find a task by its unique identifier.
+   * Find a task by its unique identifier, scoped to an organization.
    *
+   * @param orgId - Authenticated organization context
    * @param id - The task ID to look up
    * @returns The task if found, otherwise `undefined`
    */
   findById(orgId: string, id: string): Promise<TaskModel | undefined>;
 
   /**
-   * Find all tasks belonging to a root task.
+   * Find all tasks belonging to a root task, scoped to an organization.
    *
+   * @param orgId - Authenticated organization context
    * @param rootId - The root task ID
    * @returns Array of matching tasks
    */
   findByRootId(orgId: string, rootId: string): Promise<TaskModel[]>;
 
   /**
-   * Retrieve all tasks.
+   * Retrieve all tasks for an organization.
    *
-   * @returns Array of all tasks
+   * @param orgId - Authenticated organization context
+   * @returns Array of the organization's tasks
    */
   getAll(orgId: string): Promise<TaskModel[]>;
 }

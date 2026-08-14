@@ -1,14 +1,19 @@
 import { describe, it, expect } from 'vitest';
 import { TaskStatus, TaskNotFoundError } from '@agentx/core-runtime';
-import { createTestTask, createTestRepo, createTestScheduler } from '../fixtures/test-config.js';
+import {
+  createTestTask,
+  createTestRepo,
+  createTestScheduler,
+  TEST_ORG_ID as ORG,
+} from '../fixtures/test-config.js';
 
 describe('Error Handling E2E', () => {
   it('handles task not found errors', async () => {
     const repo = createTestRepo();
     const { scheduler } = createTestScheduler(repo);
 
-    await expect(scheduler.pause('nonexistent')).rejects.toThrow(TaskNotFoundError);
-    await expect(scheduler.cancel('nonexistent', 'reason')).rejects.toThrow(TaskNotFoundError);
+    await expect(scheduler.pause(ORG, 'nonexistent')).rejects.toThrow(TaskNotFoundError);
+    await expect(scheduler.cancel(ORG, 'nonexistent', 'reason')).rejects.toThrow(TaskNotFoundError);
   });
 
   it('resumes gracefully when task not in paused set', async () => {
@@ -16,10 +21,10 @@ describe('Error Handling E2E', () => {
     const { scheduler } = createTestScheduler(repo);
 
     const task = createTestTask('err-resume', 'Test task');
-    await scheduler.enqueue(task);
-    await scheduler.completeTask('err-resume', 'done');
+    await scheduler.enqueue(ORG, task);
+    await scheduler.completeTask(ORG, 'err-resume', 'done');
 
-    await expect(scheduler.resume('err-resume')).resolves.toBeUndefined();
+    await expect(scheduler.resume(ORG, 'err-resume')).resolves.toBeUndefined();
   });
 
   it('handles task failure with error propagation', async () => {
@@ -30,10 +35,10 @@ describe('Error Handling E2E', () => {
     await bus.subscribe('task.failed', () => failedEvents.push('failed'));
 
     const task = createTestTask('err-prop', 'Task that fails');
-    await scheduler.enqueue(task);
-    await scheduler.failTask('err-prop', new Error('Timeout exceeded'));
+    await scheduler.enqueue(ORG, task);
+    await scheduler.failTask(ORG, 'err-prop', new Error('Timeout exceeded'));
 
-    const failed = await repo.findById('err-prop');
+    const failed = await repo.findById(ORG, 'err-prop');
     expect(failed?.status).toBe(TaskStatus.FAILED);
     expect(failedEvents).toContain('failed');
   });
@@ -43,10 +48,10 @@ describe('Error Handling E2E', () => {
     const { scheduler } = createTestScheduler(repo);
 
     const task = createTestTask('err-cancel', 'Active task');
-    await scheduler.enqueue(task);
+    await scheduler.enqueue(ORG, task);
 
-    await scheduler.cancel('err-cancel', 'Emergency stop');
-    const cancelled = await repo.findById('err-cancel');
+    await scheduler.cancel(ORG, 'err-cancel', 'Emergency stop');
+    const cancelled = await repo.findById(ORG, 'err-cancel');
     expect(cancelled?.status).toBe(TaskStatus.CANCELLED);
   });
 
@@ -55,13 +60,13 @@ describe('Error Handling E2E', () => {
     const { scheduler } = createTestScheduler(repo);
 
     const task = createTestTask('err-status', 'Task');
-    await scheduler.enqueue(task);
+    await scheduler.enqueue(ORG, task);
 
-    const running = await repo.findById('err-status');
+    const running = await repo.findById(ORG, 'err-status');
     expect(running?.status).toBe(TaskStatus.RUNNING);
 
-    await scheduler.completeTask('err-status', 'done');
-    const completed = await repo.findById('err-status');
+    await scheduler.completeTask(ORG, 'err-status', 'done');
+    const completed = await repo.findById(ORG, 'err-status');
     expect(completed?.status).toBe(TaskStatus.COMPLETED);
   });
 });
