@@ -31,9 +31,22 @@ describe('PrismaTaskRepository tenant guard', () => {
     expect(upsert).not.toHaveBeenCalled();
   });
 
+  it('rejects overwriting a task owned by another organization', async () => {
+    const findUnique = vi.fn().mockResolvedValue({ orgId: 'org-b' });
+    const upsert = vi.fn();
+    const repo = new PrismaTaskRepository({ task: { findUnique, upsert } } as never);
+
+    await expect(repo.save(task({ orgId: 'org-a' }))).rejects.toThrow('Task organization mismatch');
+    expect(findUnique).toHaveBeenCalledWith({
+      where: { id: 'task-1' },
+      select: { orgId: true },
+    });
+    expect(upsert).not.toHaveBeenCalled();
+  });
   it('writes the server-side organization onto persistent tasks', async () => {
+    const findUnique = vi.fn().mockResolvedValue(null);
     const upsert = vi.fn().mockResolvedValue({});
-    const repo = new PrismaTaskRepository({ task: { upsert } } as never);
+    const repo = new PrismaTaskRepository({ task: { findUnique, upsert } } as never);
 
     await repo.save(task({ orgId: 'org-a' }));
 
