@@ -23,7 +23,7 @@ export class KnowledgeEngine implements IKnowledgeEngine {
     private eventBus: IEventBus,
   ) {}
 
-  public async ingest(data: Partial<KnowledgeDocument>): Promise<KnowledgeDocument> {
+  public async ingest(orgId: string, data: Partial<KnowledgeDocument>): Promise<KnowledgeDocument> {
     const now = new Date();
     const doc: KnowledgeDocument = {
       id: `doc_${Math.random().toString(36).substring(2, 9)}`,
@@ -50,7 +50,7 @@ export class KnowledgeEngine implements IKnowledgeEngine {
     await this.store.saveNode(node);
 
     await this.updateMetrics();
-    await this.eventBus.publish('knowledge.ingested', doc, `trace_${doc.id}`);
+    await this.eventBus.publish(orgId, 'knowledge.ingested', doc, `trace_${doc.id}`);
 
     return doc;
   }
@@ -67,6 +67,7 @@ export class KnowledgeEngine implements IKnowledgeEngine {
   }
 
   public async update(
+    orgId: string,
     documentId: string,
     updates: Partial<KnowledgeDocument>,
   ): Promise<KnowledgeDocument> {
@@ -92,14 +93,19 @@ export class KnowledgeEngine implements IKnowledgeEngine {
       });
     }
 
-    await this.eventBus.publish('knowledge.updated', doc, `trace_${doc.id}`);
+    await this.eventBus.publish(orgId, 'knowledge.updated', doc, `trace_${doc.id}`);
     return doc;
   }
 
-  public async delete(documentId: string): Promise<void> {
+  public async delete(orgId: string, documentId: string): Promise<void> {
     await this.store.deleteDocument(documentId);
     await this.updateMetrics();
-    await this.eventBus.publish('knowledge.deleted', { id: documentId }, `trace_${documentId}`);
+    await this.eventBus.publish(
+      orgId,
+      'knowledge.deleted',
+      { id: documentId },
+      `trace_${documentId}`,
+    );
   }
 
   public async createRelationship(

@@ -29,6 +29,7 @@ export class ContextEngine implements IContextEngine {
   }
 
   public async createContext(
+    orgId: string,
     scope: ContextScope,
     initialData: Record<string, unknown> = {},
   ): Promise<ContextSnapshot> {
@@ -47,11 +48,12 @@ export class ContextEngine implements IContextEngine {
     this.contexts.set(id, snapshot);
     this.updateMetrics();
 
-    await this.eventBus.publish('context.created', snapshot, `trace_${id}`);
+    await this.eventBus.publish(orgId, 'context.created', snapshot, `trace_${id}`);
     return snapshot;
   }
 
   public async updateContext(
+    orgId: string,
     contextId: string,
     updates: Record<string, unknown>,
   ): Promise<ContextSnapshot> {
@@ -71,7 +73,7 @@ export class ContextEngine implements IContextEngine {
     this.contexts.set(contextId, snapshot);
     this.updateMetrics();
 
-    await this.eventBus.publish('context.updated', snapshot, `trace_${contextId}`);
+    await this.eventBus.publish(orgId, 'context.updated', snapshot, `trace_${contextId}`);
     return snapshot;
   }
 
@@ -80,6 +82,7 @@ export class ContextEngine implements IContextEngine {
   }
 
   public async mergeContexts(
+    orgId: string,
     sourceIds: string[],
     targetScope: ContextScope,
   ): Promise<ContextSnapshot> {
@@ -92,10 +95,14 @@ export class ContextEngine implements IContextEngine {
     }
 
     this.metrics.mergeCount++;
-    return this.createContext(targetScope, mergedData);
+    return this.createContext(orgId, targetScope, mergedData);
   }
 
-  public async compressContext(contextId: string, targetTokens: number): Promise<ContextSnapshot> {
+  public async compressContext(
+    orgId: string,
+    contextId: string,
+    targetTokens: number,
+  ): Promise<ContextSnapshot> {
     const existing = this.contexts.get(contextId);
     if (!existing) throw new Error(`Context ${contextId} not found`);
 
@@ -104,7 +111,7 @@ export class ContextEngine implements IContextEngine {
     const ratio = targetTokens / existing.tokenEstimate;
     const compressedData = this.compressor.compress(existing.data, ratio);
 
-    return this.updateContext(contextId, compressedData);
+    return this.updateContext(orgId, contextId, compressedData);
   }
 
   public async validateContext(contextId: string): Promise<boolean> {

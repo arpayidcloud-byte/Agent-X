@@ -4,10 +4,14 @@
  */
 
 export interface IKnowledgeEngine {
-  ingest(document: Partial<KnowledgeDocument>): Promise<KnowledgeDocument>;
+  ingest(orgId: string, document: Partial<KnowledgeDocument>): Promise<KnowledgeDocument>;
   retrieve(query: KnowledgeQuery): Promise<KnowledgeNode[]>;
-  update(documentId: string, updates: Partial<KnowledgeDocument>): Promise<KnowledgeDocument>;
-  delete(documentId: string): Promise<void>;
+  update(
+    orgId: string,
+    documentId: string,
+    updates: Partial<KnowledgeDocument>,
+  ): Promise<KnowledgeDocument>;
+  delete(orgId: string, documentId: string): Promise<void>;
   createRelationship(
     sourceId: string,
     targetId: string,
