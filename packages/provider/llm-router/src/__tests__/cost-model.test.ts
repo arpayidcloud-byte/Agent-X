@@ -351,7 +351,12 @@ describe('Cost OKR regression guard (baseline $0.003162 → target ≤$0.000949/
 
   it('cache hits cost $0 (identical request within TTL)', async () => {
     const router = prodRouter();
-    const s: RouteRequest = { taskId: 'okr-cache', description: 'x', complexity: 'simple' };
+    const s: RouteRequest = {
+      taskId: 'okr-cache',
+      description: 'x',
+      complexity: 'simple',
+      context: { orgId: 'org-okr' },
+    };
     const cold = await router.execute(s, PROMPT);
     expect(cold.cost).toBeGreaterThan(0);
     const warm = await router.execute(s, PROMPT);
