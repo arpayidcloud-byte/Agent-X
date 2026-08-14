@@ -9,15 +9,22 @@ export interface EventModel {
 }
 
 export interface IEventRepository {
-  save(event: EventModel): Promise<void>;
-  findByTaskId(taskId: string): Promise<EventModel[]>;
-  findByTopic(topic: string, limit?: number): Promise<EventModel[]>;
+  save(orgId: string, event: EventModel): Promise<void>;
+  findByTaskId(orgId: string, taskId: string): Promise<EventModel[]>;
+  findByTopic(orgId: string, topic: string, limit?: number): Promise<EventModel[]>;
 }
 
 export class PrismaEventRepository implements IEventRepository {
   constructor(private prisma: PrismaClient) {}
 
-  async save(event: EventModel): Promise<void> {
+  async save(orgId: string, event: EventModel): Promise<void> {
+    if (!orgId.trim()) throw new Error('Organization context required for event persistence');
+    if (!event.taskId?.trim()) throw new Error('Task context required for event persistence');
+    const task = await this.prisma.task.findFirst({
+      where: { id: event.taskId, orgId },
+      select: { id: true },
+    });
+    if (!task) throw new Error('Task does not belong to organization');
     await this.prisma.event.create({
       data: {
         id: event.id,
@@ -29,17 +36,17 @@ export class PrismaEventRepository implements IEventRepository {
     });
   }
 
-  async findByTaskId(taskId: string): Promise<EventModel[]> {
+  async findByTaskId(orgId: string, taskId: string): Promise<EventModel[]> {
     const events = await this.prisma.event.findMany({
-      where: { taskId },
+      where: { taskId, task: { orgId } },
       orderBy: { createdAt: 'asc' },
     });
     return events.map((e: Record<string, unknown>) => this.toEventModel(e));
   }
 
-  async findByTopic(topic: string, limit?: number): Promise<EventModel[]> {
+  async findByTopic(orgId: string, topic: string, limit?: number): Promise<EventModel[]> {
     const events = await this.prisma.event.findMany({
-      where: { topic },
+      where: { topic, task: { orgId } },
       orderBy: { createdAt: 'desc' },
       take: limit,
     });
