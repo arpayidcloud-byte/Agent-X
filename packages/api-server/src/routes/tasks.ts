@@ -12,7 +12,9 @@ export async function createTaskRoutes(fastify: FastifyInstance) {
     '/tasks',
     {
       schema: {
-        description: 'Create a new task',
+        description:
+          'Deprecated: legacy tenantless task API is permanently disabled. Migrate to the tenant-aware Agent-X API.',
+        deprecated: true,
         tags: ['tasks'],
         body: {
           type: 'object',
@@ -29,16 +31,6 @@ export async function createTaskRoutes(fastify: FastifyInstance) {
             type: 'object',
             properties: { error: { type: 'string' } },
           },
-          201: {
-            type: 'object',
-            properties: {
-              id: { type: 'string' },
-              goal: { type: 'string' },
-              status: { type: 'string' },
-              priority: { type: 'string' },
-              createdAt: { type: 'string', format: 'date-time' },
-            },
-          },
         },
       },
     },
@@ -53,7 +45,9 @@ export async function createTaskRoutes(fastify: FastifyInstance) {
     '/tasks',
     {
       schema: {
-        description: 'List all tasks',
+        description:
+          'Deprecated: legacy tenantless task API is permanently disabled. Migrate to the tenant-aware Agent-X API.',
+        deprecated: true,
         tags: ['tasks'],
         querystring: {
           type: 'object',
@@ -66,19 +60,6 @@ export async function createTaskRoutes(fastify: FastifyInstance) {
           410: {
             type: 'object',
             properties: { error: { type: 'string' } },
-          },
-          200: {
-            type: 'array',
-            items: {
-              type: 'object',
-              properties: {
-                id: { type: 'string' },
-                goal: { type: 'string' },
-                status: { type: 'string' },
-                priority: { type: 'string' },
-                createdAt: { type: 'string', format: 'date-time' },
-              },
-            },
           },
         },
       },
@@ -94,7 +75,9 @@ export async function createTaskRoutes(fastify: FastifyInstance) {
     '/tasks/:id',
     {
       schema: {
-        description: 'Get a task by ID',
+        description:
+          'Deprecated: legacy tenantless task API is permanently disabled. Migrate to the tenant-aware Agent-X API.',
+        deprecated: true,
         tags: ['tasks'],
         params: {
           type: 'object',
@@ -107,22 +90,6 @@ export async function createTaskRoutes(fastify: FastifyInstance) {
           410: {
             type: 'object',
             properties: { error: { type: 'string' } },
-          },
-          200: {
-            type: 'object',
-            properties: {
-              id: { type: 'string' },
-              goal: { type: 'string' },
-              status: { type: 'string' },
-              priority: { type: 'string' },
-              createdAt: { type: 'string', format: 'date-time' },
-            },
-          },
-          404: {
-            type: 'object',
-            properties: {
-              error: { type: 'string' },
-            },
           },
         },
       },
@@ -138,7 +105,9 @@ export async function createTaskRoutes(fastify: FastifyInstance) {
     '/tasks/:id/cancel',
     {
       schema: {
-        description: 'Cancel a task',
+        description:
+          'Deprecated: legacy tenantless task API is permanently disabled. Migrate to the tenant-aware Agent-X API.',
+        deprecated: true,
         tags: ['tasks'],
         params: {
           type: 'object',
@@ -151,13 +120,6 @@ export async function createTaskRoutes(fastify: FastifyInstance) {
           410: {
             type: 'object',
             properties: { error: { type: 'string' } },
-          },
-          200: {
-            type: 'object',
-            properties: {
-              id: { type: 'string' },
-              status: { type: 'string' },
-            },
           },
         },
       },
