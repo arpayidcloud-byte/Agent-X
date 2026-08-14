@@ -317,6 +317,7 @@ describe('MessageBus', () => {
     const bus = new MessageBus(globalBus);
 
     await bus.broadcastToGlobalBus({
+      orgId: 'org-test',
       id: 'msg-1',
       topic: 'TaskAssigned',
       senderId: 'orchestrator',
