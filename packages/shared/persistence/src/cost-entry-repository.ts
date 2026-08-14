@@ -76,6 +76,7 @@ export class CostEntryRepository {
   }
 
   async create(orgId: string, input: CreateCostEntryInput): Promise<CostEntryRecord> {
+    if (!orgId.trim()) throw new Error('Organization context required');
     return this.requireDb().costEntry.create({
       data: {
         orgId,

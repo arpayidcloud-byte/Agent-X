@@ -56,6 +56,20 @@ describe('CostEntryRepository tenant boundary', () => {
     });
   });
 
+  it('rejects empty organization identifiers before touching the database', async () => {
+    const { db, calls } = fakeDb();
+    const repo = new CostEntryRepository(db);
+
+    await expect(
+      repo.create('', {
+        provider: 'openai',
+        model: 'gpt-4o',
+        costUsd: 0.01,
+      }),
+    ).rejects.toThrow('Organization context required');
+    expect(calls.create).toHaveLength(0);
+  });
+
   it('scopes list and summary queries by organization', async () => {
     const { db, calls } = fakeDb();
     const repo = new CostEntryRepository(db);
