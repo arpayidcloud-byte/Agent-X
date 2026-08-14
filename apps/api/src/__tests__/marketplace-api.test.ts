@@ -3,7 +3,8 @@ import type { Server } from 'node:http';
 
 process.env.ENABLE_MOCK_PROVIDER = 'true';
 process.env.AUTH_ENABLED = 'false';
-process.env.NODE_ENV = 'test';
+delete process.env.NODE_ENV;
+process.env.PORT = '0';
 delete process.env.DATABASE_URL;
 
 const templates = new Map<string, Record<string, unknown>>([
@@ -53,24 +54,30 @@ const templates = new Map<string, Record<string, unknown>>([
   ],
 ]);
 
-vi.mock('@agent-xai/persistence', () => ({
-  CostEntryRepository: class {},
-  AgentTemplateRepository: class {
-    async getPublishedById(id: string) {
-      const template = templates.get(id);
-      return template?.isPublished ? template : null;
-    }
-    async listPublished() {
-      return [...templates.values()].filter((template) => template.isPublished);
-    }
-    async getFeatured() {
-      return [...templates.values()].filter((template) => template.isPublished && template.isFeatured);
-    }
-    async getCategories() {
-      return [{ category: 'coding', count: 1 }];
-    }
-  },
-}));
+vi.mock('@agent-xai/persistence', async (importOriginal) => {
+  const actual = await importOriginal();
+  return {
+    ...actual,
+    CostEntryRepository: class {},
+    AgentTemplateRepository: class {
+      async getPublishedById(id: string) {
+        const template = templates.get(id);
+        return template?.isPublished ? template : null;
+      }
+      async listPublished() {
+        return [...templates.values()].filter((template) => template.isPublished);
+      }
+      async getFeatured() {
+        return [...templates.values()].filter(
+          (template) => template.isPublished && template.isFeatured,
+        );
+      }
+      async getCategories() {
+        return [{ category: 'coding', count: 1 }];
+      }
+    },
+  };
+});
 
 const { app } = await import('../agentx-server.js');
 
