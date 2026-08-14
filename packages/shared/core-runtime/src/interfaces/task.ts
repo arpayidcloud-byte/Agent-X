@@ -143,6 +143,8 @@ export interface TaskCancellation {
  * ```
  */
 export interface TaskModel {
+  /** Tenant organization owning this task; required for persistent writes. */
+  orgId?: string;
   /** Unique identifier for the task */
   id: TaskId;
   /** The goal or objective of the task */
