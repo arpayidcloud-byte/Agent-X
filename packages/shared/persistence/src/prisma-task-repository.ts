@@ -15,6 +15,15 @@ export class PrismaTaskRepository implements ITaskRepository {
 
   async save(task: TaskModel): Promise<void> {
     if (!task.orgId?.trim()) throw new Error('Organization context required for task persistence');
+
+    const existing = await this.prisma.task.findUnique({
+      where: { id: task.id },
+      select: { orgId: true },
+    });
+    if (existing && existing.orgId !== task.orgId) {
+      throw new Error('Task organization mismatch');
+    }
+
     const data: Prisma.TaskUncheckedCreateInput = {
       id: task.id,
       goal: task.goal,
