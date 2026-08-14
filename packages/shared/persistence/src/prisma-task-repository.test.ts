@@ -21,13 +21,25 @@ function task(overrides: Partial<TaskModel> = {}): TaskModel {
 }
 
 describe('PrismaTaskRepository tenant guard', () => {
-  it('rejects a task without organization context before database access', async () => {
+  it('rejects persistence without organization context before database access', async () => {
     const upsert = vi.fn();
     const repo = new PrismaTaskRepository({ task: { upsert } } as never);
 
-    await expect(repo.save(task({ orgId: undefined }))).rejects.toThrow(
+    await expect(repo.save('   ', task({ orgId: undefined }))).rejects.toThrow(
       'Organization context required for task persistence',
     );
+    expect(upsert).not.toHaveBeenCalled();
+  });
+
+  it('rejects a task payload claiming a different organization', async () => {
+    const findUnique = vi.fn();
+    const upsert = vi.fn();
+    const repo = new PrismaTaskRepository({ task: { findUnique, upsert } } as never);
+
+    await expect(repo.save('org-a', task({ orgId: 'org-b' }))).rejects.toThrow(
+      'Task organization mismatch',
+    );
+    expect(findUnique).not.toHaveBeenCalled();
     expect(upsert).not.toHaveBeenCalled();
   });
 
@@ -36,19 +48,22 @@ describe('PrismaTaskRepository tenant guard', () => {
     const upsert = vi.fn();
     const repo = new PrismaTaskRepository({ task: { findUnique, upsert } } as never);
 
-    await expect(repo.save(task({ orgId: 'org-a' }))).rejects.toThrow('Task organization mismatch');
+    await expect(repo.save('org-a', task({ orgId: 'org-a' }))).rejects.toThrow(
+      'Task organization mismatch',
+    );
     expect(findUnique).toHaveBeenCalledWith({
       where: { id: 'task-1' },
       select: { orgId: true },
     });
     expect(upsert).not.toHaveBeenCalled();
   });
+
   it('writes the server-side organization onto persistent tasks', async () => {
     const findUnique = vi.fn().mockResolvedValue(null);
     const upsert = vi.fn().mockResolvedValue({});
     const repo = new PrismaTaskRepository({ task: { findUnique, upsert } } as never);
 
-    await repo.save(task({ orgId: 'org-a' }));
+    await repo.save('org-a', task({ orgId: undefined }));
 
     expect(upsert).toHaveBeenCalledWith(
       expect.objectContaining({

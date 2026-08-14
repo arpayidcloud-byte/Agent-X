@@ -15,11 +15,15 @@ export class InMemoryTaskRepository implements ITaskRepository {
   private tasks = new Map<string, TaskModel>();
 
   /**
-   * Saves a task to the repository.
+   * Saves a task to the repository within an organization scope.
+   * @param orgId - Authenticated organization context
    * @param task - Task model to save
    */
-  async save(task: TaskModel): Promise<void> {
-    this.tasks.set(task.id, task);
+  async save(orgId: string, task: TaskModel): Promise<void> {
+    if (!orgId.trim()) throw new Error('Organization context required for task persistence');
+    const existing = this.tasks.get(task.id);
+    if (existing && existing.orgId !== orgId) throw new Error('Task organization mismatch');
+    this.tasks.set(task.id, { ...task, orgId });
   }
 
   /**

@@ -4,8 +4,13 @@
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { TaskStatus, InMemoryTaskRepository, InMemoryEventBus, Scheduler } from '../../../packages/shared/core-runtime/src/index.js';
-import { createTestTask } from '../fixtures/test-config.js';
+import {
+  TaskStatus,
+  InMemoryTaskRepository,
+  InMemoryEventBus,
+  Scheduler,
+} from '../../../packages/shared/core-runtime/src/index.js';
+import { createTestTask, TEST_ORG_ID as ORG } from '../fixtures/test-config.js';
 
 describe('Security Tests - OWASP Top 10', () => {
   let scheduler: Scheduler;
@@ -20,7 +25,7 @@ describe('Security Tests - OWASP Top 10', () => {
   describe('A01:2021 - Broken Access Control', () => {
     it('1. Prevents unauthorized task access', async () => {
       const task = createTestTask('secure-1', 'Secure task');
-      await scheduler.enqueue(task);
+      await scheduler.enqueue(ORG, task);
 
       // Without proper auth context, should not be able to modify
       // This is a placeholder - actual auth would be in middleware
@@ -29,7 +34,7 @@ describe('Security Tests - OWASP Top 10', () => {
 
     it('2. Validates user permissions for task operations', async () => {
       const task = createTestTask('secure-2', 'Permission test');
-      await scheduler.enqueue(task);
+      await scheduler.enqueue(ORG, task);
 
       // Different users should have different access levels
       // Placeholder for RBAC validation
@@ -41,7 +46,7 @@ describe('Security Tests - OWASP Top 10', () => {
     it('3. Sensitive data is not logged', async () => {
       // Verify logs don't contain sensitive information
       const task = createTestTask('secure-3', 'Crypto test');
-      
+
       // Task should not expose secrets in metadata
       expect(task.metadata).toBeDefined();
       expect(JSON.stringify(task.metadata)).not.toMatch(/password|secret|api_key/i);
@@ -61,22 +66,22 @@ describe('Security Tests - OWASP Top 10', () => {
     it('5. Prevents SQL injection in task queries', async () => {
       const maliciousGoal = "'; DROP TABLE tasks; --";
       const task = createTestTask('secure-5', maliciousGoal);
-      
+
       // Should handle malicious input safely
-      await scheduler.enqueue(task);
-      const saved = await repo.findById('secure-5');
-      
+      await scheduler.enqueue(ORG, task);
+      const saved = await repo.findById(ORG, 'secure-5');
+
       expect(saved).toBeDefined();
       expect(saved?.goal).toBe(maliciousGoal); // Stored as-is, not executed
     });
 
     it('6. Prevents command injection in task execution', async () => {
-      const maliciousGoal = "$(rm -rf /)";
+      const maliciousGoal = '$(rm -rf /)';
       const task = createTestTask('secure-6', maliciousGoal);
-      
-      await scheduler.enqueue(task);
-      const saved = await repo.findById('secure-6');
-      
+
+      await scheduler.enqueue(ORG, task);
+      const saved = await repo.findById(ORG, 'secure-6');
+
       expect(saved?.goal).toBe(maliciousGoal);
       // Command should be treated as data, not executed
     });
@@ -92,9 +97,9 @@ describe('Security Tests - OWASP Top 10', () => {
 
       for (const input of invalidInputs) {
         const task = createTestTask(`secure-7-${input.slice(0, 10)}`, input);
-        await scheduler.enqueue(task);
-        
-        const saved = await repo.findById(task.id);
+        await scheduler.enqueue(ORG, task);
+
+        const saved = await repo.findById(ORG, task.id);
         expect(saved).toBeDefined();
         // Input should be stored safely
       }
@@ -108,12 +113,12 @@ describe('Security Tests - OWASP Top 10', () => {
       const tasks = [];
       for (let i = 0; i < 10; i++) {
         const task = createTestTask(`rate-${i}`, `Rate limit test ${i}`);
-        tasks.push(scheduler.enqueue(task));
+        tasks.push(scheduler.enqueue(ORG, task));
       }
 
       await Promise.all(tasks);
       // Should not crash under load
-      await expect(repo.getAll()).resolves.toHaveLength(10);
+      await expect(repo.getAll(ORG)).resolves.toHaveLength(10);
     });
 
     it('9. Enforces task quotas', async () => {
@@ -123,19 +128,19 @@ describe('Security Tests - OWASP Top 10', () => {
 
       for (let i = 0; i < maxTasks; i++) {
         const task = createTestTask(`quota-${i}`, `Quota test ${i}`);
-        tasks.push(scheduler.enqueue(task));
+        tasks.push(scheduler.enqueue(ORG, task));
       }
 
       await Promise.all(tasks);
       // System should handle quota gracefully
-      expect((await repo.getAll()).length).toBe(maxTasks);
+      expect((await repo.getAll(ORG)).length).toBe(maxTasks);
     });
   });
 
   describe('A05:2021 - Security Misconfiguration', () => {
     it('10. No sensitive data in error messages', async () => {
       try {
-        await scheduler.pause('nonexistent-task');
+        await scheduler.pause(ORG, 'nonexistent-task');
       } catch (error) {
         const errorMessage = (error as Error).message;
         // Error should not expose internal details
@@ -146,7 +151,7 @@ describe('Security Tests - OWASP Top 10', () => {
     it('11. Default configurations are secure', () => {
       // Verify no default passwords or keys
       const envVars = process.env;
-      
+
       expect(envVars.DEFAULT_PASSWORD).toBeUndefined();
       expect(envVars.ADMIN_SECRET).toBeUndefined();
       // Should use environment-specific configs
@@ -169,7 +174,7 @@ describe('Security Tests - OWASP Top 10', () => {
   describe('A07:2021 - Identification Failures', () => {
     it('14. Task IDs are unique and non-sequential', async () => {
       const ids = new Set<string>();
-      
+
       for (let i = 0; i < 100; i++) {
         const task = createTestTask(`id-${Math.random()}`, `ID test ${i}`);
         ids.add(task.id);
@@ -177,14 +182,14 @@ describe('Security Tests - OWASP Top 10', () => {
 
       // All IDs should be unique
       expect(ids.size).toBe(100);
-      
+
       // IDs should not be predictable (not sequential)
       const sortedIds = Array.from(ids).sort();
       const isSequential = sortedIds.every((id, i) => {
         if (i === 0) return true;
         return parseInt(id) === parseInt(sortedIds[i - 1]) + 1;
       });
-      
+
       expect(isSequential).toBe(false);
     });
   });
@@ -195,8 +200,8 @@ describe('Security Tests - OWASP Top 10', () => {
       const originalGoal = task.goal;
       const originalStatus = task.status;
 
-      await scheduler.enqueue(task);
-      const saved = await repo.findById(task.id);
+      await scheduler.enqueue(ORG, task);
+      const saved = await repo.findById(ORG, task.id);
 
       expect(saved?.goal).toBe(originalGoal);
       expect(saved?.status).toBe(originalStatus);
@@ -205,7 +210,7 @@ describe('Security Tests - OWASP Top 10', () => {
 
     it('16. Prevents unauthorized task modification', async () => {
       const task = createTestTask('integrity-2', 'Modification test');
-      await scheduler.enqueue(task);
+      await scheduler.enqueue(ORG, task);
 
       // Without proper auth, modification should fail
       // Placeholder for auth check
@@ -218,7 +223,7 @@ describe('Security Tests - OWASP Top 10', () => {
       // Placeholder for audit logging
       // Actual implementation would log security events
       const task = createTestTask('audit-1', 'Audit test');
-      await scheduler.enqueue(task);
+      await scheduler.enqueue(ORG, task);
 
       // Should create audit trail
       expect(task.createdAt).toBeDefined();
@@ -262,7 +267,7 @@ describe('Security Tests - OWASP Top 10', () => {
     it('20. Validates external service calls', () => {
       // Placeholder for external call validation
       const allowedHosts = ['api.anthropic.com', 'api.openai.com'];
-      
+
       // External calls should be to allowed hosts only
       expect(allowedHosts.length).toBeGreaterThan(0);
     });
@@ -271,7 +276,7 @@ describe('Security Tests - OWASP Top 10', () => {
   describe('Additional Security Checks', () => {
     it('21. Graceful shutdown prevents data loss', async () => {
       const task = createTestTask('shutdown-1', 'Shutdown test');
-      await scheduler.enqueue(task);
+      await scheduler.enqueue(ORG, task);
 
       // In-flight tasks should complete during shutdown
       expect(task.status).toBe(TaskStatus.QUEUED);
