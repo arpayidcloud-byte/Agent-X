@@ -31,6 +31,7 @@
     "db:migrate:prod": "prisma migrate deploy",
     "db:preflight:tenant": "tsx src/tenant-migration-preflight-cli.ts",
     "db:reconcile:tenant": "tsx src/tenant-ownership-reconciliation-cli.ts",
+    "db:evidence:tenant": "tsx src/tenant-ownership-evidence-cli.ts",
     "db:seed": "prisma db seed",
     "db:studio": "prisma studio"
   },
