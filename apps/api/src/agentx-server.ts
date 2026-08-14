@@ -143,6 +143,10 @@ export interface TaskRecord {
 export const taskStore = new Map<string, TaskRecord>();
 const chatOrgStore = new Map<string, string>();
 
+function createServerTaskId(prefix: string): string {
+  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
 function recordTask(task: TaskRecord): void {
   taskStore.set(task.id, task);
   // Cap the store to the latest 200 tasks (memory-friendly)
@@ -205,7 +209,7 @@ app.post(
   quotaMiddleware,
   async (req, res): Promise<void> => {
     try {
-      const { prompt, taskId, description, complexity, type, budget, provider } = req.body ?? {};
+      const { prompt, description, complexity, type, budget, provider } = req.body ?? {};
 
       if (!prompt || typeof prompt !== 'string') {
         res.status(400).json({ error: 'Missing required field: prompt (string)' });
@@ -213,7 +217,8 @@ app.post(
       }
 
       const request = {
-        taskId: taskId ?? `api-${Date.now()}`,
+        // Client task IDs are never trusted as resource identifiers.
+        taskId: createServerTaskId('api'),
         description: description ?? prompt.slice(0, 120),
         complexity: complexity ?? 'medium',
         type: type ?? 'reasoning',
@@ -246,7 +251,6 @@ app.post(
         // Record cost entry for persistent tracking
         try {
           await costRepo.create((req as AuthenticatedRequest).auth!.orgId!, {
-            taskId: request.taskId,
             userId: (req as AuthenticatedRequest).auth?.sub ?? undefined,
             provider: response.provider ?? 'unknown',
             model: response.model ?? 'unknown',
@@ -291,7 +295,7 @@ app.post(
   quotaMiddleware,
   async (req, res): Promise<void> => {
     try {
-      const { prompt, taskId, description, complexity, type, budget, provider } = req.body ?? {};
+      const { prompt, description, complexity, type, budget, provider } = req.body ?? {};
 
       if (!prompt || typeof prompt !== 'string') {
         res.status(400).json({ error: 'Missing required field: prompt (string)' });
@@ -300,7 +304,7 @@ app.post(
 
       const orgId = (req as AuthenticatedRequest).auth!.orgId!;
       const request = {
-        taskId: taskId ?? `stream-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        taskId: createServerTaskId('stream'),
         description: description ?? prompt.slice(0, 120),
         complexity: complexity ?? 'medium',
         type: type ?? 'reasoning',
@@ -424,7 +428,6 @@ app.post(
           // Record cost entry for persistent tracking
           try {
             await costRepo.create((req as AuthenticatedRequest).auth!.orgId!, {
-              taskId: request.taskId,
               userId: (req as AuthenticatedRequest).auth?.sub ?? undefined,
               provider: response.provider ?? 'unknown',
               model: response.model ?? 'unknown',
@@ -511,7 +514,7 @@ app.post(
   quotaMiddleware,
   async (req, res): Promise<void> => {
     try {
-      const { messages, taskId, complexity, type, budget, provider } = req.body ?? {};
+      const { messages, complexity, type, budget, provider } = req.body ?? {};
       const parsed = parseChatMessages(messages);
       if (!parsed) {
         res.status(400).json({
@@ -522,7 +525,7 @@ app.post(
       }
       const last = parsed[parsed.length - 1]!;
       const request = {
-        taskId: taskId ?? `chat-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        taskId: createServerTaskId('chat'),
         description: last.content.slice(0, 120),
         complexity: complexity ?? 'medium',
         type: type ?? 'reasoning',
@@ -535,7 +538,6 @@ app.post(
       // Record cost entry for persistent tracking
       try {
         await costRepo.create((req as AuthenticatedRequest).auth!.orgId!, {
-          taskId: request.taskId,
           userId: (req as AuthenticatedRequest).auth?.sub ?? undefined,
           provider: response.provider ?? 'unknown',
           model: response.model ?? 'unknown',
@@ -570,7 +572,7 @@ app.post(
   quotaMiddleware,
   async (req, res): Promise<void> => {
     try {
-      const { messages, taskId, complexity, type, budget, provider } = req.body ?? {};
+      const { messages, complexity, type, budget, provider } = req.body ?? {};
       const parsed = parseChatMessages(messages);
       if (!parsed) {
         res.status(400).json({
@@ -583,7 +585,7 @@ app.post(
       const chatId = `chat-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
       chatOrgStore.set(chatId, (req as AuthenticatedRequest).auth!.orgId!);
       const request = {
-        taskId: taskId ?? chatId,
+        taskId: chatId,
         description: last.content.slice(0, 120),
         complexity: complexity ?? 'medium',
         type: type ?? 'reasoning',
@@ -624,7 +626,6 @@ app.post(
           });
           try {
             await costRepo.create((req as AuthenticatedRequest).auth!.orgId!, {
-              taskId: request.taskId,
               userId: (req as AuthenticatedRequest).auth?.sub ?? undefined,
               provider: response.provider ?? 'unknown',
               model: response.model ?? 'unknown',

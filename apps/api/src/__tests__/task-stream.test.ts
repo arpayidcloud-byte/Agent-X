@@ -51,7 +51,7 @@ describe('Task stream (Web Pro SSE)', () => {
     });
     expect(res.status).toBe(202);
     const body = (await res.json()) as { taskId: string; status: string };
-    expect(body.taskId).toBe('sse-task-1');
+    expect(body.taskId).toMatch(/^stream-/);
     expect(body.status).toBe('accepted');
   });
 
@@ -109,9 +109,10 @@ describe('Task stream (Web Pro SSE)', () => {
       body: JSON.stringify({ prompt: 'store check', taskId: 'sse-task-3' }),
     });
     expect(res.status).toBe(202);
+    const { taskId } = (await res.json()) as { taskId: string };
     // Worker completes in ~300ms (2 x STAGE_DELAY_MS + execute).
     await new Promise((resolve) => setTimeout(resolve, 1000));
-    const task = taskStore.get('sse-task-3');
+    const task = taskStore.get(taskId);
     expect(task?.status).toBe('success');
     expect(task?.response).toBeTruthy();
     expect(task?.provider).toBeTruthy();

@@ -76,8 +76,36 @@ export class CostEntryRepository {
   }
 
   async create(orgId: string, input: CreateCostEntryInput): Promise<CostEntryRecord> {
-    if (!orgId.trim()) throw new Error('Organization context required');
-    return this.requireDb().costEntry.create({
+    if (!orgId || !orgId.trim()) throw new Error('Organization context required');
+
+    const db = this.requireDb();
+    if (input.taskId !== undefined && input.taskId !== null) {
+      const task = await db.task.findUnique({
+        where: { id: input.taskId },
+        select: { orgId: true },
+      });
+      if (!task || !task.orgId?.trim()) {
+        throw new Error('Task ownership could not be verified');
+      }
+      if (task.orgId !== orgId) {
+        throw new Error('Task organization mismatch');
+      }
+    }
+
+    if (input.userId !== undefined && input.userId !== null) {
+      const user = await db.user.findUnique({
+        where: { id: input.userId },
+        select: { orgId: true },
+      });
+      if (!user || !user.orgId?.trim()) {
+        throw new Error('User ownership could not be verified');
+      }
+      if (user.orgId !== orgId) {
+        throw new Error('User organization mismatch');
+      }
+    }
+
+    return db.costEntry.create({
       data: {
         orgId,
         taskId: input.taskId ?? null,
@@ -96,6 +124,7 @@ export class CostEntryRepository {
   }
 
   async list(orgId: string, limit = 100, offset = 0): Promise<CostEntryRecord[]> {
+    if (!orgId || !orgId.trim()) throw new Error('Organization context required');
     return this.requireDb().costEntry.findMany({
       where: { orgId },
       orderBy: { createdAt: 'desc' },
@@ -105,6 +134,7 @@ export class CostEntryRepository {
   }
 
   async getSummary(orgId: string, days = 30): Promise<CostSummary> {
+    if (!orgId || !orgId.trim()) throw new Error('Organization context required');
     const since = new Date();
     since.setDate(since.getDate() - days);
 
