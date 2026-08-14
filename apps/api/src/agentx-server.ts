@@ -23,6 +23,7 @@ import {
 import { generateFeedback, buildRevisionPrompt } from '@agent-xai/agent-feedback';
 import {
   maybeRequireAdmin,
+  requireOrgAdmin,
   requireAuth,
   listUsers,
   register,
@@ -697,15 +698,26 @@ app.get('/v1/agentx/chat/:id/events', requireAuth, withOrg, (req, res) => {
 // ─── Team management (Web Pro, basic) ────
 // List registered users; admin-only when AUTH_ENABLED (password hashes never
 // leave the server).
-app.get('/v1/team', maybeRequireAdmin, async (_req, res) => {
-  try {
-    const users = await listUsers();
-    res.json({ users });
-  } catch (e) {
-    const err = e instanceof Error ? e.message : String(e);
-    res.status(500).json({ error: err });
-  }
-});
+app.get(
+  '/v1/team',
+  requireAuth,
+  withOrg,
+  requireOrgAdmin,
+  async (req: AuthenticatedRequest, res) => {
+    try {
+      const orgId = req.auth?.orgId;
+      if (!orgId) {
+        res.status(403).json({ error: 'Organization context required' });
+        return;
+      }
+      const users = await listUsers(orgId);
+      res.json({ users });
+    } catch (e) {
+      const err = e instanceof Error ? e.message : String(e);
+      res.status(500).json({ error: err });
+    }
+  },
+);
 
 // ─── Admin user management ────
 // Create a new user account (admin invite)
