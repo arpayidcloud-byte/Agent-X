@@ -39,8 +39,56 @@ async function main(): Promise<void> {
       c."taskId",
       t."orgId" AS "taskOrgId",
       u."orgId" AS "userOrgId",
+      s."orgId" AS "subscriptionOrgId",
+      t.context ->> 'orgId' AS "taskContextOrgId",
+      t.metadata ->> 'orgId' AS "taskMetadataOrgId",
+      t."createdAt" AS "taskCreatedAt",
+      s."createdAt" AS "subscriptionCreatedAt",
+      c."createdAt",
       (t.id IS NOT NULL) AS "taskExists",
       (u.id IS NOT NULL) AS "userExists",
+      (s.id IS NOT NULL) AS "subscriptionExists",
+      COALESCE(
+        ARRAY(
+          SELECT DISTINCT m."orgId"
+          FROM "OrganizationMember" m
+          WHERE m."userId" = c."userId"
+            AND m."orgId" IS NOT NULL
+        ),
+        ARRAY[]::text[]
+      ) AS "memberOrgIds",
+      COALESCE(
+        (
+          SELECT jsonb_agg(
+            jsonb_build_object('orgId', m."orgId", 'createdAt', m."createdAt")
+            ORDER BY m."createdAt", m."orgId"
+          )
+          FROM "OrganizationMember" m
+          WHERE m."userId" = c."userId"
+        ),
+        '[]'::jsonb
+      ) AS "membershipEvidence",
+      COALESCE(
+        ARRAY(
+          SELECT DISTINCT e.payload ->> 'orgId'
+          FROM "Event" e
+          WHERE e."taskId" = c."taskId"
+            AND e.payload ->> 'orgId' IS NOT NULL
+        ),
+        ARRAY[]::text[]
+      ) AS "eventOrgIds",
+      COALESCE(
+        (
+          SELECT jsonb_agg(
+            jsonb_build_object('orgId', e.payload ->> 'orgId', 'createdAt', e."createdAt")
+            ORDER BY e."createdAt", e.id
+          )
+          FROM "Event" e
+          WHERE e."taskId" = c."taskId"
+            AND e.payload ->> 'orgId' IS NOT NULL
+        ),
+        '[]'::jsonb
+      ) AS "eventEvidence",
       COALESCE(
         ARRAY(
           SELECT DISTINCT related_task_id
@@ -60,6 +108,7 @@ async function main(): Promise<void> {
     FROM "CostEntry" c
     LEFT JOIN "Task" t ON t.id = c."taskId"
     LEFT JOIN "User" u ON u.id = c."userId"
+    LEFT JOIN "Subscription" s ON s.id = c."subscriptionId"
     WHERE c."orgId" IS NULL
     ORDER BY c."createdAt", c.id
   `);

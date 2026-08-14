@@ -2,8 +2,14 @@ export type EvidenceStrength = 'direct' | 'corroborative' | 'missing' | 'conflic
 export type EvidenceKind =
   | 'persisted orgId'
   | 'single organization membership'
+  | 'organization membership'
   | 'task organization'
+  | 'subscription organization'
   | 'user organization'
+  | 'task context organization'
+  | 'task metadata organization'
+  | 'event organization'
+  | 'temporal inconsistency'
   | 'historical task link'
   | 'historical user link'
   | 'missing task'
@@ -33,8 +39,19 @@ export type CostEvidenceRow = {
   taskId: string | null;
   taskOrgId: string | null;
   userOrgId: string | null;
+  subscriptionOrgId?: string | null;
+  memberOrgIds?: string[];
+  taskContextOrgId?: string | null;
+  taskMetadataOrgId?: string | null;
+  eventOrgIds?: string[];
+  taskCreatedAt?: string | Date | null;
+  subscriptionCreatedAt?: string | Date | null;
+  membershipEvidence?: Array<{ orgId: string; createdAt: string | Date }>;
+  eventEvidence?: Array<{ orgId: string; createdAt: string | Date }>;
+  createdAt?: string | Date;
   taskExists: boolean;
   userExists: boolean;
+  subscriptionExists?: boolean;
   corroboratingTaskIds: string[];
 };
 
@@ -54,6 +71,28 @@ export type TenantOwnershipEvidenceInventory = {
 
 function direct(orgId: string, kind: EvidenceKind, detail: string): OwnershipEvidence {
   return { kind, strength: 'direct', orgId, referenceId: null, detail };
+}
+
+function isAtOrBefore(
+  value: string | Date | null | undefined,
+  boundary: string | Date | null | undefined,
+): boolean {
+  if (!value || !boundary) return true;
+  return new Date(value).getTime() <= new Date(boundary).getTime();
+}
+
+function corroborative(orgId: string, kind: EvidenceKind, detail: string): OwnershipEvidence {
+  return { kind, strength: 'corroborative', orgId, referenceId: null, detail };
+}
+
+function temporalConflict(referenceId: string, detail: string): OwnershipEvidence {
+  return {
+    kind: 'temporal inconsistency',
+    strength: 'conflicting',
+    orgId: null,
+    referenceId,
+    detail,
+  };
 }
 
 function classifyUser(row: UserEvidenceRow): EvidenceInventoryRow {
@@ -106,7 +145,15 @@ function classifyUser(row: UserEvidenceRow): EvidenceInventoryRow {
 function classifyCostEntry(row: CostEvidenceRow): EvidenceInventoryRow {
   const evidence: OwnershipEvidence[] = [];
   if (row.orgId) evidence.push(direct(row.orgId, 'persisted orgId', 'CostEntry.orgId'));
-  if (row.taskId && row.taskExists && row.taskOrgId)
+  const taskOrgIsHistorical = Boolean(
+    row.taskId && row.taskExists && row.taskOrgId && isAtOrBefore(row.taskCreatedAt, row.createdAt),
+  );
+  const subscriptionOrgIsHistorical = Boolean(
+    row.subscriptionOrgId &&
+    row.subscriptionExists !== false &&
+    isAtOrBefore(row.subscriptionCreatedAt, row.createdAt),
+  );
+  if (taskOrgIsHistorical && row.taskOrgId)
     evidence.push(direct(row.taskOrgId, 'task organization', 'Task.orgId'));
   else if (row.taskId && row.taskExists)
     evidence.push({
@@ -124,6 +171,8 @@ function classifyCostEntry(row: CostEvidenceRow): EvidenceInventoryRow {
       referenceId: row.taskId,
       detail: 'CostEntry.taskId does not resolve to a Task row',
     });
+  if (row.taskId && row.taskExists && row.taskOrgId && !taskOrgIsHistorical)
+    evidence.push(temporalConflict(row.taskId, 'Task evidence was created after CostEntry'));
   if (row.userId && row.userExists && row.userOrgId)
     evidence.push(direct(row.userOrgId, 'user organization', 'User.orgId'));
   else if (row.userId && row.userExists)
@@ -142,6 +191,34 @@ function classifyCostEntry(row: CostEvidenceRow): EvidenceInventoryRow {
       referenceId: row.userId,
       detail: 'CostEntry.userId does not resolve to a User row',
     });
+  if (row.subscriptionOrgId && row.subscriptionExists !== false) {
+    if (subscriptionOrgIsHistorical)
+      evidence.push(
+        direct(row.subscriptionOrgId, 'subscription organization', 'Subscription.orgId'),
+      );
+    else
+      evidence.push(temporalConflict(row.id, 'Subscription evidence was created after CostEntry'));
+  }
+  for (const membership of row.membershipEvidence ?? []) {
+    if (isAtOrBefore(membership.createdAt, row.createdAt))
+      evidence.push(
+        corroborative(membership.orgId, 'organization membership', 'OrganizationMember.orgId'),
+      );
+    else evidence.push(temporalConflict(row.id, 'membership evidence was created after CostEntry'));
+  }
+  if (row.taskContextOrgId)
+    evidence.push(
+      corroborative(row.taskContextOrgId, 'task context organization', 'Task.context.orgId'),
+    );
+  if (row.taskMetadataOrgId)
+    evidence.push(
+      corroborative(row.taskMetadataOrgId, 'task metadata organization', 'Task.metadata.orgId'),
+    );
+  for (const event of row.eventEvidence ?? []) {
+    if (isAtOrBefore(event.createdAt, row.createdAt))
+      evidence.push(corroborative(event.orgId, 'event organization', 'Event.payload.orgId'));
+    else evidence.push(temporalConflict(row.id, 'event evidence was created after CostEntry'));
+  }
   for (const taskId of row.corroboratingTaskIds)
     evidence.push({
       kind: 'historical task link',
@@ -150,12 +227,29 @@ function classifyCostEntry(row: CostEvidenceRow): EvidenceInventoryRow {
       referenceId: taskId,
       detail: 'related historical record has matching task identifier but no organization owner',
     });
-  const orgIds = [
+  const directOrgIds = [
     ...new Set(
-      [row.orgId, row.taskOrgId, row.userOrgId].filter((orgId): orgId is string => Boolean(orgId)),
+      [
+        row.orgId,
+        taskOrgIsHistorical ? row.taskOrgId : null,
+        row.userOrgId,
+        subscriptionOrgIsHistorical ? row.subscriptionOrgId : null,
+      ].filter((orgId): orgId is string => Boolean(orgId)),
     ),
   ];
-  if (orgIds.length > 1) {
+  const corroborativeOrgIds = [
+    row.taskContextOrgId,
+    row.taskMetadataOrgId,
+    ...(row.memberOrgIds ?? []),
+    ...(row.eventOrgIds ?? []),
+  ].filter((orgId): orgId is string => Boolean(orgId));
+  const corroborationConflicts =
+    directOrgIds.length > 0 && corroborativeOrgIds.some((orgId) => !directOrgIds.includes(orgId));
+  if (
+    directOrgIds.length > 1 ||
+    corroborationConflicts ||
+    evidence.some((item) => item.strength === 'conflicting')
+  ) {
     evidence.push({
       kind: 'no ownership evidence',
       strength: 'conflicting',
@@ -165,8 +259,8 @@ function classifyCostEntry(row: CostEvidenceRow): EvidenceInventoryRow {
     });
     return { id: row.id, classification: 'ambiguous', proposedOrgId: null, evidence };
   }
-  if (orgIds.length === 1)
-    return { id: row.id, classification: 'resolved', proposedOrgId: orgIds[0]!, evidence };
+  if (directOrgIds.length === 1)
+    return { id: row.id, classification: 'resolved', proposedOrgId: directOrgIds[0]!, evidence };
   if (evidence.length === 0)
     evidence.push({
       kind: 'no ownership evidence',

@@ -87,8 +87,19 @@ describe('tenant ownership evidence inventory', () => {
           taskId: 't-1',
           taskOrgId: 'org-2',
           userOrgId: 'org-1',
+          subscriptionOrgId: null,
+          memberOrgIds: [],
+          taskContextOrgId: null,
+          taskMetadataOrgId: null,
+          eventOrgIds: [],
+          taskCreatedAt: null,
+          subscriptionCreatedAt: null,
+          membershipEvidence: [],
+          eventEvidence: [],
+          createdAt: '2026-08-01T00:00:00.000Z',
           taskExists: true,
           userExists: true,
+          subscriptionExists: false,
           corroboratingTaskIds: [],
         },
       ],
@@ -101,6 +112,89 @@ describe('tenant ownership evidence inventory', () => {
     });
     expect(report.costEntries[0]?.evidence).toContainEqual(
       expect.objectContaining({ strength: 'conflicting' }),
+    );
+  });
+
+  it('uses subscription ownership as direct evidence and records corroborating history', () => {
+    const report = buildTenantOwnershipEvidenceInventory({
+      users: [],
+      costEntries: [
+        {
+          id: 'c-1',
+          orgId: null,
+          userId: 'u-1',
+          taskId: 't-1',
+          taskOrgId: null,
+          userOrgId: null,
+          subscriptionOrgId: 'org-1',
+          memberOrgIds: ['org-1'],
+          taskContextOrgId: 'org-1',
+          taskMetadataOrgId: null,
+          eventOrgIds: ['org-1'],
+          taskCreatedAt: '2026-07-31T00:00:00.000Z',
+          subscriptionCreatedAt: '2026-07-31T00:00:00.000Z',
+          membershipEvidence: [{ orgId: 'org-1', createdAt: '2026-07-31T00:00:00.000Z' }],
+          eventEvidence: [{ orgId: 'org-1', createdAt: '2026-07-31T00:00:00.000Z' }],
+          createdAt: '2026-08-01T00:00:00.000Z',
+          taskExists: true,
+          userExists: true,
+          subscriptionExists: true,
+          corroboratingTaskIds: [],
+        },
+      ],
+    });
+
+    expect(report.readyForBackfill).toBe(true);
+    expect(report.costEntries[0]).toMatchObject({
+      classification: 'resolved',
+      proposedOrgId: 'org-1',
+    });
+    expect(report.costEntries[0]?.evidence).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ kind: 'subscription organization', strength: 'direct' }),
+        expect.objectContaining({ kind: 'task context organization', strength: 'corroborative' }),
+        expect.objectContaining({ kind: 'organization membership', strength: 'corroborative' }),
+        expect.objectContaining({ kind: 'event organization', strength: 'corroborative' }),
+      ]),
+    );
+  });
+
+  it('fails closed when the only direct evidence is created after the cost entry', () => {
+    const report = buildTenantOwnershipEvidenceInventory({
+      users: [],
+      costEntries: [
+        {
+          id: 'c-1',
+          orgId: null,
+          userId: null,
+          taskId: 't-1',
+          taskOrgId: null,
+          userOrgId: null,
+          subscriptionOrgId: 'org-1',
+          memberOrgIds: [],
+          taskContextOrgId: null,
+          taskMetadataOrgId: null,
+          eventOrgIds: [],
+          taskCreatedAt: null,
+          subscriptionCreatedAt: '2026-08-02T00:00:00.000Z',
+          membershipEvidence: [],
+          eventEvidence: [],
+          createdAt: '2026-08-01T00:00:00.000Z',
+          taskExists: false,
+          userExists: false,
+          subscriptionExists: true,
+          corroboratingTaskIds: [],
+        },
+      ],
+    });
+
+    expect(report.readyForBackfill).toBe(false);
+    expect(report.costEntries[0]).toMatchObject({
+      classification: 'ambiguous',
+      proposedOrgId: null,
+    });
+    expect(report.costEntries[0]?.evidence).toContainEqual(
+      expect.objectContaining({ kind: 'temporal inconsistency', strength: 'conflicting' }),
     );
   });
 });
