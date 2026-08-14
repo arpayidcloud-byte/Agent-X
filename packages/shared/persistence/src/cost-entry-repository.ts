@@ -93,15 +93,12 @@ export class CostEntryRepository {
     }
 
     if (input.userId !== undefined && input.userId !== null) {
-      const user = await db.user.findUnique({
-        where: { id: input.userId },
-        select: { orgId: true },
+      const membership = await db.organizationMember.findFirst({
+        where: { userId: input.userId, orgId },
+        select: { id: true },
       });
-      if (!user || !user.orgId?.trim()) {
+      if (!membership) {
         throw new Error('User ownership could not be verified');
-      }
-      if (user.orgId !== orgId) {
-        throw new Error('User organization mismatch');
       }
     }
 

@@ -19,12 +19,19 @@ const entry = {
   createdAt: new Date('2026-01-01T00:00:00Z'),
 };
 
-function fakeDb(options: { taskOrgId?: string | null; userOrgId?: string | null } = {}) {
+function fakeDb(
+  options: {
+    taskOrgId?: string | null;
+    userOrgId?: string | null;
+    memberOrgId?: string | null;
+  } = {},
+) {
   const calls = {
     create: [] as unknown[],
     findMany: [] as unknown[],
     taskFindUnique: [] as unknown[],
     userFindUnique: [] as unknown[],
+    memberFindFirst: [] as unknown[],
   };
   const db = {
     costEntry: {
@@ -47,6 +54,13 @@ function fakeDb(options: { taskOrgId?: string | null; userOrgId?: string | null 
       findUnique: async (args: unknown) => {
         calls.userFindUnique.push(args);
         return options.userOrgId !== undefined ? { id: 'user-1', orgId: options.userOrgId } : null;
+      },
+    },
+    organizationMember: {
+      findFirst: async (args: unknown) => {
+        calls.memberFindFirst.push(args);
+        const where = args as { where?: { orgId?: string } };
+        return where.where?.orgId === options.memberOrgId ? { id: 'membership-1' } : null;
       },
     },
   } as unknown as PrismaClient;
@@ -114,11 +128,11 @@ describe('CostEntryRepository tenant boundary', () => {
         model: 'gpt-4o',
         costUsd: 0.01,
       }),
-    ).rejects.toThrow('User organization mismatch');
+    ).rejects.toThrow('User ownership could not be verified');
     expect(calls.create).toHaveLength(0);
-    expect(calls.userFindUnique[0]).toMatchObject({
-      where: { id: 'user-1' },
-      select: { orgId: true },
+    expect(calls.memberFindFirst[0]).toMatchObject({
+      where: { userId: 'user-1', orgId: 'org-a' },
+      select: { id: true },
     });
   });
 
@@ -167,23 +181,40 @@ describe('CostEntryRepository tenant boundary', () => {
     expect(calls.create).toHaveLength(0);
   });
 
-  it('rejects a user with null organization ownership evidence', async () => {
-    const { db, calls } = fakeDb({ userOrgId: null });
+  it('accepts a user whose primary organization is null when active membership matches', async () => {
+    const { db, calls } = fakeDb({ userOrgId: null, memberOrgId: 'org-a' });
     const repo = new CostEntryRepository(db);
 
-    await expect(
-      repo.create('org-a', {
-        userId: 'user-1',
-        provider: 'openai',
-        model: 'gpt-4o',
-        costUsd: 0.01,
-      }),
-    ).rejects.toThrow('User ownership could not be verified');
-    expect(calls.create).toHaveLength(0);
+    await repo.create('org-a', {
+      userId: 'user-1',
+      provider: 'openai',
+      model: 'gpt-4o',
+      costUsd: 0.01,
+    });
+
+    expect(calls.create).toHaveLength(1);
+    expect(calls.memberFindFirst[0]).toMatchObject({
+      where: { userId: 'user-1', orgId: 'org-a' },
+      select: { id: true },
+    });
   });
 
-  it('rejects a user with empty organization ownership evidence', async () => {
-    const { db, calls } = fakeDb({ userOrgId: '   ' });
+  it('accepts a user when active membership differs from the primary organization', async () => {
+    const { db, calls } = fakeDb({ userOrgId: 'org-a', memberOrgId: 'org-b' });
+    const repo = new CostEntryRepository(db);
+
+    await repo.create('org-b', {
+      userId: 'user-1',
+      provider: 'openai',
+      model: 'gpt-4o',
+      costUsd: 0.01,
+    });
+
+    expect(calls.create).toHaveLength(1);
+  });
+
+  it('rejects a user without membership in the active organization', async () => {
+    const { db, calls } = fakeDb({ userOrgId: 'org-a', memberOrgId: null });
     const repo = new CostEntryRepository(db);
 
     await expect(
@@ -198,7 +229,7 @@ describe('CostEntryRepository tenant boundary', () => {
   });
 
   it('verifies both optional parents before creating the cost entry', async () => {
-    const { db, calls } = fakeDb({ taskOrgId: 'org-a', userOrgId: 'org-a' });
+    const { db, calls } = fakeDb({ taskOrgId: 'org-a', userOrgId: 'org-a', memberOrgId: 'org-a' });
     const repo = new CostEntryRepository(db);
 
     await repo.create('org-a', {
@@ -213,9 +244,9 @@ describe('CostEntryRepository tenant boundary', () => {
       where: { id: 'task-1' },
       select: { orgId: true },
     });
-    expect(calls.userFindUnique[0]).toMatchObject({
-      where: { id: 'user-1' },
-      select: { orgId: true },
+    expect(calls.memberFindFirst[0]).toMatchObject({
+      where: { userId: 'user-1', orgId: 'org-a' },
+      select: { id: true },
     });
     expect(calls.create).toHaveLength(1);
   });
