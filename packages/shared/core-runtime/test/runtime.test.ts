@@ -49,6 +49,7 @@ const mockResolver = mockCredentialResolver;
 
 const createMockTask = (id: string, status = TaskStatus.CREATED): TaskModel => ({
   id,
+  orgId: 'org-1',
   goal: 'test goal',
   status,
   priority: TaskPriority.NORMAL,
@@ -394,9 +395,13 @@ describe('Scheduler', () => {
       save: async (task) => {
         tasks.set(task.id, task);
       },
-      findById: async (id) => tasks.get(id),
-      findByRootId: async (rootId) =>
-        Array.from(tasks.values()).filter((t) => t.rootTaskId === rootId),
+      findById: async (orgId, id) => {
+        const task = tasks.get(id);
+        return task?.orgId === orgId ? task : undefined;
+      },
+      findByRootId: async (orgId, rootId) =>
+        Array.from(tasks.values()).filter((t) => t.orgId === orgId && t.rootTaskId === rootId),
+      getAll: async (orgId) => Array.from(tasks.values()).filter((t) => t.orgId === orgId),
     };
     scheduler = new Scheduler(bus, repo, { maxParallelAgents: 1 });
   });
@@ -408,15 +413,15 @@ describe('Scheduler', () => {
     await scheduler.enqueue(t1);
     await scheduler.enqueue(t2);
 
-    const saved1 = await repo.findById('t1');
-    const saved2 = await repo.findById('t2');
+    const saved1 = await repo.findById('org-1', 't1');
+    const saved2 = await repo.findById('org-1', 't2');
 
     expect(saved1?.status).toBe(TaskStatus.RUNNING);
     expect(saved2?.status).toBe(TaskStatus.QUEUED);
 
     await scheduler.completeTask('t1', { status: 'ok' });
-    const saved1Post = await repo.findById('t1');
-    const saved2Post = await repo.findById('t2');
+    const saved1Post = await repo.findById('org-1', 't1');
+    const saved2Post = await repo.findById('org-1', 't2');
 
     expect(saved1Post?.status).toBe(TaskStatus.COMPLETED);
     expect(saved2Post?.status).toBe(TaskStatus.RUNNING);
@@ -425,7 +430,7 @@ describe('Scheduler', () => {
   it('enqueues tasks with FAILED and RETRYING status', async () => {
     const tFailed = createMockTask('t-failed', TaskStatus.FAILED);
     await scheduler.enqueue(tFailed);
-    const savedFailed = await repo.findById('t-failed');
+    const savedFailed = await repo.findById('org-1', 't-failed');
     // Task transitions QUEUED -> RUNNING immediately since maxParallel allows it
     expect(savedFailed?.status).toBe(TaskStatus.RUNNING);
 
@@ -433,7 +438,7 @@ describe('Scheduler', () => {
 
     const tRetrying = createMockTask('t-retrying', TaskStatus.RETRYING);
     await scheduler.enqueue(tRetrying);
-    const savedRetrying = await repo.findById('t-retrying');
+    const savedRetrying = await repo.findById('org-1', 't-retrying');
     expect(savedRetrying?.status).toBe(TaskStatus.RUNNING);
   });
 
@@ -441,43 +446,55 @@ describe('Scheduler', () => {
     const t = createMockTask('t1');
     await scheduler.enqueue(t);
 
-    await scheduler.pause('t1');
-    const paused = await repo.findById('t1');
+    await scheduler.pause('org-1', 't1');
+    const paused = await repo.findById('org-1', 't1');
     expect(paused?.status).toBe(TaskStatus.WAITING_APPROVAL);
 
-    await scheduler.resume('t1');
-    const resumed = await repo.findById('t1');
+    await scheduler.resume('org-1', 't1');
+    const resumed = await repo.findById('org-1', 't1');
     expect(resumed?.status).toBe(TaskStatus.RUNNING);
 
-    await scheduler.cancel('t1', 'test cancellation');
-    const cancelled = await repo.findById('t1');
+    await scheduler.cancel('org-1', 't1', 'test cancellation');
+    const cancelled = await repo.findById('org-1', 't1');
     expect(cancelled?.status).toBe(TaskStatus.CANCELLED);
     expect(cancelled?.cancellation?.reason).toBe('test cancellation');
+  });
+
+  it('does not allow another organization to control an in-flight task', async () => {
+    const t = createMockTask('tenant-task');
+    await scheduler.enqueue(t);
+
+    await expect(scheduler.pause('org-b', 'tenant-task')).rejects.toThrow(TaskNotFoundError);
+    await expect(scheduler.cancel('org-b', 'tenant-task', 'cross-tenant')).rejects.toThrow(
+      TaskNotFoundError,
+    );
+    expect((await repo.findById('org-1', 'tenant-task'))?.status).toBe(TaskStatus.RUNNING);
+    expect(await scheduler.getTask('org-b', 'tenant-task')).toBeUndefined();
   });
 
   it('handles task failure', async () => {
     const t = createMockTask('t1');
     await scheduler.enqueue(t);
     await scheduler.failTask('t1', { message: 'failed' });
-    const failed = await repo.findById('t1');
+    const failed = await repo.findById('org-1', 't1');
     expect(failed?.status).toBe(TaskStatus.FAILED);
   });
 
   it('throws TaskNotFoundError when targeting invalid task', async () => {
-    await expect(scheduler.pause('missing')).rejects.toThrow(TaskNotFoundError);
-    await scheduler.resume('missing');
-    await expect(scheduler.cancel('missing', 'reason')).rejects.toThrow(TaskNotFoundError);
+    await expect(scheduler.pause('org-1', 'missing')).rejects.toThrow(TaskNotFoundError);
+    await scheduler.resume('org-1', 'missing');
+    await expect(scheduler.cancel('org-1', 'missing', 'reason')).rejects.toThrow(TaskNotFoundError);
   });
 
   it('triggers catch blocks in scheduler operations', async () => {
     // Force findById to throw to trigger catch blocks
-    repo.findById = async () => {
+    repo.findById = async (_orgId, _id) => {
       throw new Error('db failure');
     };
-    await expect(scheduler.pause('missing')).rejects.toThrow('db failure');
+    await expect(scheduler.pause('org-1', 'missing')).rejects.toThrow('db failure');
     (scheduler as unknown as { pausedTasks: Set<string> }).pausedTasks.add('missing');
-    await expect(scheduler.resume('missing')).rejects.toThrow('db failure');
-    await expect(scheduler.cancel('missing', 'reason')).rejects.toThrow('db failure');
+    await expect(scheduler.resume('org-1', 'missing')).rejects.toThrow('db failure');
+    await expect(scheduler.cancel('org-1', 'missing', 'reason')).rejects.toThrow('db failure');
 
     // Force save to throw
     repo.save = async () => {
@@ -513,7 +530,7 @@ describe('Scheduler', () => {
   it('resumes gracefully if task not found in pausedTasks but missing from repo', async () => {
     // Manually inject invalid state into scheduler
     (scheduler as unknown as { pausedTasks: Set<string> }).pausedTasks.add('missing-in-db');
-    await expect(scheduler.resume('missing-in-db')).rejects.toThrow(TaskNotFoundError);
+    await expect(scheduler.resume('org-1', 'missing-in-db')).rejects.toThrow(TaskNotFoundError);
   });
 });
 

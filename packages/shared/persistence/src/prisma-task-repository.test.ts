@@ -57,4 +57,27 @@ describe('PrismaTaskRepository tenant guard', () => {
       }),
     );
   });
+
+  it('scopes reads by organization', async () => {
+    const findUnique = vi.fn().mockResolvedValue(null);
+    const findMany = vi.fn().mockResolvedValue([]);
+    const repo = new PrismaTaskRepository({ task: { findUnique, findMany } } as never);
+
+    await repo.findById('org-a', 'task-1');
+    await repo.findByRootId('org-a', 'root-1');
+    await repo.getAll('org-a');
+
+    expect(findUnique).toHaveBeenCalledWith({
+      where: { id: 'task-1', orgId: 'org-a' },
+      include: { events: true },
+    });
+    expect(findMany).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({ where: { rootTaskId: 'root-1', orgId: 'org-a' } }),
+    );
+    expect(findMany).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({ where: { orgId: 'org-a' } }),
+    );
+  });
 });

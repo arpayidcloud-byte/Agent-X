@@ -106,11 +106,11 @@ export class Scheduler implements IScheduler {
    * @param taskId - ID of the task to pause
    * @throws TaskNotFoundError if task doesn't exist
    */
-  public async pause(taskId: string): Promise<void> {
+  public async pause(orgId: string, taskId: string): Promise<void> {
     const span = this.tracer.startSpan('scheduler-pause');
     span.setAttribute('task.id', taskId);
     try {
-      const task = this.inFlightTasks.get(taskId) || (await this.taskRepo.findById(taskId));
+      const task = await this.taskRepo.findById(orgId, taskId);
       if (!task) throw new TaskNotFoundError(taskId);
 
       this.pausedTasks.add(taskId);
@@ -134,14 +134,14 @@ export class Scheduler implements IScheduler {
    * @param taskId - ID of the task to resume
    * @throws TaskNotFoundError if task doesn't exist
    */
-  public async resume(taskId: string): Promise<void> {
+  public async resume(orgId: string, taskId: string): Promise<void> {
     const span = this.tracer.startSpan('scheduler-resume');
     span.setAttribute('task.id', taskId);
     try {
       if (!this.pausedTasks.has(taskId)) return;
       this.pausedTasks.delete(taskId);
 
-      const task = this.inFlightTasks.get(taskId) || (await this.taskRepo.findById(taskId));
+      const task = await this.taskRepo.findById(orgId, taskId);
       if (!task) throw new TaskNotFoundError(taskId);
 
       if (task.status === TaskStatus.WAITING_APPROVAL) {
@@ -166,11 +166,11 @@ export class Scheduler implements IScheduler {
    * @param reason - Reason for cancellation
    * @throws TaskNotFoundError if task doesn't exist
    */
-  public async cancel(taskId: string, reason: string): Promise<void> {
+  public async cancel(orgId: string, taskId: string, reason: string): Promise<void> {
     const span = this.tracer.startSpan('scheduler-cancel');
     span.setAttribute('task.id', taskId);
     try {
-      const task = this.inFlightTasks.get(taskId) || (await this.taskRepo.findById(taskId));
+      const task = await this.taskRepo.findById(orgId, taskId);
       if (!task) throw new TaskNotFoundError(taskId);
 
       task.cancellation = {
@@ -319,7 +319,9 @@ export class Scheduler implements IScheduler {
    * @param taskId - ID of the task to retrieve
    * @returns Task model if found, undefined otherwise
    */
-  public async getTask(taskId: string): Promise<TaskModel | undefined> {
-    return this.inFlightTasks.get(taskId) || (await this.taskRepo.findById(taskId));
+  public async getTask(orgId: string, taskId: string): Promise<TaskModel | undefined> {
+    const task = this.inFlightTasks.get(taskId);
+    if (task) return task.orgId === orgId ? task : undefined;
+    return this.taskRepo.findById(orgId, taskId);
   }
 }

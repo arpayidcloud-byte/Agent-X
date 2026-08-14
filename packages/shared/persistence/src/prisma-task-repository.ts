@@ -50,24 +50,28 @@ export class PrismaTaskRepository implements ITaskRepository {
     });
   }
 
-  async findById(id: string): Promise<TaskModel | undefined> {
+  async findById(orgId: string, id: string): Promise<TaskModel | undefined> {
+    if (!orgId.trim()) return undefined;
     const task = await this.prisma.task.findUnique({
-      where: { id },
+      where: { id, orgId },
       include: { events: true },
     });
     return task ? this.toTaskModel(task) : undefined;
   }
 
-  async findByRootId(rootId: string): Promise<TaskModel[]> {
+  async findByRootId(orgId: string, rootId: string): Promise<TaskModel[]> {
+    if (!orgId.trim()) return [];
     const tasks = await this.prisma.task.findMany({
-      where: { rootTaskId: rootId },
+      where: { rootTaskId: rootId, orgId },
       orderBy: { createdAt: 'asc' },
     });
     return tasks.map((t: Record<string, unknown>) => this.toTaskModel(t));
   }
 
-  async getAll(): Promise<TaskModel[]> {
+  async getAll(orgId: string): Promise<TaskModel[]> {
+    if (!orgId.trim()) return [];
     const tasks = await this.prisma.task.findMany({
+      where: { orgId },
       orderBy: { createdAt: 'desc' },
     });
     return tasks.map((t: Record<string, unknown>) => this.toTaskModel(t));
