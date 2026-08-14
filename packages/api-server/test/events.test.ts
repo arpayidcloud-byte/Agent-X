@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { createApiServer } from '../src/index.js';
 import type { FastifyInstance } from 'fastify';
 
-describe('Legacy task routes', () => {
+describe('Legacy event route', () => {
   let server: FastifyInstance;
 
   beforeAll(async () => {
@@ -21,21 +21,11 @@ describe('Legacy task routes', () => {
     await server.close();
   });
 
-  it.each([
-    ['POST', '/api/v1/tasks'],
-    ['GET', '/api/v1/tasks'],
-    ['GET', '/api/v1/tasks/task-123'],
-    ['POST', '/api/v1/tasks/task-123/cancel'],
-  ])('%s %s fails closed without tenant-aware auth', async (method, url) => {
+  it('fails closed without tenant-aware event context', async () => {
     const response = await server.inject({
-      method: method as 'GET' | 'POST',
-      url,
-      headers: {
-        authorization: 'Bearer test-api-key',
-        'content-type': 'application/json',
-      },
-      payload:
-        method === 'POST' ? (url === '/api/v1/tasks' ? { goal: 'legacy task' } : {}) : undefined,
+      method: 'GET',
+      url: '/api/v1/events',
+      headers: { authorization: 'Bearer test-api-key' },
     });
 
     expect(response.statusCode).toBe(410);

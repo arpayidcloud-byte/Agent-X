@@ -8,6 +8,10 @@ export async function createEventRoutes(fastify: FastifyInstance) {
         description: 'Stream events via SSE',
         tags: ['events'],
         response: {
+          410: {
+            type: 'object',
+            properties: { error: { type: 'string' } },
+          },
           200: {
             type: 'object',
             properties: {
@@ -28,26 +32,10 @@ export async function createEventRoutes(fastify: FastifyInstance) {
         },
       },
     },
-    async (request: FastifyRequest, reply: FastifyReply) => {
-      const response = reply.raw;
-      response.writeHead(200, {
-        'Content-Type': 'text/event-stream',
-        'Cache-Control': 'no-cache',
-        Connection: 'keep-alive',
+    async (_request: FastifyRequest, reply: FastifyReply) => {
+      return reply.code(410).send({
+        error: 'Legacy event API disabled: tenant-aware API required',
       });
-
-      let id = 0;
-      const heartbeat = () => {
-        response.write(
-          `id: ${id++}\nevent: heartbeat\ndata: ${JSON.stringify({
-            type: 'heartbeat',
-            timestamp: new Date().toISOString(),
-          })}\n\n`,
-        );
-      };
-      heartbeat();
-      const interval = setInterval(heartbeat, 5000);
-      request.raw.on('close', () => clearInterval(interval));
     },
   );
 }
