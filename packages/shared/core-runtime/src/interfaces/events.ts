@@ -25,6 +25,8 @@ import type { TaskId } from './task.js';
  * ```
  */
 export interface EventEnvelope<T = unknown> {
+  /** Authenticated organization owning this event. */
+  orgId: string;
   /** Unique event identifier for idempotency and deduplication */
   id: string;
   /** The topic this event belongs to */
@@ -112,6 +114,7 @@ export interface IEventBus {
    * @param metadata - Optional additional metadata
    */
   publish<T>(
+    orgId: string,
     topic: string,
     payload: T,
     traceId: string,
@@ -126,14 +129,18 @@ export interface IEventBus {
    * @param topic - The topic to subscribe to
    * @param handler - Async callback invoked for each matching event
    */
-  subscribe<T>(topic: string, handler: (event: EventEnvelope<T>) => Promise<void>): Promise<void>;
+  subscribe<T>(
+    orgId: string,
+    topic: string,
+    handler: (event: EventEnvelope<T>) => Promise<void>,
+  ): Promise<void>;
 
   /**
    * Unsubscribe from a topic, removing all handlers.
    *
    * @param topic - The topic to unsubscribe from
    */
-  unsubscribe(topic: string): Promise<void>;
+  unsubscribe(orgId: string, topic: string): Promise<void>;
 
   /**
    * Send a request and wait for a correlated response (request/reply pattern).
@@ -148,6 +155,7 @@ export interface IEventBus {
    * @throws Will throw if the timeout is exceeded
    */
   request<TReq, TRes>(
+    orgId: string,
     topic: string,
     payload: TReq,
     traceId: string,
@@ -163,6 +171,7 @@ export interface IEventBus {
    * @param handler - Async callback that processes the request and returns a response
    */
   reply<TReq, TRes>(
+    orgId: string,
     topic: string,
     handler: (event: EventEnvelope<TReq>) => Promise<TRes>,
   ): Promise<void>;
@@ -175,5 +184,5 @@ export interface IEventBus {
    * @param payload - The event payload
    * @param traceId - Distributed tracing identifier
    */
-  broadcast<T>(topic: string, payload: T, traceId: string): Promise<void>;
+  broadcast<T>(orgId: string, topic: string, payload: T, traceId: string): Promise<void>;
 }

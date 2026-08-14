@@ -166,8 +166,13 @@ export class LLMMetrics {
     this.llmProviderHealth.set({ provider, org_id: orgLabel(orgId) }, healthy ? 1 : 0);
   }
 
-  async getMetrics(): Promise<string> {
-    return await this.registry.metrics();
+  async getMetrics(orgId?: string): Promise<string> {
+    const metrics = await this.registry.metrics();
+    if (!orgId) return metrics;
+    return `${metrics
+      .split('\n')
+      .filter((line) => !line.includes('org_id=') || line.includes(`org_id="${orgId}"`))
+      .join('\n')}`;
   }
 
   getRegistry(): Registry {

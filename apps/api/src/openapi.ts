@@ -55,12 +55,15 @@ export const openApiSpec: OpenAPIV3.Document = {
     '/metrics': {
       get: {
         tags: ['Health'],
-        summary: 'Prometheus metrics',
+        summary: 'Prometheus metrics for the authenticated organization',
+        security: [{ BearerAuth: [] }],
         responses: {
           200: {
-            description: 'Metrics text',
+            description: 'Metrics text scoped to the authenticated organization',
             content: { 'text/plain': { schema: { type: 'string' } } },
           },
+          401: { description: 'Missing or invalid bearer token' },
+          403: { description: 'Authenticated user has no organization' },
         },
       },
     },

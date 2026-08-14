@@ -51,7 +51,7 @@ export class PlanningEngine implements IPlanningEngine {
     };
 
     this.updateMetrics(plan, true);
-    await this.eventBus.publish('plan.created', plan, `trace_${plan.id}`);
+    await this.eventBus.publish('system', 'plan.created', plan, `trace_${plan.id}`);
 
     return plan;
   }
@@ -66,7 +66,7 @@ export class PlanningEngine implements IPlanningEngine {
     };
 
     this.metrics.totalPlansOptimized++;
-    await this.eventBus.publish('plan.optimized', optimized, `trace_${optimized.id}`);
+    await this.eventBus.publish('system', 'plan.optimized', optimized, `trace_${optimized.id}`);
     return optimized;
   }
 

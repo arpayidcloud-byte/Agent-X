@@ -115,7 +115,13 @@ export class Scheduler implements IScheduler {
       ) {
         task = { ...TaskStateMachine.transition(task, TaskStatus.QUEUED), orgId: org };
         await this.taskRepo.save(org, task);
-        await this.eventBus.publish(EventTopic.TASK_QUEUED, task, task.traceId, task.id);
+        await this.eventBus.publish(
+          task.orgId ?? '',
+          EventTopic.TASK_QUEUED,
+          task,
+          task.traceId,
+          task.id,
+        );
 
         this.inFlightTasks.set(tenantKey(org, task.id), task);
         this.metrics.counter('tasks_enqueued', 1, { status: task.status });
@@ -149,7 +155,13 @@ export class Scheduler implements IScheduler {
       if (task.status === TaskStatus.RUNNING) {
         task.status = TaskStatus.WAITING_APPROVAL;
         await this.taskRepo.save(org, task);
-        await this.eventBus.publish(EventTopic.TASK_WAITING_APPROVAL, task, task.traceId, task.id);
+        await this.eventBus.publish(
+          task.orgId ?? '',
+          EventTopic.TASK_WAITING_APPROVAL,
+          task,
+          task.traceId,
+          task.id,
+        );
       }
       span.setStatus({ code: 0 });
     } catch (e: unknown) {
@@ -182,7 +194,13 @@ export class Scheduler implements IScheduler {
       if (task.status === TaskStatus.WAITING_APPROVAL) {
         task.status = TaskStatus.RUNNING;
         await this.taskRepo.save(org, task);
-        await this.eventBus.publish(EventTopic.TASK_STARTED, task, task.traceId, task.id);
+        await this.eventBus.publish(
+          task.orgId ?? '',
+          EventTopic.TASK_STARTED,
+          task,
+          task.traceId,
+          task.id,
+        );
         await this.dispatch();
       }
       span.setStatus({ code: 0 });
@@ -218,7 +236,13 @@ export class Scheduler implements IScheduler {
       task.status = TaskStatus.CANCELLED;
       task.updatedAt = new Date();
       await this.taskRepo.save(org, task);
-      await this.eventBus.publish(EventTopic.TASK_CANCELLED, task, task.traceId, task.id);
+      await this.eventBus.publish(
+        task.orgId ?? '',
+        EventTopic.TASK_CANCELLED,
+        task,
+        task.traceId,
+        task.id,
+      );
 
       const key = tenantKey(org, taskId);
       this.inFlightTasks.delete(key);
@@ -250,7 +274,13 @@ export class Scheduler implements IScheduler {
         task.status = TaskStatus.RUNNING;
         this.activeCount++;
         await this.taskRepo.save(org, task);
-        await this.eventBus.publish(EventTopic.TASK_STARTED, task, task.traceId, task.id);
+        await this.eventBus.publish(
+          task.orgId ?? '',
+          EventTopic.TASK_STARTED,
+          task,
+          task.traceId,
+          task.id,
+        );
 
         // Execute agent if registry is configured
         if (this.agentRegistry && task.assignedAgentRole) {
@@ -309,7 +339,13 @@ export class Scheduler implements IScheduler {
       task.status = TaskStatus.COMPLETED;
       task.updatedAt = new Date();
       await this.taskRepo.save(org, task);
-      await this.eventBus.publish(EventTopic.TASK_COMPLETED, task, task.traceId, task.id);
+      await this.eventBus.publish(
+        task.orgId ?? '',
+        EventTopic.TASK_COMPLETED,
+        task,
+        task.traceId,
+        task.id,
+      );
 
       this.inFlightTasks.delete(key);
       this.activeCount--;
@@ -343,7 +379,13 @@ export class Scheduler implements IScheduler {
       task.status = TaskStatus.FAILED;
       task.updatedAt = new Date();
       await this.taskRepo.save(org, task);
-      await this.eventBus.publish(EventTopic.TASK_FAILED, task, task.traceId, task.id);
+      await this.eventBus.publish(
+        task.orgId ?? '',
+        EventTopic.TASK_FAILED,
+        task,
+        task.traceId,
+        task.id,
+      );
 
       this.inFlightTasks.delete(key);
       this.activeCount--;

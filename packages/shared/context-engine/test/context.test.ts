@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import {
   ContextEngine,
   SimpleTokenEstimator,
@@ -23,19 +23,19 @@ describe('Context Engine', () => {
   });
 
   it('creates and updates contexts correctly', async () => {
-    const ctx = await engine.createContext('global', { foo: 'bar' });
+    const ctx = await engine.createContext('org-test', 'global', { foo: 'bar' });
     expect(ctx.id).toBeDefined();
     expect(ctx.scope).toBe('global');
     expect(ctx.data.foo).toBe('bar');
 
-    const updated = await engine.updateContext(ctx.id, { hello: 'world' });
+    const updated = await engine.updateContext('org-test', ctx.id, { hello: 'world' });
     expect(updated.version).toBe(2);
     expect(updated.data.hello).toBe('world');
     expect(updated.data.foo).toBe('bar');
   });
 
   it('retrieves and validates context successfully', async () => {
-    const ctx = await engine.createContext('task', { abc: 123 });
+    const ctx = await engine.createContext('org-test', 'task', { abc: 123 });
     const retrieved = await engine.getContext(ctx.id);
     expect(retrieved?.id).toBe(ctx.id);
 
@@ -47,16 +47,16 @@ describe('Context Engine', () => {
   });
 
   it('merges multiple contexts', async () => {
-    const ctx1 = await engine.createContext('task', { a: 1 });
-    const ctx2 = await engine.createContext('task', { b: 2 });
-    const merged = await engine.mergeContexts([ctx1.id, ctx2.id], 'workflow');
+    const ctx1 = await engine.createContext('org-test', 'task', { a: 1 });
+    const ctx2 = await engine.createContext('org-test', 'task', { b: 2 });
+    const merged = await engine.mergeContexts('org-test', [ctx1.id, ctx2.id], 'workflow');
 
     expect(merged.data.a).toBe(1);
     expect(merged.data.b).toBe(2);
   });
 
   it('compress contexts correctly based on token target', async () => {
-    const ctx = await engine.createContext('conversation', {
+    const ctx = await engine.createContext('org-test', 'conversation', {
       text: 'a'.repeat(200), // ~50 tokens
       arr: [1, 2, 3],
       nested: { obj: 'val' },
@@ -65,11 +65,11 @@ describe('Context Engine', () => {
     });
     expect(ctx.tokenEstimate).toBeGreaterThan(45);
 
-    const compressed = await engine.compressContext(ctx.id, 10);
+    const compressed = await engine.compressContext('org-test', ctx.id, 10);
     expect(compressed.tokenEstimate).toBeLessThanOrEqual(25);
 
     // Also test early exit when targetTokens is >= estimate
-    const uncompressed = await engine.compressContext(ctx.id, 100);
+    const uncompressed = await engine.compressContext('org-test', ctx.id, 100);
     // Since ctx was updated by the first compress, we should compare to compressed.version
     expect(uncompressed.version).toBe(compressed.version); // No update
   });
@@ -92,7 +92,7 @@ describe('Context Engine', () => {
   });
 
   it('throws on missing context', async () => {
-    await expect(engine.updateContext('missing', {})).rejects.toThrow();
-    await expect(engine.compressContext('missing', 10)).rejects.toThrow();
+    await expect(engine.updateContext('org-test', 'missing', {})).rejects.toThrow();
+    await expect(engine.compressContext('org-test', 'missing', 10)).rejects.toThrow();
   });
 });

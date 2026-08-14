@@ -12,6 +12,7 @@ export class LLMCacheManager {
 
   private hashRequest(req: RouteRequest, prompt: string): string {
     const payload = JSON.stringify({
+      orgId: req.context?.orgId,
       taskId: req.taskId, // Often task is isolated, but let's hash prompt + complexity
       complexity: req.complexity,
       type: req.type,
@@ -21,6 +22,9 @@ export class LLMCacheManager {
   }
 
   async getCached(req: RouteRequest, prompt: string): Promise<LLMResponse | null> {
+    // Requests without authenticated tenant context must never read a cache
+    // entry, including entries created by older versions with shared keys.
+    if (!req.context?.orgId) return null;
     const key = this.hashRequest(req, prompt);
     const entry = this.cache.get(key);
 
@@ -36,6 +40,8 @@ export class LLMCacheManager {
   }
 
   async setCache(req: RouteRequest, prompt: string, response: LLMResponse): Promise<void> {
+    // Fail closed: do not create an unscoped/shared cache entry.
+    if (!req.context?.orgId) return;
     const key = this.hashRequest(req, prompt);
     this.cache.set(key, {
       response,

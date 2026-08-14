@@ -145,6 +145,26 @@ describe('Command Deck API (Web Pro)', () => {
     }
   });
 
+  it('GET /metrics rejects unauthenticated requests', async () => {
+    const res = await fetch(`${baseUrl}/metrics`);
+    expect(res.status).toBe(401);
+  });
+
+  it("GET /metrics requires auth and only exposes the authenticated organization's labelled telemetry", async () => {
+    const token = deckHeaders['Authorization']!.split(' ')[1]!;
+    const payload = JSON.parse(Buffer.from(token.split('.')[1]!, 'base64url').toString()) as {
+      sub: string;
+    };
+    const ownOrg = `memory-org-${payload.sub}`;
+    llmMetrics.recordCost('audit-provider', 'audit-model', 1, 'memory-org-metrics-other');
+    llmMetrics.recordCost('audit-provider', 'audit-model', 1, ownOrg);
+    const res = await fetch(`${baseUrl}/metrics`, { headers: deckHeaders });
+    expect(res.status).toBe(200);
+    const body = await res.text();
+    expect(body).toContain(`org_id="${ownOrg}"`);
+    expect(body).not.toContain('memory-org-metrics-other');
+  });
+
   it('GET /v1/agentx/providers is public (no auth) and returns safe provider info', async () => {
     const res = await fetch(`${baseUrl}/v1/agentx/providers`);
     expect(res.status).toBe(200);

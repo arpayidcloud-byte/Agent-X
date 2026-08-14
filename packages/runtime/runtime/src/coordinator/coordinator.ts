@@ -54,12 +54,22 @@ export class ProductionExecutionCoordinator {
   async start(): Promise<void> {
     this.stateMachine.transition('INITIALIZING');
     this.stateMachine.transition('READY');
-    await this.eventBus.publish('coordinator.started', { timestamp: new Date() }, 'system');
+    await this.eventBus.publish(
+      'system',
+      'coordinator.started',
+      { timestamp: new Date() },
+      'system',
+    );
   }
 
   async shutdown(): Promise<void> {
     this.stateMachine.transition('CANCELLED');
-    await this.eventBus.publish('coordinator.cancelled', { timestamp: new Date() }, 'system');
+    await this.eventBus.publish(
+      'system',
+      'coordinator.cancelled',
+      { timestamp: new Date() },
+      'system',
+    );
   }
 
   async execute(session: CoordinatorSession): Promise<unknown> {
@@ -100,6 +110,7 @@ export class ProductionExecutionCoordinator {
 
       await this.hookManager.executeAfterExecution(session, result);
       await this.eventBus.publish(
+        'system',
         'coordinator.finished',
         { sessionId: session.id, result },
         session.traceId,
@@ -114,6 +125,7 @@ export class ProductionExecutionCoordinator {
       this.stateMachine.transition('FAILED');
       const errorMessage = err instanceof Error ? err.message : String(err);
       await this.eventBus.publish(
+        'system',
         'coordinator.failed',
         { sessionId: session.id, error: errorMessage },
         session.traceId,

@@ -46,6 +46,8 @@ export interface SubAgentHeartbeat {
 }
 
 export interface AgentMessage {
+  /** Authenticated organization owning this agent message. */
+  orgId: string;
   id: string;
   topic:
     | 'TaskAssigned'

@@ -5,13 +5,22 @@
 
 export interface IContextEngine {
   createContext(
+    orgId: string,
     scope: ContextScope,
     initialData?: Record<string, unknown>,
   ): Promise<ContextSnapshot>;
-  updateContext(contextId: string, updates: Record<string, unknown>): Promise<ContextSnapshot>;
+  updateContext(
+    orgId: string,
+    contextId: string,
+    updates: Record<string, unknown>,
+  ): Promise<ContextSnapshot>;
   getContext(contextId: string): Promise<ContextSnapshot | undefined>;
-  mergeContexts(sourceIds: string[], targetScope: ContextScope): Promise<ContextSnapshot>;
-  compressContext(contextId: string, targetTokens: number): Promise<ContextSnapshot>;
+  mergeContexts(
+    orgId: string,
+    sourceIds: string[],
+    targetScope: ContextScope,
+  ): Promise<ContextSnapshot>;
+  compressContext(orgId: string, contextId: string, targetTokens: number): Promise<ContextSnapshot>;
   validateContext(contextId: string): Promise<boolean>;
 }
 
