@@ -14,3 +14,4 @@ export * from './agent-template-repository.js';
 export * from './workflow-repository.js';
 export * from './eval-experiment-repository.js';
 export * from './prisma-email-verification-token-repository.js';
+export * from './tenant-ownership-evidence.js';

@@ -97,6 +97,10 @@ describe('tenant ownership evidence inventory', () => {
           membershipEvidence: [],
           eventEvidence: [],
           createdAt: '2026-08-01T00:00:00.000Z',
+          corroboratingRecords: [
+            { source: 'QualityScore', id: 'qs-1', taskId: 't-1' },
+            { source: 'AgentFeedback', id: 'af-1', taskId: 't-1' },
+          ],
           taskExists: true,
           userExists: true,
           subscriptionExists: false,
@@ -195,6 +199,69 @@ describe('tenant ownership evidence inventory', () => {
     });
     expect(report.costEntries[0]?.evidence).toContainEqual(
       expect.objectContaining({ kind: 'temporal inconsistency', strength: 'conflicting' }),
+    );
+  });
+
+  it('keeps corroborating QualityScore and AgentFeedback row references audit-able', () => {
+    const report = buildTenantOwnershipEvidenceInventory({
+      users: [],
+      costEntries: [
+        {
+          id: 'c-1',
+          orgId: null,
+          userId: null,
+          taskId: 't-1',
+          taskOrgId: null,
+          userOrgId: null,
+          subscriptionOrgId: null,
+          memberOrgIds: [],
+          taskContextOrgId: null,
+          taskMetadataOrgId: null,
+          eventOrgIds: [],
+          taskCreatedAt: null,
+          subscriptionCreatedAt: null,
+          membershipEvidence: [],
+          eventEvidence: [],
+          createdAt: '2026-08-01T00:00:00.000Z',
+          corroboratingRecords: [
+            { source: 'QualityScore', id: 'qs-1', taskId: 't-1' },
+            { source: 'AgentFeedback', id: 'af-1', taskId: 't-1' },
+          ],
+          taskExists: false,
+          userExists: false,
+          subscriptionExists: false,
+          corroboratingTaskIds: [],
+        },
+      ],
+    });
+
+    expect(report.costEntries[0]?.evidence).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ kind: 'historical task link', referenceId: 'qs-1' }),
+        expect.objectContaining({ kind: 'historical task link', referenceId: 'af-1' }),
+      ]),
+    );
+  });
+
+  it('lists conflicting membership organization IDs in the evidence detail', () => {
+    const report = buildTenantOwnershipEvidenceInventory({
+      users: [
+        {
+          id: 'u-1',
+          email: 'one@test',
+          orgId: null,
+          memberOrgIds: ['org-1', 'org-2'],
+          historicalCostEntryIds: [],
+        },
+      ],
+      costEntries: [],
+    });
+
+    expect(report.users[0]?.evidence).toContainEqual(
+      expect.objectContaining({
+        strength: 'conflicting',
+        detail: expect.stringContaining('org-1, org-2'),
+      }),
     );
   });
 });
