@@ -194,12 +194,19 @@ export function registerDeckRoutes(app: Express): void {
       const latest = tasks[0];
 
       // Metric totals (same aggregation as /v1/agentx/stats).
-      const registry = llmMetrics.getRegistry();
-      const json = await registry.getMetricsAsJSON();
-      const totals: Record<string, number> = {};
-      for (const metric of json) {
-        totals[metric.name] = metric.values.reduce((acc, v) => acc + (Number(v.value) || 0), 0);
-      }
+      const json = await llmMetrics.getSnapshot(orgId);
+      const metricTotal = (name: string): number => {
+        const metric = json.find((entry) => entry.name === name);
+        return metric?.values.reduce((acc, value) => acc + (Number(value.value) || 0), 0) ?? 0;
+      };
+      const histogramTotal = (name: string): number => {
+        const metric = json.find((entry) => entry.name === name);
+        return (
+          metric?.values
+            .filter((value) => value.labels.le === undefined)
+            .reduce((acc, value) => acc + (Number(value.value) || 0), 0) ?? 0
+        );
+      };
 
       const mem = memInfo();
       const logs = [...taskLogEntries(orgId), ...multiAgentLogEntries(orgId)]
@@ -232,8 +239,8 @@ export function registerDeckRoutes(app: Express): void {
         logs,
         stats: {
           totalTasks: tasks.length,
-          totalCostUsd: Number((totals.llm_cost_usd_total ?? 0).toFixed(4)),
-          totalTokens: totals.llm_tokens_total ?? 0,
+          totalCostUsd: Number(metricTotal('llm_cost_usd_total').toFixed(4)),
+          totalTokens: histogramTotal('llm_token_usage'),
         },
       });
     } catch (e) {

@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import type { Server } from 'node:http';
+import { llmMetrics } from '@agent-xai/observability';
 
 process.env.ENABLE_MOCK_PROVIDER = 'true';
 process.env.AUTH_ENABLED = 'true';
@@ -80,6 +81,23 @@ describe('Command Deck API (Web Pro)', () => {
     expect(typeof deck.stats.totalTasks).toBe('number');
   });
 
+  it('scopes metric totals to the authenticated organization', async () => {
+    const token = deckHeaders['Authorization']!.split(' ')[1]!;
+    const payload = JSON.parse(Buffer.from(token.split('.')[1]!, 'base64url').toString()) as {
+      sub: string;
+    };
+    const ownOrg = `memory-org-${payload.sub}`;
+    llmMetrics.recordCost('test-deck', 'model-a', 1.25, ownOrg);
+    llmMetrics.recordCost('test-deck', 'model-b', 9.5, 'org-deck-b');
+    llmMetrics.recordTokenUsage('test-deck', 'model-a', 'input', 10, ownOrg);
+    llmMetrics.recordTokenUsage('test-deck', 'model-a', 'output', 10, ownOrg);
+    llmMetrics.recordTokenUsage('test-deck', 'model-b', 'input', 100, 'org-deck-b');
+    llmMetrics.recordTokenUsage('test-deck', 'model-b', 'output', 100, 'org-deck-b');
+
+    const deck = await getDeck();
+    expect(deck.stats.totalCostUsd).toBe(1.25);
+    expect(deck.stats.totalTokens).toBe(22);
+  });
   it('records a run/stream task and reflects real progress + token usage in deck.task', async () => {
     const start = Date.now();
     const headers = deckHeaders;
