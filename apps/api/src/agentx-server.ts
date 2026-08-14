@@ -181,9 +181,10 @@ if (process.env.ENABLE_MOCK_PROVIDER === 'true') {
 }
 
 // ─── Metrics endpoint (Prometheus scrape) ────
-app.get('/metrics', async (_req, res) => {
+app.get('/metrics', requireAuth, withOrg, async (req, res) => {
   try {
-    const metricsData = await llmMetrics.getMetrics();
+    const orgId = (req as AuthenticatedRequest).auth!.orgId!;
+    const metricsData = await llmMetrics.getMetrics(orgId);
     res.set('Content-Type', 'text/plain; version=0.0.4');
     res.send(metricsData);
   } catch (e) {
