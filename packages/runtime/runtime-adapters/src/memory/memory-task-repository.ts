@@ -7,15 +7,19 @@ export class InMemoryTaskRepository implements ITaskRepository {
     this.tasks.set(task.id, task);
   }
 
-  async findById(id: string): Promise<TaskModel | undefined> {
-    return this.tasks.get(id);
+  async findById(orgId: string, id: string): Promise<TaskModel | undefined> {
+    if (!orgId.trim()) return undefined;
+    const task = this.tasks.get(id);
+    return task?.orgId === orgId ? task : undefined;
   }
 
-  async findByRootId(rootId: string): Promise<TaskModel[]> {
-    return Array.from(this.tasks.values()).filter((t) => t.rootTaskId === rootId);
+  async findByRootId(orgId: string, rootId: string): Promise<TaskModel[]> {
+    return Array.from(this.tasks.values()).filter(
+      (t) => t.orgId === orgId && t.rootTaskId === rootId,
+    );
   }
 
-  async getAll(): Promise<TaskModel[]> {
-    return Array.from(this.tasks.values());
+  async getAll(orgId: string): Promise<TaskModel[]> {
+    return Array.from(this.tasks.values()).filter((t) => t.orgId === orgId);
   }
 }

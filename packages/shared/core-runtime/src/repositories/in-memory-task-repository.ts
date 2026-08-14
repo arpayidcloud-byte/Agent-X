@@ -27,8 +27,10 @@ export class InMemoryTaskRepository implements ITaskRepository {
    * @param id - Task ID to search for
    * @returns Task model if found, undefined otherwise
    */
-  async findById(id: string): Promise<TaskModel | undefined> {
-    return this.tasks.get(id);
+  async findById(orgId: string, id: string): Promise<TaskModel | undefined> {
+    if (!orgId.trim()) return undefined;
+    const task = this.tasks.get(id);
+    return task?.orgId === orgId ? task : undefined;
   }
 
   /**
@@ -36,15 +38,17 @@ export class InMemoryTaskRepository implements ITaskRepository {
    * @param rootId - Root task ID to filter by
    * @returns Array of matching task models
    */
-  async findByRootId(rootId: string): Promise<TaskModel[]> {
-    return Array.from(this.tasks.values()).filter((t) => t.rootTaskId === rootId);
+  async findByRootId(orgId: string, rootId: string): Promise<TaskModel[]> {
+    return Array.from(this.tasks.values()).filter(
+      (t) => t.orgId === orgId && t.rootTaskId === rootId,
+    );
   }
 
   /**
    * Retrieves all tasks from the repository.
    * @returns Array of all task models
    */
-  async getAll(): Promise<TaskModel[]> {
-    return Array.from(this.tasks.values());
+  async getAll(orgId: string): Promise<TaskModel[]> {
+    return Array.from(this.tasks.values()).filter((t) => t.orgId === orgId);
   }
 }

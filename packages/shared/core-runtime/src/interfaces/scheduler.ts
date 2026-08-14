@@ -74,14 +74,14 @@ export interface IScheduler {
    *
    * @param taskId - ID of the task to pause
    */
-  pause(taskId: string): Promise<void>;
+  pause(orgId: string, taskId: string): Promise<void>;
 
   /**
    * Resume a paused task.
    *
    * @param taskId - ID of the task to resume
    */
-  resume(taskId: string): Promise<void>;
+  resume(orgId: string, taskId: string): Promise<void>;
 
   /**
    * Cancel a task.
@@ -89,7 +89,7 @@ export interface IScheduler {
    * @param taskId - ID of the task to cancel
    * @param reason - Reason for cancellation
    */
-  cancel(taskId: string, reason: string): Promise<void>;
+  cancel(orgId: string, taskId: string, reason: string): Promise<void>;
 }
 
 /**
@@ -116,7 +116,7 @@ export interface ITaskRepository {
    * @param id - The task ID to look up
    * @returns The task if found, otherwise `undefined`
    */
-  findById(id: string): Promise<TaskModel | undefined>;
+  findById(orgId: string, id: string): Promise<TaskModel | undefined>;
 
   /**
    * Find all tasks belonging to a root task.
@@ -124,14 +124,14 @@ export interface ITaskRepository {
    * @param rootId - The root task ID
    * @returns Array of matching tasks
    */
-  findByRootId(rootId: string): Promise<TaskModel[]>;
+  findByRootId(orgId: string, rootId: string): Promise<TaskModel[]>;
 
   /**
    * Retrieve all tasks.
    *
    * @returns Array of all tasks
    */
-  getAll(): Promise<TaskModel[]>;
+  getAll(orgId: string): Promise<TaskModel[]>;
 }
 
 /**
