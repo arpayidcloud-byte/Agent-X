@@ -25,6 +25,10 @@ export async function createTaskRoutes(fastify: FastifyInstance) {
           },
         },
         response: {
+          410: {
+            type: 'object',
+            properties: { error: { type: 'string' } },
+          },
           201: {
             type: 'object',
             properties: {
@@ -38,20 +42,10 @@ export async function createTaskRoutes(fastify: FastifyInstance) {
         },
       },
     },
-    async (request: FastifyRequest<{ Body: TaskBody }>, reply: FastifyReply) => {
-      const { goal, priority = 'medium', parentTaskId, dependsOn = [] } = request.body;
-
-      const task = {
-        id: `task-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
-        goal,
-        status: 'CREATED',
-        priority,
-        parentTaskId,
-        dependsOn,
-        createdAt: new Date().toISOString(),
-      };
-
-      void reply.code(201).send(task);
+    async (_request: FastifyRequest<{ Body: TaskBody }>, reply: FastifyReply) => {
+      void reply.code(410).send({
+        error: 'Legacy task API disabled: tenant-aware API required',
+      });
     },
   );
 
@@ -69,6 +63,10 @@ export async function createTaskRoutes(fastify: FastifyInstance) {
           },
         },
         response: {
+          410: {
+            type: 'object',
+            properties: { error: { type: 'string' } },
+          },
           200: {
             type: 'array',
             items: {
@@ -85,8 +83,10 @@ export async function createTaskRoutes(fastify: FastifyInstance) {
         },
       },
     },
-    async (_request, _reply) => {
-      return [];
+    async (_request, reply) => {
+      return reply.code(410).send({
+        error: 'Legacy task API disabled: tenant-aware API required',
+      });
     },
   );
 
@@ -104,6 +104,10 @@ export async function createTaskRoutes(fastify: FastifyInstance) {
           },
         },
         response: {
+          410: {
+            type: 'object',
+            properties: { error: { type: 'string' } },
+          },
           200: {
             type: 'object',
             properties: {
@@ -123,23 +127,10 @@ export async function createTaskRoutes(fastify: FastifyInstance) {
         },
       },
     },
-    async (request, reply) => {
-      const { id } = request.params as { id: string };
-
-      const task = {
-        id,
-        goal: 'Sample task',
-        status: 'CREATED',
-        priority: 'medium',
-        createdAt: new Date().toISOString(),
-      };
-
-      if (!task) {
-        void reply.code(404).send({ error: 'Task not found' });
-        return;
-      }
-
-      void reply.send(task);
+    async (_request, reply) => {
+      return reply.code(410).send({
+        error: 'Legacy task API disabled: tenant-aware API required',
+      });
     },
   );
 
@@ -157,6 +148,10 @@ export async function createTaskRoutes(fastify: FastifyInstance) {
           },
         },
         response: {
+          410: {
+            type: 'object',
+            properties: { error: { type: 'string' } },
+          },
           200: {
             type: 'object',
             properties: {
@@ -167,12 +162,9 @@ export async function createTaskRoutes(fastify: FastifyInstance) {
         },
       },
     },
-    async (request, reply) => {
-      const { id } = request.params as { id: string };
-
-      void reply.send({
-        id,
-        status: 'CANCELLED',
+    async (_request, reply) => {
+      return reply.code(410).send({
+        error: 'Legacy task API disabled: tenant-aware API required',
       });
     },
   );
