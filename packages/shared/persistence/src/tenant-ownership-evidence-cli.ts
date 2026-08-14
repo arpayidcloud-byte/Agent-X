@@ -90,21 +90,28 @@ async function main(): Promise<void> {
         '[]'::jsonb
       ) AS "eventEvidence",
       COALESCE(
-        ARRAY(
-          SELECT DISTINCT related_task_id
+        (
+          SELECT jsonb_agg(record ORDER BY record->>'source', record->>'id')
           FROM (
-            SELECT qs."taskId" AS related_task_id
+            SELECT jsonb_build_object(
+              'source', 'QualityScore',
+              'id', qs.id,
+              'taskId', qs."taskId"
+            ) AS record
             FROM "QualityScore" qs
             WHERE qs."taskId" = c."taskId"
-            UNION
-            SELECT af."taskId" AS related_task_id
+            UNION ALL
+            SELECT jsonb_build_object(
+              'source', 'AgentFeedback',
+              'id', af.id,
+              'taskId', af."taskId"
+            ) AS record
             FROM "AgentFeedback" af
             WHERE af."taskId" = c."taskId"
-          ) related
-          WHERE related_task_id IS NOT NULL
+          ) records
         ),
-        ARRAY[]::text[]
-      ) AS "corroboratingTaskIds"
+        '[]'::jsonb
+      ) AS "corroboratingRecords"
     FROM "CostEntry" c
     LEFT JOIN "Task" t ON t.id = c."taskId"
     LEFT JOIN "User" u ON u.id = c."userId"
