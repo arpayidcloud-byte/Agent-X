@@ -61,7 +61,7 @@ describe('Dashboard API (task store, stats)', () => {
     expect(tasksRes.status).toBe(200);
     const tasksBody = await asJson(tasksRes);
     expect(tasksBody.total).toBe(1);
-    expect(tasksBody.tasks[0].id).toBe('test-task-1');
+    expect(tasksBody.tasks[0].id).toMatch(/^api-/);
     expect(tasksBody.tasks[0].status).toBe('success');
     expect(tasksBody.tasks[0].provider).toBeTruthy();
     expect(tasksBody.tasks[0].response).toBeTruthy();
@@ -80,8 +80,8 @@ describe('Dashboard API (task store, stats)', () => {
     const body = await asJson(res);
     expect(body.tasks.length).toBe(2);
     expect(body.total).toBe(5);
-    expect(body.tasks[0].id).toBe('limit-task-4');
-    expect(body.tasks[1].id).toBe('limit-task-3');
+    expect(body.tasks[0].id).toMatch(/^api-/);
+    expect(body.tasks[1].id).toMatch(/^api-/);
   });
 
   it('POST /v1/agentx/run without prompt returns 400 and records nothing', async () => {

@@ -239,6 +239,15 @@ describe('CostEntryRepository tenant boundary', () => {
       },
     });
   });
+
+  it('rejects blank organization identifiers for reads before touching the database', async () => {
+    const { db, calls } = fakeDb();
+    const repo = new CostEntryRepository(db);
+
+    await expect(repo.list('   ')).rejects.toThrow('Organization context required');
+    await expect(repo.getSummary('')).rejects.toThrow('Organization context required');
+    expect(calls.findMany).toHaveLength(0);
+  });
 });
 
 void entry;

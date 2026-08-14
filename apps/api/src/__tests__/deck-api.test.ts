@@ -45,12 +45,14 @@ interface DeckPayload {
 describe('Command Deck API (Web Pro)', () => {
   let server: Server;
   let baseUrl: string;
+  let deckHeaders: Record<string, string>;
 
   beforeAll(async () => {
     server = app.listen(0);
     const address = server.address();
     if (!address || typeof address === 'string') throw new Error('no port');
     baseUrl = `http://127.0.0.1:${address.port}`;
+    deckHeaders = await authHeader(baseUrl);
   });
 
   afterAll(async () => {
@@ -58,7 +60,7 @@ describe('Command Deck API (Web Pro)', () => {
   });
 
   async function getDeck(): Promise<DeckPayload> {
-    const res = await fetch(`${baseUrl}/v1/agentx/deck`);
+    const res = await fetch(`${baseUrl}/v1/agentx/deck`, { headers: deckHeaders });
     expect(res.status).toBe(200);
     return (await res.json()) as DeckPayload;
   }
@@ -80,7 +82,7 @@ describe('Command Deck API (Web Pro)', () => {
 
   it('records a run/stream task and reflects real progress + token usage in deck.task', async () => {
     const start = Date.now();
-    const headers = await authHeader(baseUrl);
+    const headers = deckHeaders;
     const res = await fetch(`${baseUrl}/v1/agentx/run/stream`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...headers },

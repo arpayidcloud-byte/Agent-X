@@ -124,6 +124,7 @@ export class CostEntryRepository {
   }
 
   async list(orgId: string, limit = 100, offset = 0): Promise<CostEntryRecord[]> {
+    if (!orgId || !orgId.trim()) throw new Error('Organization context required');
     return this.requireDb().costEntry.findMany({
       where: { orgId },
       orderBy: { createdAt: 'desc' },
@@ -133,6 +134,7 @@ export class CostEntryRepository {
   }
 
   async getSummary(orgId: string, days = 30): Promise<CostSummary> {
+    if (!orgId || !orgId.trim()) throw new Error('Organization context required');
     const since = new Date();
     since.setDate(since.getDate() - days);
 

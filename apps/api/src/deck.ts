@@ -19,6 +19,8 @@ import { taskStore } from './agentx-server.js';
 import { getTaskEventHistory, type TaskStreamEvent } from './task-stream.js';
 import { getMultiAgentEventHistory, type MultiAgentStreamEvent } from './multi-agent-stream.js';
 import { getActiveRuns, getRecentRuns } from './multi-agent-runner.js';
+import { requireAuth, type AuthenticatedRequest } from './auth.js';
+import { withOrg } from './middleware/withOrg.js';
 
 export interface DeckAgent {
   id: string;
@@ -59,9 +61,11 @@ function memInfo(): { usedGb: number; totalGb: number; pct: number } {
   };
 }
 
-function taskLogEntries(): DeckLogEntry[] {
+function taskLogEntries(orgId: string): DeckLogEntry[] {
   const entries: DeckLogEntry[] = [];
-  for (const taskId of taskStore.keys()) {
+  for (const task of taskStore.values()) {
+    if (task.orgId !== orgId) continue;
+    const taskId = task.id;
     for (const ev of getTaskEventHistory(taskId)) {
       entries.push(taskEventToLog(taskId, ev));
     }
@@ -88,9 +92,11 @@ function taskEventToLog(taskId: string, ev: TaskStreamEvent): DeckLogEntry {
   }
 }
 
-function multiAgentLogEntries(): DeckLogEntry[] {
+function multiAgentLogEntries(orgId: string): DeckLogEntry[] {
   const entries: DeckLogEntry[] = [];
-  for (const run of getRecentRuns(5)) {
+  for (const run of getRecentRuns(20)
+    .filter((run) => run.orgId === orgId)
+    .slice(0, 5)) {
     for (const ev of getMultiAgentEventHistory(run.runId)) {
       entries.push(multiAgentEventToLog(ev));
     }
@@ -124,9 +130,11 @@ function multiAgentEventToLog(ev: MultiAgentStreamEvent): DeckLogEntry {
   }
 }
 
-function agentsFromRuns(): DeckAgent[] {
-  const active = getActiveRuns();
-  const recent = getRecentRuns(3);
+function agentsFromRuns(orgId: string): DeckAgent[] {
+  const active = getActiveRuns().filter((run) => run.orgId === orgId);
+  const recent = getRecentRuns(10)
+    .filter((run) => run.orgId === orgId)
+    .slice(0, 3);
   // Show active runs first (status from real run state), then the most recent
   // finished run as idle so the panel isn't empty between runs.
   const seen = new Set<string>();
@@ -176,10 +184,13 @@ export function registerDeckRoutes(app: Express): void {
     }
   });
 
-  app.get('/v1/agentx/deck', async (_req, res) => {
+  app.get('/v1/agentx/deck', requireAuth, withOrg, async (req, res) => {
     try {
-      // Most recent task (any status) — the TASK panel focus.
-      const tasks = [...taskStore.values()].sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
+      const orgId = (req as AuthenticatedRequest).auth!.orgId!;
+      // Most recent task within the authenticated organization.
+      const tasks = [...taskStore.values()]
+        .filter((task) => task.orgId === orgId)
+        .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
       const latest = tasks[0];
 
       // Metric totals (same aggregation as /v1/agentx/stats).
@@ -191,7 +202,7 @@ export function registerDeckRoutes(app: Express): void {
       }
 
       const mem = memInfo();
-      const logs = [...taskLogEntries(), ...multiAgentLogEntries()]
+      const logs = [...taskLogEntries(orgId), ...multiAgentLogEntries(orgId)]
         .sort((a, b) => (a.at < b.at ? 1 : -1))
         .slice(0, 30);
 
@@ -203,7 +214,7 @@ export function registerDeckRoutes(app: Express): void {
           memTotalGb: mem.totalGb,
           memPct: mem.pct,
         },
-        agents: agentsFromRuns(),
+        agents: agentsFromRuns(orgId),
         task: latest
           ? {
               id: latest.id,
@@ -220,7 +231,7 @@ export function registerDeckRoutes(app: Express): void {
           : null,
         logs,
         stats: {
-          totalTasks: taskStore.size,
+          totalTasks: tasks.length,
           totalCostUsd: Number((totals.llm_cost_usd_total ?? 0).toFixed(4)),
           totalTokens: totals.llm_tokens_total ?? 0,
         },
