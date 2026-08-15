@@ -23,6 +23,7 @@ export interface AgentTemplateRecord {
   isPublished: boolean;
   isFeatured: boolean;
   config: unknown;
+  orgId: string | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -32,6 +33,7 @@ export interface CreateAgentTemplateInput {
   description?: string;
   authorId: string;
   authorName: string;
+  orgId?: string | null;
   systemPrompt?: string;
   tags?: string[];
   category?: string;
@@ -79,6 +81,7 @@ export class AgentTemplateRepository {
         description: input.description ?? null,
         authorId: input.authorId,
         authorName: input.authorName,
+        orgId: input.orgId ?? null,
         systemPrompt: input.systemPrompt ?? null,
         tags: input.tags ?? [],
         category: input.category ?? null,
@@ -101,9 +104,18 @@ export class AgentTemplateRepository {
     }) as Promise<AgentTemplateRecord | null>;
   }
 
-  async update(id: string, input: UpdateAgentTemplateInput): Promise<AgentTemplateRecord> {
+  async update(
+    id: string,
+    orgId: string,
+    input: UpdateAgentTemplateInput,
+  ): Promise<AgentTemplateRecord> {
+    // Fail-closed: mutation requires matching orgId.
+    const existing = await this.getById(id);
+    if (!existing) throw new Error('Template not found');
+    if (existing.orgId !== orgId) throw new Error('Tenant isolation violation');
+
     return this.requireDb().agentTemplate.update({
-      where: { id },
+      where: { id, orgId },
       data: {
         ...(input.name !== undefined && { name: input.name }),
         ...(input.description !== undefined && { description: input.description }),
@@ -118,8 +130,11 @@ export class AgentTemplateRepository {
     }) as Promise<AgentTemplateRecord>;
   }
 
-  async delete(id: string): Promise<void> {
-    await this.requireDb().agentTemplate.delete({ where: { id } });
+  async delete(id: string, orgId: string): Promise<void> {
+    const existing = await this.getById(id);
+    if (!existing) throw new Error('Template not found');
+    if (existing.orgId !== orgId) throw new Error('Tenant isolation violation');
+    await this.requireDb().agentTemplate.delete({ where: { id, orgId } });
   }
 
   async listPublished(query: MarketplaceQuery = {}): Promise<AgentTemplateRecord[]> {

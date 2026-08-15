@@ -1629,11 +1629,13 @@ if (process.env.NODE_ENV !== 'test') {
         res.status(400).json({ error: 'Missing authorId' });
         return;
       }
+      const orgId = (req as AuthenticatedRequest).auth?.orgId ?? null;
       const template = await templateRepo.create({
         name,
         description,
         authorId,
         authorName: authorName ?? 'Admin',
+        orgId,
         systemPrompt,
         tags,
         category,
@@ -1649,19 +1651,40 @@ if (process.env.NODE_ENV !== 'test') {
   app.put('/v1/admin/templates/:id', maybeRequireAdmin, async (req, res) => {
     try {
       const id = String(req.params.id);
-      const updated = await templateRepo.update(id, req.body ?? {});
+      const orgId = (req as AuthenticatedRequest).auth?.orgId;
+      if (!orgId) {
+        res.status(403).json({ error: 'Tenant isolation: orgId required for mutation' });
+        return;
+      }
+      const updated = await templateRepo.update(id, orgId, req.body ?? {});
       res.json(updated);
     } catch (e) {
-      res.status(500).json({ error: String(e) });
+      const message = e instanceof Error ? e.message : String(e);
+      if (message.includes('Tenant isolation') || message.includes('not found')) {
+        res.status(404).json({ error: message });
+        return;
+      }
+      res.status(500).json({ error: message });
     }
   });
 
   app.delete('/v1/admin/templates/:id', maybeRequireAdmin, async (req, res) => {
     try {
-      await templateRepo.delete(String(req.params.id));
+      const id = String(req.params.id);
+      const orgId = (req as AuthenticatedRequest).auth?.orgId;
+      if (!orgId) {
+        res.status(403).json({ error: 'Tenant isolation: orgId required for mutation' });
+        return;
+      }
+      await templateRepo.delete(id, orgId);
       res.json({ success: true });
     } catch (e) {
-      res.status(500).json({ error: String(e) });
+      const message = e instanceof Error ? e.message : String(e);
+      if (message.includes('Tenant isolation') || message.includes('not found')) {
+        res.status(404).json({ error: message });
+        return;
+      }
+      res.status(500).json({ error: message });
     }
   });
 
