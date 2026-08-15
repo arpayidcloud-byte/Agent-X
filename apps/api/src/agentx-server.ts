@@ -23,6 +23,7 @@ import {
 import { generateFeedback, buildRevisionPrompt } from '@agent-xai/agent-feedback';
 import {
   maybeRequireAdmin,
+  requireOrgAdmin,
   requireAuth,
   listUsers,
   register,
@@ -77,6 +78,36 @@ import { verifyTurnstile } from './turnstile.js';
 
 const costRepo = new CostEntryRepository();
 const templateRepo = new AgentTemplateRepository();
+
+type PublicAgentTemplate = {
+  id: string;
+  name: string;
+  description: string | null;
+  authorName: string;
+  tags: string[];
+  category: string | null;
+  installCount: number;
+  rating: number;
+  ratingCount: number;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+function toPublicAgentTemplate(template: PublicAgentTemplate): PublicAgentTemplate {
+  return {
+    id: template.id,
+    name: template.name,
+    description: template.description,
+    authorName: template.authorName,
+    tags: template.tags,
+    category: template.category,
+    installCount: template.installCount,
+    rating: template.rating,
+    ratingCount: template.ratingCount,
+    createdAt: template.createdAt,
+    updatedAt: template.updatedAt,
+  };
+}
 
 export { waitlistStore, feedbackStore, resetBetaStores } from './beta-store.js';
 export { qualityStore, resetQualityStore } from './quality-store.js';
@@ -697,15 +728,26 @@ app.get('/v1/agentx/chat/:id/events', requireAuth, withOrg, (req, res) => {
 // ─── Team management (Web Pro, basic) ────
 // List registered users; admin-only when AUTH_ENABLED (password hashes never
 // leave the server).
-app.get('/v1/team', maybeRequireAdmin, async (_req, res) => {
-  try {
-    const users = await listUsers();
-    res.json({ users });
-  } catch (e) {
-    const err = e instanceof Error ? e.message : String(e);
-    res.status(500).json({ error: err });
-  }
-});
+app.get(
+  '/v1/team',
+  requireAuth,
+  withOrg,
+  requireOrgAdmin,
+  async (req: AuthenticatedRequest, res) => {
+    try {
+      const orgId = req.auth?.orgId;
+      if (!orgId) {
+        res.status(403).json({ error: 'Organization context required' });
+        return;
+      }
+      const users = await listUsers(orgId);
+      res.json({ users });
+    } catch (e) {
+      const err = e instanceof Error ? e.message : String(e);
+      res.status(500).json({ error: err });
+    }
+  },
+);
 
 // ─── Admin user management ────
 // Create a new user account (admin invite)
@@ -1520,12 +1562,12 @@ if (process.env.NODE_ENV !== 'test') {
   // Get single template
   app.get('/v1/marketplace/templates/:id', async (req, res) => {
     try {
-      const template = await templateRepo.getById(req.params.id);
+      const template = await templateRepo.getPublishedById(req.params.id);
       if (!template) {
         res.status(404).json({ error: 'Template not found' });
         return;
       }
-      res.json(template);
+      res.json(toPublicAgentTemplate(template));
     } catch (e) {
       res.status(500).json({ error: String(e) });
     }

@@ -25,12 +25,12 @@ export function registerAuthRoutes(app: Express): void {
   // ─── Register ──── (email verify flow — no auto issueTokens)
   app.post('/v1/auth/register', async (req: Request, res: Response): Promise<void> => {
     try {
-      const { email, password, turnstileToken } = req.body ?? {};
+      const { email, password, turnstileToken, orgId } = req.body ?? {};
       if (!(await verifyTurnstile(turnstileToken))) {
         res.status(403).json({ error: 'Human verification failed — please try again.' });
         return;
       }
-      const regRes = await register(email, password);
+      const regRes = await register(email, password, orgId);
       // Auto-create trial org for new user (no-op without DB or Plan seed)
       try {
         const trial = regRes?.user?.id ? await createTrialOnRegister(regRes.user.id, email) : null;
