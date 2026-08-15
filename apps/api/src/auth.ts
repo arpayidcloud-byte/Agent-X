@@ -81,7 +81,7 @@ interface UserBackend {
   }): Promise<UserRecord>;
   findByEmail(email: string): Promise<UserRecord | undefined>;
   findById(id: string): Promise<UserRecord | undefined>;
-  list(): Promise<UserRecord[]>;
+  list(orgId: string): Promise<UserRecord[]>;
   updatePassword(id: string, passwordHash: string): Promise<void>;
   deleteUser(id: string): Promise<boolean>;
   updateUserRoles(id: string, roles: string[]): Promise<UserRecord | undefined>;
@@ -107,8 +107,8 @@ const memoryUserBackend: UserBackend = {
   async findById(id) {
     return userStore.get(id);
   },
-  async list() {
-    return [...userStore.values()];
+  async list(orgId) {
+    return [...userStore.values()].filter((user) => user.orgId === orgId);
   },
   async updatePassword(id, passwordHash) {
     const user = userStore.get(id);
@@ -143,8 +143,8 @@ function prismaUserBackend(prisma: NonNullable<ReturnType<typeof getPrisma>>): U
     async findById(id) {
       return repo.findById(id);
     },
-    async list() {
-      return repo.findAll();
+    async list(orgId) {
+      return repo.findAll(orgId);
     },
     async updatePassword(id, passwordHash) {
       await repo.updatePassword(id, passwordHash);
@@ -346,7 +346,11 @@ export function rolesFor(email: string): string[] {
   return ADMIN_EMAILS.includes(email.toLowerCase()) ? ['admin', 'user'] : ['user'];
 }
 
-export async function register(email: string, password: string): Promise<{ user: AuthUser }> {
+export async function register(
+  email: string,
+  password: string,
+  orgId?: string,
+): Promise<{ user: AuthUser }> {
   if (!email || typeof email !== 'string' || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     throw new AuthError('Missing or invalid field: email', 400);
   }
@@ -365,6 +369,7 @@ export async function register(email: string, password: string): Promise<{ user:
     email: normalized,
     passwordHash,
     roles: rolesFor(normalized),
+    orgId: orgId ?? undefined,
   });
   logger.info('User registered', { email: normalized, roles: user.roles });
   return { user: toAuthUser(user) };
@@ -574,10 +579,25 @@ export async function updateUserRoles(
 }
 
 /** All registered users (password hashes stripped) — for team management. */
-export async function listUsers(): Promise<Array<Omit<UserRecord, 'passwordHash'>>> {
+export async function listUsers(orgId: string): Promise<
+  Array<{
+    id: string;
+    email: string;
+    roles: string[];
+    emailVerified: boolean;
+    createdAt: string;
+  }>
+> {
+  if (!orgId.trim()) throw new AuthError('Organization context required', 403);
   const backend = await getUserBackend();
-  const users = await backend.list();
-  return users.map(({ passwordHash: _ph, ...rest }) => rest);
+  const users = await backend.list(orgId);
+  return users.map(({ id, email, roles, emailVerified, createdAt }) => ({
+    id,
+    email,
+    roles,
+    emailVerified,
+    createdAt,
+  }));
 }
 
 export function verifyToken(token: string): JWTPayload {
@@ -650,4 +670,21 @@ export function requireAdmin(req: AuthenticatedRequest, res: Response, next: Nex
 }
 
 /** @deprecated alias — prefer `requireAdmin`. Kept for 29 call sites. */
+/** Require an admin role after withOrg has resolved the authenticated organization. */
+export function requireOrgAdmin(
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction,
+): void {
+  if (!req.auth?.orgId) {
+    res.status(403).json({ error: 'Organization context required' });
+    return;
+  }
+  if (!req.auth.roles?.includes('admin')) {
+    res.status(403).json({ error: 'Organization admin role required' });
+    return;
+  }
+  next();
+}
+
 export const maybeRequireAdmin = requireAdmin;

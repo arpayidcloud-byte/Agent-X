@@ -1,7 +1,6 @@
 import type { Express, Request, Response } from 'express';
 import type { QualityBackend } from './quality-store.js';
 import { getQualityBackend } from './quality-store.js';
-import { EvalExperimentRepository } from '@agent-xai/persistence';
 import { maybeRequireAdmin, requireAuth, type AuthenticatedRequest } from './auth.js';
 import { withOrg } from './middleware/withOrg.js';
 
@@ -52,6 +51,13 @@ interface BenchmarkSummary {
 }
 
 export function registerEvalRoutes(app: Express): void {
+  const experimentsUnavailable = (_req: Request, res: Response): void => {
+    res.status(410).json({
+      error: 'Eval experiments are unavailable until tenant scoping is migrated',
+      migration:
+        'Add EvalExperiment.orgId, backfill existing rows, and use the authenticated organization context before re-enabling this endpoint.',
+    });
+  };
   // ─── Jalankan benchmark ────
   app.post(
     '/v1/eval/benchmark',
@@ -230,90 +236,14 @@ export function registerEvalRoutes(app: Express): void {
   );
 
   // ─── A/B experiment: bandingkan 2 provider/model pada 1 prompt ────
-  app.post(
-    '/v1/eval/experiment',
-    maybeRequireAdmin,
-    async (req: Request, res: Response): Promise<void> => {
-      try {
-        const { name, prompt, responseA, responseB, providerA, modelA, providerB, modelB } =
-          req.body ?? {};
-        if (
-          typeof prompt !== 'string' ||
-          typeof responseA !== 'string' ||
-          typeof responseB !== 'string'
-        ) {
-          res.status(400).json({
-            error: 'Missing or invalid field: prompt, responseA, responseB (strings)',
-          });
-          return;
-        }
-        const pa = typeof providerA === 'string' && providerA ? providerA : 'default';
-        const ma = typeof modelA === 'string' && modelA ? modelA : 'default';
-        const pb = typeof providerB === 'string' && providerB ? providerB : 'default';
-        const mb = typeof modelB === 'string' && modelB ? modelB : 'default';
+  app.post('/v1/eval/experiment', maybeRequireAdmin, experimentsUnavailable);
 
-        const { QualityScorer } = await import('@agent-xai/quality-scoring');
-        const scorer = new QualityScorer();
-        const sa = await scorer.score({ prompt, response: responseA, provider: pa, model: ma });
-        const sb = await scorer.score({ prompt, response: responseB, provider: pb, model: mb });
+  // EvalExperiment has no orgId in the current schema. Keep these endpoints
+  // fail-closed until the schema and all existing rows can be migrated.
+  app.get('/v1/eval/experiments', requireAuth, experimentsUnavailable);
 
-        const winner = sa.overall > sb.overall ? 'A' : sb.overall > sa.overall ? 'B' : 'tie';
-        const repo = new EvalExperimentRepository();
-        const row = await repo.create({
-          name: typeof name === 'string' && name ? name : `${pa}/${ma} vs ${pb}/${mb}`,
-          prompt,
-          providerA: pa,
-          modelA: ma,
-          providerB: pb,
-          modelB: mb,
-          scoreA: sa.overall,
-          scoreB: sb.overall,
-          winner,
-          gradeA: sa.grade,
-          gradeB: sb.grade,
-        });
-        res.status(201).json({
-          experiment: row,
-          winner,
-          detail: {
-            A: { provider: pa, model: ma, overall: sa.overall, grade: sa.grade },
-            B: { provider: pb, model: mb, overall: sb.overall, grade: sb.grade },
-          },
-        });
-      } catch (e) {
-        const err = e instanceof Error ? e.message : String(e);
-        res.status(500).json({ error: err });
-      }
-    },
-  );
-
-  // ─── Daftar A/B experiments ────
-  app.get(
-    '/v1/eval/experiments',
-    requireAuth,
-    async (_req: Request, res: Response): Promise<void> => {
-      try {
-        const repo = new EvalExperimentRepository();
-        const experiments = await repo.findAll(100);
-        res.json({ experiments, total: experiments.length });
-      } catch (e) {
-        const err = e instanceof Error ? e.message : String(e);
-        res.status(500).json({ error: err });
-      }
-    },
-  );
-
-  // ─── Win-rate summary ────
-  app.get('/v1/eval/winrates', requireAuth, async (_req: Request, res: Response): Promise<void> => {
-    try {
-      const repo = new EvalExperimentRepository();
-      const winRates = await repo.winRates();
-      res.json({ winRates });
-    } catch (e) {
-      const err = e instanceof Error ? e.message : String(e);
-      res.status(500).json({ error: err });
-    }
-  });
+  // Win rates aggregate the same tenantless table and must be disabled too.
+  app.get('/v1/eval/winrates', requireAuth, experimentsUnavailable);
 
   // ─── Quality gates status (#117) ────
   app.get(

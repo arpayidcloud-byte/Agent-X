@@ -54,8 +54,11 @@ export class PrismaUserRepository {
     return row ? toRecord(row) : undefined;
   }
 
-  async findAll(): Promise<UserRecord[]> {
-    const rows = await this.prisma.user.findMany({ orderBy: { createdAt: 'desc' } });
+  async findAll(orgId: string): Promise<UserRecord[]> {
+    const rows = await this.prisma.user.findMany({
+      where: { members: { some: { orgId } } },
+      orderBy: { createdAt: 'desc' },
+    });
     return rows.map(toRecord);
   }
 

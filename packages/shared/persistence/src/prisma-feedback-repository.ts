@@ -6,6 +6,7 @@ export interface FeedbackEntryRecord {
   category: string;
   message: string;
   rating?: number;
+  orgId?: string;
   createdAt: string;
 }
 
@@ -15,6 +16,7 @@ function toRecord(row: {
   category: string;
   message: string;
   rating: number | null;
+  orgId: string | null;
   createdAt: Date;
 }): FeedbackEntryRecord {
   return {
@@ -23,6 +25,7 @@ function toRecord(row: {
     category: row.category,
     message: row.message,
     rating: row.rating ?? undefined,
+    orgId: row.orgId ?? undefined,
     createdAt: row.createdAt.toISOString(),
   };
 }
@@ -38,20 +41,22 @@ export class PrismaFeedbackRepository {
         category: entry.category,
         message: entry.message,
         rating: entry.rating ?? null,
+        orgId: entry.orgId ?? null,
       },
     });
     return toRecord(row);
   }
 
-  async findAll(limit: number): Promise<FeedbackEntryRecord[]> {
+  async findAll(limit: number, orgId?: string): Promise<FeedbackEntryRecord[]> {
     const rows = await this.prisma.feedbackEntry.findMany({
+      where: orgId ? { orgId } : undefined,
       orderBy: { createdAt: 'desc' },
       take: limit,
     });
     return rows.map(toRecord);
   }
 
-  async count(): Promise<number> {
-    return this.prisma.feedbackEntry.count();
+  async count(orgId?: string): Promise<number> {
+    return this.prisma.feedbackEntry.count({ where: orgId ? { orgId } : undefined });
   }
 }

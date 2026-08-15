@@ -30,6 +30,46 @@ export const openApiSpec: OpenAPIV3.Document = {
     { name: 'Beta', description: 'Beta waitlist & feedback' },
   ],
   paths: {
+    '/v1/eval/experiment': {
+      post: {
+        deprecated: true,
+        summary: 'Disabled until EvalExperiment is tenant-scoped',
+        description:
+          'This tenantless endpoint is permanently disabled until EvalExperiment.orgId is added and existing rows are migrated. Use the tenant-aware evaluation APIs after migration.',
+        security: [{ BearerAuth: [] }],
+        responses: {
+          401: { description: 'Missing or invalid bearer token' },
+          403: { description: 'Admin role required' },
+          410: { description: 'Endpoint disabled pending tenant-scoping migration' },
+        },
+      },
+    },
+    '/v1/eval/experiments': {
+      get: {
+        deprecated: true,
+        summary: 'Disabled until EvalExperiment is tenant-scoped',
+        description:
+          'This tenantless endpoint is permanently disabled until EvalExperiment.orgId is added and existing rows are migrated.',
+        security: [{ BearerAuth: [] }],
+        responses: {
+          401: { description: 'Missing or invalid bearer token' },
+          410: { description: 'Endpoint disabled pending tenant-scoping migration' },
+        },
+      },
+    },
+    '/v1/eval/winrates': {
+      get: {
+        deprecated: true,
+        summary: 'Disabled until EvalExperiment is tenant-scoped',
+        description:
+          'This aggregate endpoint is permanently disabled until EvalExperiment.orgId is added and existing rows are migrated.',
+        security: [{ BearerAuth: [] }],
+        responses: {
+          401: { description: 'Missing or invalid bearer token' },
+          410: { description: 'Endpoint disabled pending tenant-scoping migration' },
+        },
+      },
+    },
     '/health': {
       get: {
         tags: ['Health'],
@@ -634,6 +674,31 @@ export const openApiSpec: OpenAPIV3.Document = {
               },
             },
           },
+        },
+      },
+    },
+    '/v1/team': {
+      get: {
+        tags: ['Admin'],
+        summary: 'List users in the authenticated organization',
+        security: [{ BearerAuth: [] }],
+        responses: {
+          200: {
+            description: 'Organization-scoped user list',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  required: ['users'],
+                  properties: {
+                    users: { type: 'array', items: { $ref: '#/components/schemas/TeamUser' } },
+                  },
+                },
+              },
+            },
+          },
+          401: { description: 'Authentication required' },
+          403: { description: 'Organization admin role required' },
         },
       },
     },
@@ -1511,6 +1576,17 @@ export const openApiSpec: OpenAPIV3.Document = {
           id: { type: 'string' },
           email: { type: 'string', format: 'email' },
           roles: { type: 'array', items: { type: 'string' } },
+          createdAt: { type: 'string', format: 'date-time' },
+        },
+      },
+      TeamUser: {
+        type: 'object',
+        required: ['id', 'email', 'roles', 'emailVerified', 'createdAt'],
+        properties: {
+          id: { type: 'string' },
+          email: { type: 'string', format: 'email' },
+          roles: { type: 'array', items: { type: 'string' } },
+          emailVerified: { type: 'boolean' },
           createdAt: { type: 'string', format: 'date-time' },
         },
       },

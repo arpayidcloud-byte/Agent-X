@@ -95,6 +95,12 @@ export class AgentTemplateRepository {
     }) as Promise<AgentTemplateRecord | null>;
   }
 
+  async getPublishedById(id: string): Promise<AgentTemplateRecord | null> {
+    return this.requireDb().agentTemplate.findFirst({
+      where: { id, isPublished: true },
+    }) as Promise<AgentTemplateRecord | null>;
+  }
+
   async update(id: string, input: UpdateAgentTemplateInput): Promise<AgentTemplateRecord> {
     return this.requireDb().agentTemplate.update({
       where: { id },
