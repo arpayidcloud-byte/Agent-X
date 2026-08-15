@@ -323,6 +323,7 @@ model AgentTemplate {
   isPublished  Boolean  @default(false)
   isFeatured   Boolean  @default(false)
   config       Json? // extra config (model, provider, params)
+  orgId        String?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
