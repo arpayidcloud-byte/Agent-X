@@ -22,10 +22,15 @@ describe('Settings & Team API (Web Pro)', () => {
     baseUrl = `http://127.0.0.1:${address.port}`;
 
     // Admin registers
+    const regBody = JSON.stringify({
+      email: ADMIN_EMAIL,
+      password: 'Test1234!',
+      orgId: 'test-org-shared',
+    });
     const reg = await fetch(`${baseUrl}/v1/auth/register`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: ADMIN_EMAIL, password: 'Test1234!' }),
+      body: regBody,
     });
     expect(reg.status).toBe(201);
     const login = await fetch(`${baseUrl}/v1/auth/login`, {
@@ -41,7 +46,7 @@ describe('Settings & Team API (Web Pro)', () => {
     const mreg = await fetch(`${baseUrl}/v1/auth/register`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: memberEmail, password: 'Test1234!' }),
+      body: JSON.stringify({ email: memberEmail, password: 'Test1234!', orgId: 'test-org-shared' }),
     });
     expect(mreg.status).toBe(201);
   });

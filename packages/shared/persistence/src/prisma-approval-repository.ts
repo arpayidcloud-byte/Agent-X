@@ -11,16 +11,38 @@ export interface ApprovalModel {
 }
 
 export interface IApprovalRepository {
-  save(approval: ApprovalModel): Promise<void>;
-  findByTaskId(taskId: string): Promise<ApprovalModel | undefined>;
-  approve(taskId: string, approvedBy: string, reason?: string): Promise<void>;
-  reject(taskId: string, approvedBy: string, reason: string): Promise<void>;
+  save(orgId: string, approval: ApprovalModel): Promise<void>;
+  findByTaskId(orgId: string, taskId: string): Promise<ApprovalModel | undefined>;
+  approve(orgId: string, taskId: string, approvedBy: string, reason?: string): Promise<void>;
+  reject(orgId: string, taskId: string, approvedBy: string, reason: string): Promise<void>;
 }
 
 export class PrismaApprovalRepository implements IApprovalRepository {
   constructor(private prisma: PrismaClient) {}
 
-  async save(approval: ApprovalModel): Promise<void> {
+  private requireOrg(orgId: string): void {
+    if (!orgId || !orgId.trim()) {
+      throw new Error('Organization context required');
+    }
+  }
+
+  private async verifyTaskOwnership(orgId: string, taskId: string): Promise<void> {
+    const task = await this.prisma.task.findUnique({
+      where: { id: taskId },
+      select: { orgId: true },
+    });
+    if (!task || !task.orgId?.trim()) {
+      throw new Error('Task ownership could not be verified');
+    }
+    if (task.orgId !== orgId) {
+      throw new Error('Task organization mismatch');
+    }
+  }
+
+  async save(orgId: string, approval: ApprovalModel): Promise<void> {
+    this.requireOrg(orgId);
+    await this.verifyTaskOwnership(orgId, approval.taskId);
+
     await this.prisma.approval.upsert({
       where: { taskId: approval.taskId },
       update: {
@@ -41,14 +63,20 @@ export class PrismaApprovalRepository implements IApprovalRepository {
     });
   }
 
-  async findByTaskId(taskId: string): Promise<ApprovalModel | undefined> {
+  async findByTaskId(orgId: string, taskId: string): Promise<ApprovalModel | undefined> {
+    this.requireOrg(orgId);
+    await this.verifyTaskOwnership(orgId, taskId);
+
     const approval = await this.prisma.approval.findUnique({
       where: { taskId },
     });
     return approval ? this.toApprovalModel(approval) : undefined;
   }
 
-  async approve(taskId: string, approvedBy: string, reason?: string): Promise<void> {
+  async approve(orgId: string, taskId: string, approvedBy: string, reason?: string): Promise<void> {
+    this.requireOrg(orgId);
+    await this.verifyTaskOwnership(orgId, taskId);
+
     await this.prisma.approval.update({
       where: { taskId },
       data: {
@@ -60,7 +88,10 @@ export class PrismaApprovalRepository implements IApprovalRepository {
     });
   }
 
-  async reject(taskId: string, approvedBy: string, reason: string): Promise<void> {
+  async reject(orgId: string, taskId: string, approvedBy: string, reason: string): Promise<void> {
+    this.requireOrg(orgId);
+    await this.verifyTaskOwnership(orgId, taskId);
+
     await this.prisma.approval.update({
       where: { taskId },
       data: {
