@@ -55,10 +55,10 @@ const templates = new Map<string, Record<string, unknown>>([
 ]);
 
 vi.mock('@agent-xai/persistence', async (importOriginal) => {
-  const actual = await importOriginal();
+  const actual = (await importOriginal()) as Record<string, unknown>;
   return {
-    ...actual,
-    CostEntryRepository: class {},
+    ...(actual as Record<string, unknown>),
+    CostEntryRepository: actual.CostEntryRepository,
     AgentTemplateRepository: class {
       async getPublishedById(id: string) {
         const template = templates.get(id);
