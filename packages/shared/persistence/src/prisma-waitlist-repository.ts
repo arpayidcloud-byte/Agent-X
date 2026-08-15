@@ -6,6 +6,7 @@ export interface WaitlistEntryRecord {
   name?: string;
   source?: string;
   status: string;
+  orgId?: string;
   createdAt: string;
 }
 
@@ -21,6 +22,7 @@ function toRecord(row: {
   name: string | null;
   source: string | null;
   status: string;
+  orgId: string | null;
   createdAt: Date;
 }): WaitlistEntryRecord {
   return {
@@ -29,6 +31,7 @@ function toRecord(row: {
     name: row.name ?? undefined,
     source: row.source ?? undefined,
     status: row.status,
+    orgId: row.orgId ?? undefined,
     createdAt: row.createdAt.toISOString(),
   };
 }
@@ -44,6 +47,7 @@ export class PrismaWaitlistRepository {
         name: entry.name ?? null,
         source: entry.source ?? null,
         status: entry.status,
+        orgId: entry.orgId ?? null,
       },
     });
     return toRecord(row);
@@ -54,8 +58,9 @@ export class PrismaWaitlistRepository {
     return row ? toRecord(row) : undefined;
   }
 
-  async findAll(limit: number): Promise<WaitlistEntryRecord[]> {
+  async findAll(limit: number, orgId?: string): Promise<WaitlistEntryRecord[]> {
     const rows = await this.prisma.waitlistEntry.findMany({
+      where: orgId ? { orgId } : undefined,
       orderBy: { createdAt: 'desc' },
       take: limit,
     });
@@ -74,11 +79,16 @@ export class PrismaWaitlistRepository {
     }
   }
 
-  async stats(): Promise<WaitlistStats> {
+  async count(orgId?: string): Promise<number> {
+    return this.prisma.waitlistEntry.count({ where: orgId ? { orgId } : undefined });
+  }
+
+  async stats(orgId?: string): Promise<WaitlistStats> {
+    const where = orgId ? { orgId } : undefined;
     const [byStatusRows, bySourceRows, total] = await Promise.all([
-      this.prisma.waitlistEntry.groupBy({ by: ['status'], _count: { _all: true } }),
-      this.prisma.waitlistEntry.groupBy({ by: ['source'], _count: { _all: true } }),
-      this.prisma.waitlistEntry.count(),
+      this.prisma.waitlistEntry.groupBy({ by: ['status'], _count: { _all: true }, where }),
+      this.prisma.waitlistEntry.groupBy({ by: ['source'], _count: { _all: true }, where }),
+      this.prisma.waitlistEntry.count({ where }),
     ]);
 
     const byStatus: Record<string, number> = {};

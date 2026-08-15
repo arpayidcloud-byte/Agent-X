@@ -9,6 +9,7 @@ export interface PromptTemplateRecord {
   version: number;
   usageCount: number;
   createdBy: string | null;
+  orgId?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -22,6 +23,7 @@ function toRecord(row: {
   version: number;
   usageCount: number;
   createdBy: string | null;
+  orgId: string | null;
   createdAt: Date;
   updatedAt: Date;
 }): PromptTemplateRecord {
@@ -34,6 +36,7 @@ function toRecord(row: {
     version: row.version,
     usageCount: row.usageCount,
     createdBy: row.createdBy,
+    orgId: row.orgId ?? undefined,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   };
@@ -48,25 +51,33 @@ export class PromptTemplateRepository {
     content: string;
     tags?: string[];
     createdBy?: string;
+    orgId?: string;
   }): Promise<PromptTemplateRecord> {
-    const row = await this.prisma.promptTemplate.create({ data });
+    const row = await this.prisma.promptTemplate.create({
+      data: { ...data, orgId: data.orgId ?? null },
+    });
     return toRecord(row);
   }
 
-  async findAll(): Promise<PromptTemplateRecord[]> {
+  async findAll(orgId?: string): Promise<PromptTemplateRecord[]> {
     const rows = await this.prisma.promptTemplate.findMany({
+      where: orgId ? { orgId } : undefined,
       orderBy: { updatedAt: 'desc' },
     });
     return rows.map(toRecord);
   }
 
-  async findById(id: string): Promise<PromptTemplateRecord | undefined> {
-    const row = await this.prisma.promptTemplate.findUnique({ where: { id } });
+  async findById(id: string, orgId?: string): Promise<PromptTemplateRecord | undefined> {
+    const row = await this.prisma.promptTemplate.findFirst({
+      where: { id, ...(orgId ? { orgId } : {}) },
+    });
     return row ? toRecord(row) : undefined;
   }
 
-  async findByName(name: string): Promise<PromptTemplateRecord | undefined> {
-    const row = await this.prisma.promptTemplate.findFirst({ where: { name } });
+  async findByName(name: string, orgId?: string): Promise<PromptTemplateRecord | undefined> {
+    const row = await this.prisma.promptTemplate.findFirst({
+      where: { name, ...(orgId ? { orgId } : {}) },
+    });
     return row ? toRecord(row) : undefined;
   }
 
@@ -78,24 +89,40 @@ export class PromptTemplateRepository {
       content?: string;
       tags?: string[];
     },
-  ): Promise<PromptTemplateRecord> {
+    orgId?: string,
+  ): Promise<PromptTemplateRecord | undefined> {
+    const existing = await this.prisma.promptTemplate.findFirst({
+      where: { id, ...(orgId ? { orgId } : {}) },
+      select: { id: true },
+    });
+    if (!existing) return undefined;
     const row = await this.prisma.promptTemplate.update({
-      where: { id },
+      where: { id: existing.id },
       data: { ...data, version: { increment: 1 } },
     });
     return toRecord(row);
   }
 
-  async incrementUsage(id: string): Promise<void> {
+  async incrementUsage(id: string, orgId?: string): Promise<void> {
+    const row = await this.prisma.promptTemplate.findFirst({
+      where: { id, ...(orgId ? { orgId } : {}) },
+      select: { id: true },
+    });
+    if (!row) return;
     await this.prisma.promptTemplate.update({
-      where: { id },
+      where: { id: row.id },
       data: { usageCount: { increment: 1 } },
     });
   }
 
-  async delete(id: string): Promise<boolean> {
+  async delete(id: string, orgId?: string): Promise<boolean> {
     try {
-      await this.prisma.promptTemplate.delete({ where: { id } });
+      const row = await this.prisma.promptTemplate.findFirst({
+        where: { id, ...(orgId ? { orgId } : {}) },
+        select: { id: true },
+      });
+      if (!row) return false;
+      await this.prisma.promptTemplate.delete({ where: { id: row.id } });
       return true;
     } catch {
       return false;

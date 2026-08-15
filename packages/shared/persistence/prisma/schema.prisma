@@ -101,6 +101,7 @@ model EmailVerificationToken {
   id        String   @id @default(cuid())
   email     String
   token     String   @unique
+  orgId     String?
   expiresAt DateTime
 
   @@index([email])
@@ -112,6 +113,7 @@ model RefreshToken {
   id        String   @id @default(cuid())
   token     String   @unique
   userId    String
+  orgId     String?
   expiresAt DateTime
 
   @@index([userId])
@@ -185,6 +187,7 @@ model WaitlistEntry {
   name      String?
   source    String?
   status    String   @default("pending")
+  orgId     String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -197,6 +200,7 @@ model FeedbackEntry {
   category  String
   message   String
   rating    Int?
+  orgId     String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -270,6 +274,7 @@ model PromptTemplate {
   version     Int      @default(1)
   usageCount  Int      @default(0)
   createdBy   String? // user id or 'system'
+  orgId       String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
